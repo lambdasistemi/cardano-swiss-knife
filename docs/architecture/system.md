@@ -34,6 +34,7 @@ The Halogen application in `app/` coordinates navigation, form state, vault usag
 - transaction identity extraction
 - intent summary generation
 - witness plan analysis
+- vkey witness attachment
 - transaction tree browsing
 
 ### Providers

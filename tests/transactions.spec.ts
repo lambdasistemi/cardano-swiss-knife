@@ -197,7 +197,15 @@ const countVkeyWitnesses = (txHex: string) => {
   const vkeyEntry = witnessSet.map.find(([key]) => key === 0);
   if (!vkeyEntry) return 0;
 
-  const witnesses = vkeyEntry[1];
+  const witnessValue = vkeyEntry[1];
+  const witnesses = Array.isArray(witnessValue)
+    ? witnessValue
+    : witnessValue &&
+        typeof witnessValue === "object" &&
+        "tag" in witnessValue &&
+        Array.isArray(witnessValue.value)
+      ? witnessValue.value
+      : null;
   if (!Array.isArray(witnesses)) {
     throw new Error("Expected vkey witnesses to decode as an array.");
   }

@@ -9,6 +9,8 @@ module TxInspector.Json
   , IntentSummary
   , Metric
   , OutputRow
+  , WitnessAttachment
+  , WitnessAttachmentIssue
   , WitnessPlan
   , WitnessPlanRow
   , WitnessPlanSection
@@ -17,6 +19,7 @@ module TxInspector.Json
   , operationBrowser
   , operationIdentification
   , operationIntentSummary
+  , operationWitnessAttachment
   , operationWitnessPlan
   , pretty
   ) where
@@ -140,6 +143,21 @@ type WitnessPlan =
   , sections :: Array WitnessPlanSection
   }
 
+type WitnessAttachmentIssue =
+  { code :: String
+  , message :: String
+  , path :: Array String
+  }
+
+type WitnessAttachment =
+  { valid :: Boolean
+  , status :: String
+  , signedTxCborHex :: String
+  , witnessPatchAction :: String
+  , errors :: Array WitnessAttachmentIssue
+  , warnings :: Array String
+  }
+
 pretty :: String -> String
 pretty = prettyImpl
 
@@ -157,6 +175,11 @@ operationIntentSummary raw =
   parseJsonImpl raw normalizeIntentRoot
     (invalidIntentSummary "Signing summary" "Ledger operation response was not JSON.")
 
+operationWitnessAttachment :: String -> WitnessAttachment
+operationWitnessAttachment raw =
+  parseJsonImpl raw normalizeWitnessAttachmentRoot
+    (invalidWitnessAttachment "Witness attachment" "Ledger operation response was not JSON.")
+
 operationWitnessPlan :: String -> WitnessPlan
 operationWitnessPlan = operationWitnessPlanImpl
 
@@ -171,12 +194,31 @@ invalidIntentSummary title subtitle =
   , warnings: []
   }
 
+invalidWitnessAttachment :: String -> String -> WitnessAttachment
+invalidWitnessAttachment _title _subtitle =
+  { valid: false
+  , status: "rejected"
+  , signedTxCborHex: ""
+  , witnessPatchAction: ""
+  , errors: []
+  , warnings: []
+  }
+
 normalizeIntentRoot :: Foreign -> IntentSummary
 normalizeIntentRoot root =
   case field "intent" (operationResultValue root) of
     Just intent -> readIntentSummary intent
     Nothing ->
       invalidIntentSummary "Signing summary" "Ledger operation response missing intent."
+
+normalizeWitnessAttachmentRoot :: Foreign -> WitnessAttachment
+normalizeWitnessAttachmentRoot root =
+  case field "witness_attachment" (operationResultValue root) of
+    Just witnessAttachment -> readWitnessAttachment witnessAttachment
+    Nothing ->
+      invalidWitnessAttachment
+        "Witness attachment"
+        "Ledger operation response missing witness attachment."
 
 operationResultValue :: Foreign -> Foreign
 operationResultValue root =
@@ -193,10 +235,32 @@ readIntentSummary intent =
   , warnings: map readStringDefault (arrayField "warnings" intent)
   }
 
+readWitnessAttachment :: Foreign -> WitnessAttachment
+readWitnessAttachment value =
+  let
+    signedTxCborHex = stringField "signed_tx_cbor_hex" "" value
+    fallbackTxCborHex = stringField "tx_cbor" "" value
+  in
+    { valid: true
+    , status: stringField "status" "rejected" value
+    , signedTxCborHex:
+        if signedTxCborHex == "" then fallbackTxCborHex else signedTxCborHex
+    , witnessPatchAction: stringField "witness_patch_action" "" value
+    , errors: map readWitnessAttachmentIssue (arrayField "errors" value)
+    , warnings: map readStringDefault (arrayField "warnings" value)
+    }
+
 readMetric :: Foreign -> Metric
 readMetric value =
   { label: stringField "label" "" value
   , value: stringField "value" "" value
+  }
+
+readWitnessAttachmentIssue :: Foreign -> WitnessAttachmentIssue
+readWitnessAttachmentIssue value =
+  { code: stringField "code" "" value
+  , message: stringField "message" "" value
+  , path: map readStringDefault (arrayField "path" value)
   }
 
 readIntentClaim :: Foreign -> IntentClaim
