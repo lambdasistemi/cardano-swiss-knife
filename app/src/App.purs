@@ -533,6 +533,7 @@ handleAction = case _ of
             , txIntentSummary = Nothing
             , txWitnessPlan = Nothing
             , txBrowser = Nothing
+            , txSigningResult = Nothing
             }
         outcome <- H.liftAff
           ( try do
@@ -580,32 +581,38 @@ handleAction = case _ of
               }
   RunTxSign -> do
     state <- H.get
-    case txBodyHash state of
-      Nothing ->
-        H.modify_ _
-          { txSigningRunning = false
-          , txSigningResult = Just (Left "Inspect a transaction first to derive its body hash.")
-          }
-      Just bodyHashHex ->
-        if String.trim state.txSigningKeyInput == "" then
+    if state.txRunning then
+      H.modify_ _
+        { txSigningRunning = false
+        , txSigningResult = Just (Left "Wait for transaction inspection to finish before signing.")
+        }
+    else
+      case txBodyHash state of
+        Nothing ->
           H.modify_ _
             { txSigningRunning = false
-            , txSigningResult = Just (Left "Paste an extended signing key to produce witness material.")
+            , txSigningResult = Just (Left "Inspect a transaction first to derive its body hash.")
             }
-        else do
-          case state.txCbor of
-            Nothing ->
-              H.modify_ _
-                { txSigningRunning = false
-                , txSigningResult = Just (Left "Inspect a transaction first to load its CBOR.")
-                }
-            Just txCbor -> do
-              H.modify_ _ { txSigningRunning = true, txSigningResult = Nothing }
-              result <- H.liftAff (TxSigning.signTransaction txCbor bodyHashHex state.txSigningKeyInput)
-              H.modify_ _
-                { txSigningRunning = false
-                , txSigningResult = Just result
-                }
+        Just bodyHashHex ->
+          if String.trim state.txSigningKeyInput == "" then
+            H.modify_ _
+              { txSigningRunning = false
+              , txSigningResult = Just (Left "Paste an extended signing key to produce witness material.")
+              }
+          else do
+            case state.txCbor of
+              Nothing ->
+                H.modify_ _
+                  { txSigningRunning = false
+                  , txSigningResult = Just (Left "Inspect a transaction first to load its CBOR.")
+                  }
+              Just txCbor -> do
+                H.modify_ _ { txSigningRunning = true, txSigningResult = Nothing }
+                result <- H.liftAff (TxSigning.signTransaction txCbor bodyHashHex state.txSigningKeyInput)
+                H.modify_ _
+                  { txSigningRunning = false
+                  , txSigningResult = Just result
+                  }
   BrowseTxPath path -> do
     state <- H.get
     case state.txCbor of
@@ -1781,7 +1788,7 @@ renderTransactionsPage state =
             [ HP.class_ (HH.ClassName "action-row") ]
             [ HH.button
                 [ HP.class_ (HH.ClassName "primary-btn")
-                , HP.disabled state.txSigningRunning
+                , HP.disabled (state.txSigningRunning || state.txRunning)
                 , HE.onClick \_ -> RunTxSign
                 ]
                 [ HH.text (if state.txSigningRunning then "Signing..." else "Create signed transaction") ]
