@@ -2,6 +2,7 @@ module App where
 
 import Prelude
 
+import App.Storage as Storage
 import App.Vault as Vault
 import Cardano.Address.Bootstrap as Bootstrap
 import Cardano.Address.Derivation as Derivation
@@ -67,7 +68,8 @@ data TxInputMode
 derive instance eqTxInputMode :: Eq TxInputMode
 
 data Action
-  = SelectPage Page
+  = Initialize
+  | SelectPage Page
   | SetInspectInput String
   | RunInspect
   | SetMnemonicWordCount Int
@@ -117,6 +119,7 @@ data Action
   | SetTxHexInput String
   | SetTxBlockfrostKey String
   | SetTxKoiosBearer String
+  | ToggleTxCredentialVisibility
   | SetTxSigningKeyInput String
   | ToggleTxSigningKeyVisibility
   | RunTxSign
@@ -187,6 +190,7 @@ type State =
   , txHexInput :: String
   , txBlockfrostKey :: String
   , txKoiosBearer :: String
+  , showTxCredential :: Boolean
   , txRunning :: Boolean
   , txSigningRunning :: Boolean
   , txSigningKeyInput :: String
@@ -260,6 +264,7 @@ initialState =
   , txHexInput: ""
   , txBlockfrostKey: ""
   , txKoiosBearer: ""
+  , showTxCredential: false
   , txRunning: false
   , txSigningRunning: false
   , txSigningKeyInput: ""
@@ -289,7 +294,7 @@ component =
   H.mkComponent
     { initialState: const initialState
     , render
-    , eval: H.mkEval H.defaultEval { handleAction = handleAction }
+    , eval: H.mkEval H.defaultEval { handleAction = handleAction, initialize = Just Initialize }
     }
 
 foreign import copyToClipboard :: String -> Effect Unit
@@ -299,6 +304,9 @@ foreign import parseIndexInput :: String -> Int
 
 handleAction :: forall output monad. MonadAff monad => Action -> H.HalogenM State Action () output monad Unit
 handleAction = case _ of
+  Initialize -> do
+    persistedBlockfrostKey <- liftEffect (Storage.getItem txBlockfrostKeyStorageKey)
+    H.modify_ _ { txBlockfrostKey = persistedBlockfrostKey }
   SelectPage page ->
     H.modify_ _ { activePage = page }
   SetInspectInput value ->
@@ -489,9 +497,12 @@ handleAction = case _ of
   SetTxHexInput value ->
     H.modify_ \state -> resetTxInspectorState (state { txHexInput = value })
   SetTxBlockfrostKey value ->
-    H.modify_ \state -> resetTxInspectorState (state { txBlockfrostKey = value })
+    H.modify_ (\state -> resetTxInspectorState (state { txBlockfrostKey = value }))
+      *> liftEffect (Storage.setItem txBlockfrostKeyStorageKey value)
   SetTxKoiosBearer value ->
     H.modify_ \state -> resetTxInspectorState (state { txKoiosBearer = value })
+  ToggleTxCredentialVisibility ->
+    H.modify_ \state -> state { showTxCredential = not state.showTxCredential }
   SetTxSigningKeyInput value ->
     H.modify_ _ { txSigningKeyInput = value, txSigningResult = Nothing }
   ToggleTxSigningKeyVisibility ->
@@ -1583,16 +1594,28 @@ renderTransactionsPage state =
         , case state.txInputMode of
             TxByHash ->
               HH.div_
-                [ HH.label
+                [ HH.div
+                    [ HP.class_ (HH.ClassName "action-row") ]
+                    [ HH.button
+                        [ HP.class_ (HH.ClassName "secondary-btn")
+                        , HE.onClick \_ -> ToggleTxCredentialVisibility
+                        ]
+                        [ HH.text (if state.showTxCredential then "Hide credential" else "Show credential") ]
+                    ]
+                , HH.label
                     [ HP.class_ (HH.ClassName "field-group") ]
                     [ HH.span [ HP.class_ (HH.ClassName "field-label") ] [ HH.text (txCredentialLabel state.txProvider) ]
                     , HH.input
                         [ HP.class_ (HH.ClassName "inline-input")
+                        , HP.type_ (if state.showTxCredential then HP.InputText else HP.InputPassword)
                         , HP.placeholder (txCredentialPlaceholder state.txProvider)
                         , HP.value (txProviderCredential state)
                         , HE.onValueInput (txCredentialAction state.txProvider)
                         ]
                     ]
+                , HH.div
+                    [ HP.class_ (HH.ClassName "privacy-note") ]
+                    [ HH.p_ [ HH.text (txCredentialNote state.txProvider) ] ]
                 , HH.input
                     [ HP.class_ (HH.ClassName "text-input")
                     , HP.placeholder "64-character transaction hash"
@@ -1951,6 +1974,11 @@ txCredentialPlaceholder :: TxProvider.Provider -> String
 txCredentialPlaceholder = case _ of
   TxProvider.Blockfrost -> "mainnet..."
   TxProvider.Koios -> "Optional bearer token"
+
+txCredentialNote :: TxProvider.Provider -> String
+txCredentialNote = case _ of
+  TxProvider.Blockfrost -> "Stored locally in this browser so the project ID survives reloads on this device."
+  TxProvider.Koios -> "Kept in memory only for now."
 
 txCredentialAction :: TxProvider.Provider -> String -> Action
 txCredentialAction = case _ of
@@ -3304,6 +3332,9 @@ rolePathLabel role = case role of
 
 defaultVaultFileName :: String
 defaultVaultFileName = "cardano-swiss-knife.vault.json"
+
+txBlockfrostKeyStorageKey :: String
+txBlockfrostKeyStorageKey = "cardano-swiss-knife.tx.blockfrost-project-id"
 
 vaultStateLabel :: State -> String
 vaultStateLabel state

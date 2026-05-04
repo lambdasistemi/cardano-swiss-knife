@@ -3,11 +3,15 @@ import fs from "node:fs";
 import path from "node:path";
 
 const vectors = JSON.parse(
-  fs.readFileSync(path.join(process.cwd(), "test-vectors", "vectors.json"), "utf8"),
+  fs.readFileSync(
+    path.join(process.cwd(), "test-vectors", "vectors.json"),
+    "utf8",
+  ),
 );
 
 const signingVector = vectors.signingVectors.find(
-  (candidate: { label: string }) => candidate.label === "message-sign-address-hex",
+  (candidate: { label: string }) =>
+    candidate.label === "message-sign-address-hex",
 );
 
 if (!signingVector) {
@@ -15,28 +19,89 @@ if (!signingVector) {
 }
 
 const txCbor = fs
-  .readFileSync(path.join(process.cwd(), "tests", "fixtures", "tx-validate-complete.tx-cbor.txt"), "utf8")
+  .readFileSync(
+    path.join(
+      process.cwd(),
+      "tests",
+      "fixtures",
+      "tx-validate-complete.tx-cbor.txt",
+    ),
+    "utf8",
+  )
   .trim();
 
-test("transactions page inspects CBOR and creates detached witness material", async ({ page }) => {
+test("transactions page persists the Blockfrost project ID and hides it for CBOR input", async ({
+  page,
+}) => {
   await page.goto("/");
 
-  await page.getByRole("button", { name: /Transactions Inspect and sign/ }).click();
+  await page
+    .getByRole("button", { name: /Transactions Inspect and sign/ })
+    .click();
+
+  const inspectCard = page
+    .locator("section.card")
+    .filter({ has: page.getByText("Inspect transaction") });
+
+  const credentialInput = inspectCard.getByPlaceholder("mainnet...");
+  await inspectCard.getByRole("button", { name: "Show credential" }).click();
+  await credentialInput.fill("mainnet_persisted_project_id");
+
+  await inspectCard.getByRole("button", { name: "CBOR hex" }).click();
+  await expect(credentialInput).toBeHidden();
+
+  await page.reload();
+  await page
+    .getByRole("button", { name: /Transactions Inspect and sign/ })
+    .click();
+
+  const reloadedInspectCard = page
+    .locator("section.card")
+    .filter({ has: page.getByText("Inspect transaction") });
+  await expect(reloadedInspectCard.getByPlaceholder("mainnet...")).toHaveValue(
+    "mainnet_persisted_project_id",
+  );
+});
+
+test("transactions page inspects CBOR and creates detached witness material", async ({
+  page,
+}) => {
+  await page.goto("/");
+
+  await page
+    .getByRole("button", { name: /Transactions Inspect and sign/ })
+    .click();
   await expect(page.locator(".page-title")).toHaveText("Transaction Workbench");
 
-  const inspectCard = page.locator("section.card").filter({ has: page.getByText("Inspect transaction") });
+  const inspectCard = page
+    .locator("section.card")
+    .filter({ has: page.getByText("Inspect transaction") });
   await inspectCard.getByRole("button", { name: "CBOR hex" }).click();
   await inspectCard.getByPlaceholder("84a40081825820...").fill(txCbor);
-  await inspectCard.getByRole("button", { name: "Inspect transaction" }).click();
+  await inspectCard
+    .getByRole("button", { name: "Inspect transaction" })
+    .click();
 
-  const signCard = page.locator("section.card").filter({ has: page.getByText("Sign transaction body") });
-  await expect(signCard).not.toContainText("Inspect a transaction first", { timeout: 20000 });
-  await expect(page.locator(".kv-label", { hasText: "Transaction ID" })).toBeVisible();
+  const signCard = page
+    .locator("section.card")
+    .filter({ has: page.getByText("Sign transaction body") });
+  await expect(signCard).not.toContainText("Inspect a transaction first", {
+    timeout: 20000,
+  });
+  await expect(
+    page.locator(".kv-label", { hasText: "Transaction ID" }),
+  ).toBeVisible();
 
   await signCard.getByRole("button", { name: "Show signing key" }).click();
-  await signCard.getByPlaceholder("addr_xsk1... or stake_xsk1...").fill(signingVector.signingKeyBech32);
-  await signCard.getByRole("button", { name: "Create detached witness" }).click();
+  await signCard
+    .getByPlaceholder("addr_xsk1... or stake_xsk1...")
+    .fill(signingVector.signingKeyBech32);
+  await signCard
+    .getByRole("button", { name: "Create detached witness" })
+    .click();
 
-  await expect(signCard.getByText(signingVector.verificationKeyBech32)).toBeVisible();
+  await expect(
+    signCard.getByText(signingVector.verificationKeyBech32),
+  ).toBeVisible();
   await expect(signCard.getByText("VKey witness CBOR")).toBeVisible();
 });
