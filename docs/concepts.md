@@ -25,9 +25,9 @@ Vault-backed secrets are encrypted at rest in the exported vault file. Provider 
 There are two separate signing stories in the app:
 
 - payload signing on the Signing page
-- transaction witness creation on the Transactions page
+- transaction witness creation and transaction mutation on the Transactions page
 
-The Transactions page does not yet mutate the transaction CBOR. It creates detached witness material so the user can inspect what was signed and how it matches the witness plan.
+The Transactions page now patches a generated vkey witness back into transaction CBOR while still showing the detached witness details. That does not mean the page handles every signing class or submission path: script witnesses, bootstrap witnesses, hardware wallets, and submission flows still sit outside this slice.
 
 ## CLI parity as a design constraint
 

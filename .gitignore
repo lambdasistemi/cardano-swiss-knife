@@ -8,6 +8,8 @@ dist/wasm/
 .psci_modules/
 WIP.md
 result
+result-tx-inspector
 result-dist
 site/
 site-root/
+test-results/

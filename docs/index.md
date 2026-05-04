@@ -13,12 +13,12 @@ The live app is published at <https://lambdasistemi.github.io/cardano-swiss-knif
 - Generate or restore mnemonics and derive Shelley keys
 - Sign arbitrary payloads with extended signing keys
 - Inspect transactions by hash or by CBOR hex
-- Produce detached witness material from a transaction body hash
+- Produce detached witness details and a patched signed transaction from a transaction body hash
 - Store mnemonics, signing keys, and provider credentials in the encrypted vault
 
 ## Important capability boundary
 
-Transaction signing is intentionally explicit right now. The app can derive the transaction body hash and create detached witness material, but it does **not** patch witnesses back into transaction CBOR yet.
+Transaction signing is intentionally explicit right now. The app derives the transaction body hash, produces detached witness details, and patches the generated vkey witness back into transaction CBOR locally in the browser. Transaction submission and non-vkey witness flows still remain separate steps.
 
 ## Project shape
 
