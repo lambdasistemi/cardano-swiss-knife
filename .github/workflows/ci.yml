@@ -5,12 +5,19 @@ on:
     branches:
       - main
   pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+      - closed
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
   check-and-build:
+    if: github.event_name != 'pull_request' || github.event.action != 'closed'
     runs-on: nixos
 
     steps:
@@ -45,12 +52,9 @@ jobs:
         run: nix run .#ci-playwright
 
   pr-preview:
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' && github.event.action != 'closed'
     needs: check-and-build
     runs-on: nixos
-    continue-on-error: true
-    env:
-      SURGE_TOKEN: ${{ secrets.SURGE_TOKEN }}
 
     steps:
       - name: Checkout
@@ -76,33 +80,29 @@ jobs:
           chmod -R u+w site-root
           cp -R site/* site-root/docs/
 
-      - name: Skip preview when SURGE_TOKEN is missing
-        if: ${{ env.SURGE_TOKEN == '' }}
-        run: echo "SURGE_TOKEN is not configured; skipping PR preview."
-
-      - name: Validate Surge token
-        id: surge_auth
-        if: ${{ env.SURGE_TOKEN != '' }}
-        continue-on-error: true
-        run: nix shell nixpkgs#nodejs_22 -c npx --yes surge@0.27.3 whoami --token "$SURGE_TOKEN"
-
-      - name: Deploy to Surge
-        id: surge_deploy
-        if: ${{ env.SURGE_TOKEN != '' && steps.surge_auth.outcome == 'success' }}
-        continue-on-error: true
+      - name: Deploy to shared preview host
+        id: deploy_preview
         run: |
-          nix shell nixpkgs#nodejs_22 -c npx --yes surge@0.27.3 \
-            site-root \
-            ${{ github.repository_owner }}-${{ github.event.repository.name }}-pr-${{ github.event.number }}.surge.sh \
-            --token "$SURGE_TOKEN"
+          preview_parent="/opt/services/previews/${{ github.repository_owner }}/${{ github.event.repository.name }}"
+          preview_dir="$preview_parent/pr-${{ github.event.number }}"
+          preview_tmp="${preview_dir}.tmp"
+          umask 0002
+          mkdir -p "$preview_parent"
+          rm -rf "$preview_tmp"
+          cp -R site-root "$preview_tmp"
+          chgrp -R github-runners "$preview_tmp"
+          chmod -R g+rwX "$preview_tmp"
+          find "$preview_tmp" -type d -exec chmod g+s {} +
+          rm -rf "$preview_dir"
+          mv "$preview_tmp" "$preview_dir"
+          echo "preview_url=https://preview.dev.plutimus.com/${{ github.repository_owner }}/${{ github.event.repository.name }}/pr-${{ github.event.number }}/" >> "$GITHUB_OUTPUT"
 
       - name: Comment preview URL on PR
-        if: ${{ env.SURGE_TOKEN != '' && steps.surge_auth.outcome == 'success' && steps.surge_deploy.outcome == 'success' }}
         uses: actions/github-script@v7
         with:
           script: |
-            const url = `https://${context.repo.owner}-${context.repo.repo}-pr-${context.issue.number}.surge.sh`;
-            const marker = '<!-- surge-preview-url -->';
+            const url = ${{ toJSON(steps.deploy_preview.outputs.preview_url) }};
+            const marker = '<!-- shared-preview-url -->';
             const body = `${marker}\nPreview: ${url}`;
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
@@ -126,6 +126,15 @@ jobs:
               });
             }
 
-      - name: Note preview failure
-        if: ${{ env.SURGE_TOKEN != '' && (steps.surge_auth.outcome != 'success' || steps.surge_deploy.outcome != 'success') }}
-        run: echo "Surge preview is unavailable because the token is invalid or Surge rejected the deployment; leaving CI green because preview publishing is optional."
+  pr-preview-cleanup:
+    if: github.event_name == 'pull_request' && github.event.action == 'closed'
+    runs-on: nixos
+
+    steps:
+      - name: Remove preview directory
+        run: |
+          preview_dir="/opt/services/previews/${{ github.repository_owner }}/${{ github.event.repository.name }}/pr-${{ github.event.number }}"
+          preview_repo_dir="/opt/services/previews/${{ github.repository_owner }}/${{ github.event.repository.name }}"
+          rm -rf "$preview_dir"
+          rmdir --ignore-fail-on-non-empty "$preview_repo_dir" 2>/dev/null || true
+          rmdir --ignore-fail-on-non-empty "/opt/services/previews/${{ github.repository_owner }}" 2>/dev/null || true

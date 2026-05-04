@@ -19,12 +19,12 @@ The Pages workflow deploys the combined static artifact from `main`:
 - app bundle at `/`
 - documentation at `/docs/`
 
-## `surge.sh` PR previews
+## Shared PR previews
 
 Pull requests can publish a disposable preview to:
 
 ```text
-https://lambdasistemi-cardano-swiss-knife-pr-<PR_NUMBER>.surge.sh
+https://preview.dev.plutimus.com/lambdasistemi/cardano-swiss-knife/pr-<PR_NUMBER>/
 ```
 
 The preview workflow:
@@ -32,19 +32,11 @@ The preview workflow:
 1. builds the app bundle
 2. builds the MkDocs site
 3. assembles one writable static tree
-4. deploys it to `surge.sh`
+4. copies it into `/opt/services/previews/lambdasistemi/cardano-swiss-knife/pr-<PR_NUMBER>/`
 5. upserts the preview URL as a PR comment
 
-### Required secret
-
-The workflow needs the repository secret `SURGE_TOKEN`.
-
-Generate it locally with:
-
-```bash
-nix shell nixpkgs#nodePackages.surge -c surge token
-gh secret set SURGE_TOKEN --repo lambdasistemi/cardano-swiss-knife --body "<token>"
-```
+The preview host is served by the same `nixos` self-hosted runner machine, so
+no external deploy secret is required.
 
 ### URL convention
 
