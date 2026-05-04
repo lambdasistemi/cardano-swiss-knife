@@ -45,6 +45,7 @@ jobs:
     if: github.event_name == 'pull_request'
     needs: check-and-build
     runs-on: nixos
+    continue-on-error: true
     env:
       SURGE_TOKEN: ${{ secrets.SURGE_TOKEN }}
 
@@ -77,7 +78,9 @@ jobs:
         run: echo "SURGE_TOKEN is not configured; skipping PR preview."
 
       - name: Deploy to Surge
+        id: surge_deploy
         if: ${{ env.SURGE_TOKEN != '' }}
+        continue-on-error: true
         run: |
           nix --quiet shell nixpkgs#nodePackages.surge -c surge \
             site-root \
@@ -85,7 +88,7 @@ jobs:
             --token "$SURGE_TOKEN"
 
       - name: Comment preview URL on PR
-        if: ${{ env.SURGE_TOKEN != '' }}
+        if: ${{ env.SURGE_TOKEN != '' && steps.surge_deploy.outcome == 'success' }}
         uses: actions/github-script@v7
         with:
           script: |
@@ -113,3 +116,7 @@ jobs:
                 body,
               });
             }
+
+      - name: Note preview failure
+        if: ${{ env.SURGE_TOKEN != '' && steps.surge_deploy.outcome != 'success' }}
+        run: echo "Surge preview failed upstream; leaving CI green because preview publishing is optional."
