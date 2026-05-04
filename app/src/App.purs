@@ -139,6 +139,8 @@ data Action
   | PopVaultEntryInRestore String
   | UseVaultEntryInSigning String
   | PopVaultEntryInSigning String
+  | UseVaultEntryInTxSigning String
+  | PopVaultEntryInTxSigning String
   | SaveTxCredentialToVault
   | UseVaultEntryInTransactions String
   | PopVaultEntryInTransactions String
@@ -809,6 +811,37 @@ handleAction = case _ of
           persistVaultEntries nextEntries ("Popped " <> entry.label <> " from the vault stack.")
           H.modify_ _ { signingKeyInput = entry.value }
           refreshSigning
+  UseVaultEntryInTxSigning entryId -> do
+    state <- H.get
+    case lookupVaultEntry entryId state.vaultEntries of
+      Nothing ->
+        H.modify_ _ { vaultErrorMessage = Just "Selected vault entry was not found.", vaultStatusMessage = Nothing }
+      Just entry ->
+        if not (acceptsVaultEntry signingAcceptedKinds entry) then
+          H.modify_ _ { vaultErrorMessage = Just "Selected vault entry is not compatible with transaction signing.", vaultStatusMessage = Nothing }
+        else
+          H.modify_ _
+            { txSigningKeyInput = entry.value
+            , txSigningResult = Nothing
+            , vaultErrorMessage = Nothing
+            , vaultStatusMessage = Just ("Loaded " <> entry.label <> " into transaction signing.")
+            }
+  PopVaultEntryInTxSigning entryId -> do
+    state <- H.get
+    case lookupVaultEntry entryId state.vaultEntries of
+      Nothing ->
+        H.modify_ _ { vaultErrorMessage = Just "Selected vault entry was not found.", vaultStatusMessage = Nothing }
+      Just entry -> do
+        if not (acceptsVaultEntry signingAcceptedKinds entry) then
+          H.modify_ _ { vaultErrorMessage = Just "Selected vault entry is not compatible with transaction signing.", vaultStatusMessage = Nothing }
+        else do
+          let
+            nextEntries = filter (\candidate -> candidate.id /= entryId) state.vaultEntries
+          persistVaultEntries nextEntries ("Popped " <> entry.label <> " into transaction signing.")
+          H.modify_ _
+            { txSigningKeyInput = entry.value
+            , txSigningResult = Nothing
+            }
   SaveTxCredentialToVault -> do
     state <- H.get
     let
@@ -1727,6 +1760,7 @@ renderTransactionsPage state =
                 ]
                 [ HH.text (if state.showTxSigningKey then "Hide signing key" else "Show signing key") ]
             ]
+        , renderTxSigningVaultShelf state
         , if state.showTxSigningKey then
             HH.textarea
               [ HP.class_ (HH.ClassName "text-input inspector-input")
@@ -3257,6 +3291,27 @@ renderTxCredentialVaultShelf state =
             (map renderTxCredentialVaultEntry entries)
         ]
 
+renderTxSigningVaultShelf :: forall w. State -> HH.HTML w Action
+renderTxSigningVaultShelf state =
+  let
+    entries = stackEntries (vaultEntriesForKinds signingAcceptedKinds state.vaultEntries)
+  in
+    if not state.vaultUnlocked then
+      HH.div
+        [ HP.class_ (HH.ClassName "privacy-note") ]
+        [ HH.p_ [ HH.text "Unlock a vault to load signing keys directly into transaction signing." ] ]
+    else if length entries == 0 then
+      HH.div
+        [ HP.class_ (HH.ClassName "privacy-note") ]
+        [ HH.p_ [ HH.text "No signing-compatible entries in the unlocked vault yet. Push a root, account, address, stake, or explicit signing key into the stack." ] ]
+    else
+      HH.div_
+        [ renderVaultAcceptanceNote "Accepts" signingAcceptedKinds
+        , HH.div
+            [ HP.class_ (HH.ClassName "vault-shelf") ]
+            (map renderTxSigningVaultEntry entries)
+        ]
+
 renderVaultEntries :: forall w. State -> HH.HTML w Action
 renderVaultEntries state =
   if not state.vaultUnlocked then
@@ -3361,6 +3416,30 @@ renderTxCredentialVaultEntry entry =
         , HH.button
             [ HP.class_ (HH.ClassName "secondary-btn")
             , HE.onClick \_ -> PopVaultEntryInTransactions entry.id
+            ]
+            [ HH.text "Pop" ]
+        ]
+    ]
+
+renderTxSigningVaultEntry :: forall w. Vault.VaultEntry -> HH.HTML w Action
+renderTxSigningVaultEntry entry =
+  HH.div
+    [ HP.class_ (HH.ClassName "vault-entry") ]
+    [ HH.div_
+        [ HH.strong_ [ HH.text entry.label ]
+        , HH.p [ HP.class_ (HH.ClassName "sidebar-kicker") ] [ HH.text (vaultEntryKindLabel entry.kind) ]
+        , HH.p [ HP.class_ (HH.ClassName "sidebar-copy") ] [ HH.text entry.createdAt ]
+        ]
+    , HH.div
+        [ HP.class_ (HH.ClassName "output-actions") ]
+        [ HH.button
+            [ HP.class_ (HH.ClassName "secondary-btn")
+            , HE.onClick \_ -> UseVaultEntryInTxSigning entry.id
+            ]
+            [ HH.text "Peek" ]
+        , HH.button
+            [ HP.class_ (HH.ClassName "secondary-btn")
+            , HE.onClick \_ -> PopVaultEntryInTxSigning entry.id
             ]
             [ HH.text "Pop" ]
         ]
