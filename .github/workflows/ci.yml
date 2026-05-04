@@ -32,6 +32,9 @@ jobs:
       - name: Build app
         run: nix run .#ci-build
 
+      - name: Build docs
+        run: nix develop github:paolino/dev-assets?dir=mkdocs --quiet -c mkdocs build --strict
+
       - name: Run PureScript tests
         run: nix run .#ci-test
 
