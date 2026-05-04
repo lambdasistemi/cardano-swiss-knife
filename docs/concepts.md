@@ -5,7 +5,7 @@
 Cardano Swiss Knife is not a fresh cryptography implementation. It is a composed product shell around existing engines:
 
 - `cardano-addresses` handles mnemonic, derivation, address, and raw signing primitives
-- `cardano-ledger-inspector` handles transaction decoding and witness-oriented analysis
+- `cardano-ledger-inspector` handles transaction decoding, witness-oriented analysis, and ledger-aware vkey witness attachment
 
 That keeps behavior closer to the native Cardano tooling instead of reimplementing critical logic in ad hoc JavaScript.
 
@@ -27,7 +27,7 @@ There are two separate signing stories in the app:
 - payload signing on the Signing page
 - transaction witness creation and transaction mutation on the Transactions page
 
-The Transactions page now patches a generated vkey witness back into transaction CBOR while still showing the detached witness details. That does not mean the page handles every signing class or submission path: script witnesses, bootstrap witnesses, hardware wallets, and submission flows still sit outside this slice.
+The Transactions page now asks the inspector engine to attach or replace a generated vkey witness in transaction CBOR while still showing the detached witness details. That does not mean the page handles every signing class or submission path: script witnesses, bootstrap witnesses, hardware wallets, and submission flows still sit outside this slice.
 
 ## CLI parity as a design constraint
 

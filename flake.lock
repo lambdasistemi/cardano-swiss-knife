@@ -345,11 +345,11 @@
         "purescript-overlay": "purescript-overlay"
       },
       "locked": {
-        "lastModified": 1777838466,
-        "narHash": "sha256-zSNjmSDKCyi1suN2isVKZ2SSbFhKi2VnAGkyr/5EBWc=",
+        "lastModified": 1777911675,
+        "narHash": "sha256-JNHdADzWFJQ2XYPZU71Aza85wnolh9NzBkO4Yc8LgKQ=",
         "owner": "lambdasistemi",
         "repo": "cardano-ledger-inspector",
-        "rev": "669defa7df83ef87ae657f997ac0f72c24fafc86",
+        "rev": "b905b09bfb49f85154b1cb6d8b79375bef15bf24",
         "type": "github"
       },
       "original": {

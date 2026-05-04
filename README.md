@@ -1,6 +1,6 @@
 # cardano-swiss-knife
 
-Browser-first Cardano Swiss Knife. Address inspection, mnemonic and derivation flows, payload signing, transaction inspection, and signed transaction witness patching in one static web workbench.
+Browser-first Cardano Swiss Knife. Address inspection, mnemonic and derivation flows, payload signing, transaction inspection, and signed transaction witness attachment in one static web workbench.
 
 - Live app: <https://lambdasistemi.github.io/cardano-swiss-knife/>
 - Docs manual: <https://lambdasistemi.github.io/cardano-swiss-knife/docs/>
@@ -10,10 +10,10 @@ Browser-first Cardano Swiss Knife. Address inspection, mnemonic and derivation f
 This repository is the composed product shell:
 
 - `cardano-addresses.wasm` provides mnemonic, derivation, address, and raw signing primitives.
-- `wasm-tx-inspector.wasm` provides transaction decoding, transaction identity, signer intent, and witness planning.
+- `wasm-tx-inspector.wasm` provides transaction decoding, transaction identity, signer intent, witness planning, and vkey witness attachment.
 - The Halogen frontend keeps those capabilities in one browser-native workspace with a future CLI host planned around the same operation model.
 
-The current transaction signing flow is intentionally explicit: it signs the transaction body hash locally, keeps detached witness details visible, and patches the generated vkey witness back into transaction CBOR. Submission, bootstrap witness mutation, and hardware-wallet flows are still separate work.
+The current transaction signing flow is intentionally explicit: it signs the transaction body hash locally, keeps detached witness details visible, and asks the inspector WASM to attach or replace the generated vkey witness in transaction CBOR. Submission, bootstrap witness mutation, and hardware-wallet flows are still separate work.
 
 ## Development
 

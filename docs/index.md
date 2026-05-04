@@ -3,7 +3,7 @@
 Cardano Swiss Knife is a browser-first workspace that combines two authoritative Cardano engines in one static site:
 
 - `cardano-addresses.wasm` for mnemonic, derivation, address, and raw signing primitives
-- `wasm-tx-inspector.wasm` for transaction decoding, identity, intent, and witness planning
+- `wasm-tx-inspector.wasm` for transaction decoding, identity, intent, witness planning, and vkey witness attachment
 
 The live app is published at <https://lambdasistemi.github.io/cardano-swiss-knife/>. This manual is published under `/docs/` on the same site.
 
@@ -18,7 +18,7 @@ The live app is published at <https://lambdasistemi.github.io/cardano-swiss-knif
 
 ## Important capability boundary
 
-Transaction signing is intentionally explicit right now. The app derives the transaction body hash, produces detached witness details, and patches the generated vkey witness back into transaction CBOR locally in the browser. Transaction submission and non-vkey witness flows still remain separate steps.
+Transaction signing is intentionally explicit right now. The app derives the transaction body hash, produces detached witness details, and then asks the inspector WASM to attach or replace the generated vkey witness in transaction CBOR. Transaction submission and non-vkey witness flows still remain separate steps.
 
 ## Project shape
 
