@@ -76,7 +76,14 @@ signTransaction txCborHex bodyHashHex signingKeyBech32 = do
                               )
                         | not attachment.valid ->
                             Left
-                              "Failed to patch transaction CBOR: Ledger witness attachment response was not JSON."
+                              ( "Failed to patch transaction CBOR: " <>
+                                  if attachResult.stderr /= "" then
+                                    attachResult.stderr
+                                  else if attachResult.stdout /= "" then
+                                    "Ledger witness attachment response was not JSON."
+                                  else
+                                    "Ledger witness attachment produced no JSON response."
+                              )
                         | attachment.status /= "applied" ->
                             Left
                               ( "Failed to patch transaction CBOR: " <>
