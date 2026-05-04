@@ -591,12 +591,19 @@ handleAction = case _ of
             , txSigningResult = Just (Left "Paste an extended signing key to produce witness material.")
             }
         else do
-          H.modify_ _ { txSigningRunning = true, txSigningResult = Nothing }
-          result <- H.liftAff (TxSigning.signBodyHash bodyHashHex state.txSigningKeyInput)
-          H.modify_ _
-            { txSigningRunning = false
-            , txSigningResult = Just result
-            }
+          case state.txCbor of
+            Nothing ->
+              H.modify_ _
+                { txSigningRunning = false
+                , txSigningResult = Just (Left "Inspect a transaction first to load its CBOR.")
+                }
+            Just txCbor -> do
+              H.modify_ _ { txSigningRunning = true, txSigningResult = Nothing }
+              result <- H.liftAff (TxSigning.signTransaction txCbor bodyHashHex state.txSigningKeyInput)
+              H.modify_ _
+                { txSigningRunning = false
+                , txSigningResult = Just result
+                }
   BrowseTxPath path -> do
     state <- H.get
     case state.txCbor of
@@ -1087,7 +1094,7 @@ renderSidebar activePage =
         , HH.h1 [ HP.class_ (HH.ClassName "sidebar-title") ] [ HH.text "Swiss Knife" ]
         , HH.p
             [ HP.class_ (HH.ClassName "sidebar-copy") ]
-            [ HH.text "A browser-native workspace for inspecting addresses and transactions, deriving keys, and producing detached witness material." ]
+            [ HH.text "A browser-native workspace for inspecting addresses and transactions, deriving keys, and patching signed transaction witnesses locally." ]
         ]
     , HH.nav
         [ HP.class_ (HH.ClassName "nav-list") ]
@@ -1141,7 +1148,7 @@ renderOverview =
     [ HP.class_ (HH.ClassName "page-grid") ]
     [ heroCard
         "Browser-first workbench"
-        "Cardano Swiss Knife keeps the current address-app ergonomics while widening the scope to transaction diagnosis and detached witness work."
+        "Cardano Swiss Knife keeps the current address-app ergonomics while widening the scope to transaction diagnosis and signed transaction assembly."
         [ "just build"
         , "just bundle"
         , "nix develop -c just build"
@@ -1157,7 +1164,7 @@ renderOverview =
         "Current workflow"
         [ roadmapStep "1" "Inspect addresses" "Decode Shelley and Byron payloads into structured fields."
         , roadmapStep "2" "Inspect transactions" "Decode CBOR, identify body hashes, signer intent, and witness gaps."
-        , roadmapStep "3" "Sign detached witnesses" "Produce body-hash signatures and vkey witness CBOR without leaving the browser."
+        , roadmapStep "3" "Assemble signed txs" "Produce body-hash signatures, inspect detached witness details, and patch vkey witnesses back into transaction CBOR."
         ]
     , sectionCard
         "Current bundles"
@@ -1709,7 +1716,7 @@ renderTransactionsPage state =
     , sectionCard
         "Sign transaction body"
         [ HH.p_
-            [ HH.text "This produces detached witness material from the transaction body hash. It does not patch the witness set back into the transaction CBOR yet." ]
+            [ HH.text "This signs the transaction body hash locally, keeps the detached witness details visible, and patches the vkey witness back into the transaction CBOR." ]
         , keyValue "Body hash" (txBodyHashLabel state)
         , keyValue "Witness plan match" (txSigningMatchLabel state)
         , HH.div
@@ -1743,7 +1750,7 @@ renderTransactionsPage state =
                 , HP.disabled state.txSigningRunning
                 , HE.onClick \_ -> RunTxSign
                 ]
-                [ HH.text (if state.txSigningRunning then "Signing..." else "Create detached witness") ]
+                [ HH.text (if state.txSigningRunning then "Signing..." else "Create signed transaction") ]
             ]
         , keyValue "Accepted signing keys" "root_xsk, acct_xsk, addr_xsk, stake_xsk"
         , renderTxSigningResult state
@@ -3062,16 +3069,18 @@ renderTxSigningResult state = case state.txSigningResult of
   Nothing ->
     HH.div
       [ HP.class_ (HH.ClassName "empty-state") ]
-      [ HH.p_ [ HH.text "Inspect a transaction, load a body hash, and produce detached witness material here." ] ]
+      [ HH.p_ [ HH.text "Inspect a transaction, load a body hash, and produce a signed transaction artifact here." ] ]
   Just (Left err) ->
     HH.div [ HP.class_ (HH.ClassName "result-error") ] [ HH.text err ]
   Just (Right result) ->
     HH.div
       [ HP.class_ (HH.ClassName "derivation-result") ]
       [ addressCard "Signer hash" result.signerHashHex
+      , addressCard "Patch action" result.witnessPatchAction
       , addressCard "Verification key" result.verificationKeyBech32
       , addressCard "Signature (hex)" result.signatureHex
       , addressCard "VKey witness CBOR" result.vkeyWitnessCborHex
+      , addressCard "Signed transaction CBOR" result.signedTxCborHex
       ]
 
 renderScriptAnalysisResult :: forall w. Maybe (Either String Script.ScriptAnalysis) -> HH.HTML w Action
