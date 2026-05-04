@@ -2,6 +2,9 @@
 
 Browser-first Cardano Swiss Knife. Address inspection, mnemonic and derivation flows, payload signing, transaction inspection, and detached witness material in one static web workbench.
 
+- Live app: <https://lambdasistemi.github.io/cardano-swiss-knife/>
+- Docs manual: <https://lambdasistemi.github.io/cardano-swiss-knife/docs/>
+
 ## Direction
 
 This repository is the composed product shell:
@@ -19,10 +22,24 @@ nix develop
 npm install
 just build
 just bundle
+just build-docs
+just assemble-site
 just test
 ```
 
 For local browser testing you need both WASM artifacts available under `dist/wasm/`. The Nix `web-dist` package assembles them automatically.
+
+`just assemble-site` produces a writable `site-root/` directory with the app at `/` and the MkDocs manual under `/docs/`.
+
+## Preview Deployments
+
+Pull requests can publish a disposable preview to `surge.sh` at:
+
+```text
+https://lambdasistemi-cardano-swiss-knife-pr-<PR_NUMBER>.surge.sh
+```
+
+The preview workflow comments that URL back onto the PR when the `SURGE_TOKEN` repository secret is configured.
 
 ## Repository Shape
 
@@ -44,5 +61,4 @@ tests/        Playwright browser coverage
 - Honest capability boundaries around inspection, signing, validation, and mutation
 
 ## License
-
-See `LICENSE`.
+No license has been declared in this repository yet.

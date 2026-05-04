@@ -16,6 +16,18 @@ test:
 test-playwright: bundle
   npx playwright test --reporter=list
 
+build-docs:
+  nix develop github:paolino/dev-assets?dir=mkdocs --quiet -c mkdocs build --strict
+
+assemble-site:
+  rm -rf result-dist site site-root
+  nix build .#web-dist -o result-dist
+  just build-docs
+  mkdir -p site-root/docs
+  cp -LR result-dist/* site-root/
+  chmod -R u+w site-root
+  cp -R site/* site-root/docs/
+
 haskell-format:
   cd haskell && fourmolu -i app/Main.hs
 

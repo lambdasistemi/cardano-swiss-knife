@@ -110,6 +110,7 @@ data Action
   | SetMnemonicVaultLabelInput String
   | SetRestoreVaultLabelInput String
   | SetSigningVaultLabelInput String
+  | SetTxVaultLabelInput String
   | SetTxProvider TxProvider.Provider
   | SetTxInputMode TxInputMode
   | SetTxNetwork TxBlockfrost.Network
@@ -117,6 +118,7 @@ data Action
   | SetTxHexInput String
   | SetTxBlockfrostKey String
   | SetTxKoiosBearer String
+  | ToggleTxCredentialVisibility
   | SetTxSigningKeyInput String
   | ToggleTxSigningKeyVisibility
   | RunTxSign
@@ -137,6 +139,9 @@ data Action
   | PopVaultEntryInRestore String
   | UseVaultEntryInSigning String
   | PopVaultEntryInSigning String
+  | SaveTxCredentialToVault
+  | UseVaultEntryInTransactions String
+  | PopVaultEntryInTransactions String
   | DeleteVaultEntry String
 
 type State =
@@ -187,6 +192,7 @@ type State =
   , txHexInput :: String
   , txBlockfrostKey :: String
   , txKoiosBearer :: String
+  , showTxCredential :: Boolean
   , txRunning :: Boolean
   , txSigningRunning :: Boolean
   , txSigningKeyInput :: String
@@ -204,6 +210,7 @@ type State =
   , mnemonicVaultLabelInput :: String
   , restoreVaultLabelInput :: String
   , signingVaultLabelInput :: String
+  , txVaultLabelInput :: String
   , vaultUnlocked :: Boolean
   , vaultEntries :: Array Vault.VaultEntry
   , vaultDirty :: Boolean
@@ -260,6 +267,7 @@ initialState =
   , txHexInput: ""
   , txBlockfrostKey: ""
   , txKoiosBearer: ""
+  , showTxCredential: false
   , txRunning: false
   , txSigningRunning: false
   , txSigningKeyInput: ""
@@ -277,6 +285,7 @@ initialState =
   , mnemonicVaultLabelInput: ""
   , restoreVaultLabelInput: ""
   , signingVaultLabelInput: ""
+  , txVaultLabelInput: ""
   , vaultUnlocked: false
   , vaultEntries: []
   , vaultDirty: false
@@ -492,6 +501,8 @@ handleAction = case _ of
     H.modify_ \state -> resetTxInspectorState (state { txBlockfrostKey = value })
   SetTxKoiosBearer value ->
     H.modify_ \state -> resetTxInspectorState (state { txKoiosBearer = value })
+  ToggleTxCredentialVisibility ->
+    H.modify_ \state -> state { showTxCredential = not state.showTxCredential }
   SetTxSigningKeyInput value ->
     H.modify_ _ { txSigningKeyInput = value, txSigningResult = Nothing }
   ToggleTxSigningKeyVisibility ->
@@ -616,6 +627,8 @@ handleAction = case _ of
     H.modify_ _ { restoreVaultLabelInput = value, vaultErrorMessage = Nothing, vaultStatusMessage = Nothing }
   SetSigningVaultLabelInput value ->
     H.modify_ _ { signingVaultLabelInput = value, vaultErrorMessage = Nothing, vaultStatusMessage = Nothing }
+  SetTxVaultLabelInput value ->
+    H.modify_ _ { txVaultLabelInput = value, vaultErrorMessage = Nothing, vaultStatusMessage = Nothing }
   CreateVault -> do
     state <- H.get
     if String.trim state.vaultPassphraseInput == "" then
@@ -789,6 +802,47 @@ handleAction = case _ of
           persistVaultEntries nextEntries ("Popped " <> entry.label <> " from the vault stack.")
           H.modify_ _ { signingKeyInput = entry.value }
           refreshSigning
+  SaveTxCredentialToVault -> do
+    state <- H.get
+    let
+      credential = String.trim (txProviderCredential state)
+    if credential == "" then
+      H.modify_ _ { vaultErrorMessage = Just ("Enter a " <> txCredentialLabel state.txProvider <> " before saving it into the vault."), vaultStatusMessage = Nothing }
+    else
+      saveVaultEntry
+        (txCredentialVaultKind state.txProvider)
+        (normalizedEntryLabel state.txVaultLabelInput (txCredentialDefaultVaultLabel state.txProvider))
+        credential
+  UseVaultEntryInTransactions entryId -> do
+    state <- H.get
+    case lookupVaultEntry entryId state.vaultEntries of
+      Nothing ->
+        H.modify_ _ { vaultErrorMessage = Just "Selected vault entry was not found.", vaultStatusMessage = Nothing }
+      Just entry ->
+        if not (acceptsVaultEntry (txCredentialAcceptedKinds state.txProvider) entry) then
+          H.modify_ _ { vaultErrorMessage = Just ("Selected vault entry is not compatible with " <> TxProvider.providerName state.txProvider <> "."), vaultStatusMessage = Nothing }
+        else
+          H.modify_ \st ->
+            let
+              nextState = resetTxInspectorState (setTxProviderCredentialValue st.txProvider entry.value st)
+            in
+              nextState
+                { vaultErrorMessage = Nothing
+                , vaultStatusMessage = Just ("Loaded " <> entry.label <> " into " <> TxProvider.providerName st.txProvider <> ".")
+                }
+  PopVaultEntryInTransactions entryId -> do
+    state <- H.get
+    case lookupVaultEntry entryId state.vaultEntries of
+      Nothing ->
+        H.modify_ _ { vaultErrorMessage = Just "Selected vault entry was not found.", vaultStatusMessage = Nothing }
+      Just entry ->
+        if not (acceptsVaultEntry (txCredentialAcceptedKinds state.txProvider) entry) then
+          H.modify_ _ { vaultErrorMessage = Just ("Selected vault entry is not compatible with " <> TxProvider.providerName state.txProvider <> "."), vaultStatusMessage = Nothing }
+        else do
+          let
+            nextEntries = filter (\candidate -> candidate.id /= entryId) state.vaultEntries
+          persistVaultEntries nextEntries ("Popped " <> entry.label <> " from the vault stack.")
+          H.modify_ \st -> resetTxInspectorState (setTxProviderCredentialValue st.txProvider entry.value st)
   DeleteVaultEntry entryId ->
     do
       state <- H.get
@@ -1583,16 +1637,46 @@ renderTransactionsPage state =
         , case state.txInputMode of
             TxByHash ->
               HH.div_
-                [ HH.label
+                [ HH.div
+                    [ HP.class_ (HH.ClassName "action-row") ]
+                    [ HH.button
+                        [ HP.class_ (HH.ClassName "secondary-btn")
+                        , HE.onClick \_ -> ToggleTxCredentialVisibility
+                        ]
+                        [ HH.text (if state.showTxCredential then "Hide credential" else "Show credential") ]
+                    , HH.button
+                        [ HP.class_ (HH.ClassName "secondary-btn")
+                        , HP.disabled (not state.vaultUnlocked || String.trim (txProviderCredential state) == "")
+                        , HE.onClick \_ -> SaveTxCredentialToVault
+                        ]
+                        [ HH.text "Save secret to vault" ]
+                    ]
+                , HH.label
                     [ HP.class_ (HH.ClassName "field-group") ]
                     [ HH.span [ HP.class_ (HH.ClassName "field-label") ] [ HH.text (txCredentialLabel state.txProvider) ]
                     , HH.input
                         [ HP.class_ (HH.ClassName "inline-input")
+                        , HP.type_ (if state.showTxCredential then HP.InputText else HP.InputPassword)
                         , HP.placeholder (txCredentialPlaceholder state.txProvider)
                         , HP.value (txProviderCredential state)
                         , HE.onValueInput (txCredentialAction state.txProvider)
                         ]
                     ]
+                , HH.label
+                    [ HP.class_ (HH.ClassName "field-group") ]
+                    [ HH.span [ HP.class_ (HH.ClassName "field-label") ] [ HH.text "Vault item name" ]
+                    , HH.input
+                        [ HP.class_ (HH.ClassName "inline-input")
+                        , HP.placeholder (txCredentialDefaultVaultLabel state.txProvider)
+                        , HP.value state.txVaultLabelInput
+                        , HE.onValueInput SetTxVaultLabelInput
+                        ]
+                    ]
+                , renderTxCredentialVaultShelf state
+                , HH.div
+                    [ HP.class_ (HH.ClassName "privacy-note") ]
+                    [ HH.p_ [ HH.text (txCredentialNote state.txProvider) ] ]
+                , renderVaultInlineStatus state
                 , HH.input
                     [ HP.class_ (HH.ClassName "text-input")
                     , HP.placeholder "64-character transaction hash"
@@ -1951,6 +2035,11 @@ txCredentialPlaceholder :: TxProvider.Provider -> String
 txCredentialPlaceholder = case _ of
   TxProvider.Blockfrost -> "mainnet..."
   TxProvider.Koios -> "Optional bearer token"
+
+txCredentialNote :: TxProvider.Provider -> String
+txCredentialNote = case _ of
+  TxProvider.Blockfrost -> "Project IDs belong in the encrypted vault. Load one here only when you need to fetch a transaction by hash."
+  TxProvider.Koios -> "Bearer tokens belong in the encrypted vault. Load one here only when you need to fetch a transaction by hash."
 
 txCredentialAction :: TxProvider.Provider -> String -> Action
 txCredentialAction = case _ of
@@ -3137,6 +3226,28 @@ renderVaultSigningShelf state =
             (map renderSigningVaultEntry entries)
         ]
 
+renderTxCredentialVaultShelf :: forall w. State -> HH.HTML w Action
+renderTxCredentialVaultShelf state =
+  let
+    acceptedKinds = txCredentialAcceptedKinds state.txProvider
+    entries = stackEntries (vaultEntriesForKinds acceptedKinds state.vaultEntries)
+  in
+    if not state.vaultUnlocked then
+      HH.div
+        [ HP.class_ (HH.ClassName "privacy-note") ]
+        [ HH.p_ [ HH.text "Unlock a vault to load provider credentials directly into transaction inspection." ] ]
+    else if length entries == 0 then
+      HH.div
+        [ HP.class_ (HH.ClassName "privacy-note") ]
+        [ HH.p_ [ HH.text ("No " <> txCredentialLabel state.txProvider <> " entries in the unlocked vault yet.") ] ]
+    else
+      HH.div_
+        [ renderVaultAcceptanceNote "Accepts" acceptedKinds
+        , HH.div
+            [ HP.class_ (HH.ClassName "vault-shelf") ]
+            (map renderTxCredentialVaultEntry entries)
+        ]
+
 renderVaultEntries :: forall w. State -> HH.HTML w Action
 renderVaultEntries state =
   if not state.vaultUnlocked then
@@ -3146,7 +3257,7 @@ renderVaultEntries state =
   else if length state.vaultEntries == 0 then
     HH.div
       [ HP.class_ (HH.ClassName "empty-state") ]
-      [ HH.p_ [ HH.text "The unlocked vault is empty. Save a mnemonic or signing key from the feature pages." ] ]
+      [ HH.p_ [ HH.text "The unlocked vault is empty. Save a mnemonic, signing key, or provider credential from the feature pages." ] ]
   else
     HH.div
       [ HP.class_ (HH.ClassName "derivation-result") ]
@@ -3222,6 +3333,30 @@ renderSigningVaultEntry entry =
         ]
     ]
 
+renderTxCredentialVaultEntry :: forall w. Vault.VaultEntry -> HH.HTML w Action
+renderTxCredentialVaultEntry entry =
+  HH.div
+    [ HP.class_ (HH.ClassName "vault-entry") ]
+    [ HH.div_
+        [ HH.strong_ [ HH.text entry.label ]
+        , HH.p [ HP.class_ (HH.ClassName "sidebar-kicker") ] [ HH.text (vaultEntryKindLabel entry.kind) ]
+        , HH.p [ HP.class_ (HH.ClassName "sidebar-copy") ] [ HH.text entry.createdAt ]
+        ]
+    , HH.div
+        [ HP.class_ (HH.ClassName "output-actions") ]
+        [ HH.button
+            [ HP.class_ (HH.ClassName "secondary-btn")
+            , HE.onClick \_ -> UseVaultEntryInTransactions entry.id
+            ]
+            [ HH.text "Peek" ]
+        , HH.button
+            [ HP.class_ (HH.ClassName "secondary-btn")
+            , HE.onClick \_ -> PopVaultEntryInTransactions entry.id
+            ]
+            [ HH.text "Pop" ]
+        ]
+    ]
+
 lookupVaultEntry :: String -> Array Vault.VaultEntry -> Maybe Vault.VaultEntry
 lookupVaultEntry entryId entries = case uncons (filter (\entry -> entry.id == entryId) entries) of
   Nothing -> Nothing
@@ -3242,6 +3377,11 @@ signingAcceptedKinds =
   , Vault.kindTag Vault.VaultAddressPrivateKey
   , Vault.kindTag Vault.VaultStakePrivateKey
   ]
+
+txCredentialAcceptedKinds :: TxProvider.Provider -> Array VaultKindTag
+txCredentialAcceptedKinds = case _ of
+  TxProvider.Blockfrost -> [ Vault.kindTag Vault.VaultBlockfrostProjectId ]
+  TxProvider.Koios -> [ Vault.kindTag Vault.VaultKoiosBearerToken ]
 
 vaultEntriesForKinds :: Array VaultKindTag -> Array Vault.VaultEntry -> Array Vault.VaultEntry
 vaultEntriesForKinds acceptedKinds =
@@ -3267,6 +3407,8 @@ vaultEntryKindLabel kind
   | kind == Vault.kindTag Vault.VaultAccountPrivateKey = Vault.labelForKind Vault.VaultAccountPrivateKey
   | kind == Vault.kindTag Vault.VaultAddressPrivateKey = Vault.labelForKind Vault.VaultAddressPrivateKey
   | kind == Vault.kindTag Vault.VaultStakePrivateKey = Vault.labelForKind Vault.VaultStakePrivateKey
+  | kind == Vault.kindTag Vault.VaultBlockfrostProjectId = Vault.labelForKind Vault.VaultBlockfrostProjectId
+  | kind == Vault.kindTag Vault.VaultKoiosBearerToken = Vault.labelForKind Vault.VaultKoiosBearerToken
   | otherwise = kind
 
 normalizedEntryLabel :: String -> String -> String
@@ -3295,6 +3437,14 @@ shelleyAddressKeyLabel state =
 
 shelleyStakeKeyLabel :: State -> String
 shelleyStakeKeyLabel state = "Shelley account " <> normalizeIndexInput state.accountIndexInput <> " stake private key"
+
+txCredentialVaultKind :: TxProvider.Provider -> Vault.VaultKind
+txCredentialVaultKind = case _ of
+  TxProvider.Blockfrost -> Vault.VaultBlockfrostProjectId
+  TxProvider.Koios -> Vault.VaultKoiosBearerToken
+
+txCredentialDefaultVaultLabel :: TxProvider.Provider -> String
+txCredentialDefaultVaultLabel provider = Vault.labelForKind (txCredentialVaultKind provider)
 
 rolePathLabel :: Derivation.Role -> String
 rolePathLabel role = case role of
@@ -3330,6 +3480,11 @@ txProviderCredential :: State -> String
 txProviderCredential state = case state.txProvider of
   TxProvider.Blockfrost -> state.txBlockfrostKey
   TxProvider.Koios -> state.txKoiosBearer
+
+setTxProviderCredentialValue :: TxProvider.Provider -> String -> State -> State
+setTxProviderCredentialValue provider value state = case provider of
+  TxProvider.Blockfrost -> state { txBlockfrostKey = value }
+  TxProvider.Koios -> state { txKoiosBearer = value }
 
 txBodyHash :: State -> Maybe String
 txBodyHash state = do
