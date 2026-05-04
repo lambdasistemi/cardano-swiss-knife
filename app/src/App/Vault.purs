@@ -24,6 +24,8 @@ data VaultKind
   | VaultAccountPrivateKey
   | VaultAddressPrivateKey
   | VaultStakePrivateKey
+  | VaultBlockfrostProjectId
+  | VaultKoiosBearerToken
 
 derive instance eqVaultKind :: Eq VaultKind
 
@@ -74,6 +76,8 @@ kindTag = case _ of
   VaultAccountPrivateKey -> "account-private-key"
   VaultAddressPrivateKey -> "address-private-key"
   VaultStakePrivateKey -> "stake-private-key"
+  VaultBlockfrostProjectId -> "blockfrost-project-id"
+  VaultKoiosBearerToken -> "koios-bearer-token"
 
 labelForKind :: VaultKind -> String
 labelForKind = case _ of
@@ -83,3 +87,5 @@ labelForKind = case _ of
   VaultAccountPrivateKey -> "Account private key"
   VaultAddressPrivateKey -> "Address private key"
   VaultStakePrivateKey -> "Stake private key"
+  VaultBlockfrostProjectId -> "Blockfrost project ID"
+  VaultKoiosBearerToken -> "Koios bearer token"
