@@ -12,10 +12,8 @@ import Cardano.Address.Signing as Signing
 import Cardano.Bytes (byteLength)
 import Data.ArrayBuffer.Types (Uint8Array)
 import Data.Either (Either(..))
-import Effect (Effect)
 import Effect.Aff (Aff)
-import Effect.Class (liftEffect)
-import Effect.Exception as Exception
+import TxInspector.Cbor as Cbor
 
 type WitnessMaterial =
   { bodyHashHex :: String
@@ -30,14 +28,6 @@ type WitnessMaterial =
 foreign import xpubPublicKeyBytesImpl :: Uint8Array -> Uint8Array
 
 foreign import vkeyWitnessCborHexImpl :: Uint8Array -> Uint8Array -> String
-
-foreign import patchSignedTxCborImpl
-  :: String
-  -> String
-  -> Effect
-       { signedTxCborHex :: String
-       , witnessPatchAction :: String
-       }
 
 signTransaction :: String -> String -> String -> Aff (Either String WitnessMaterial)
 signTransaction txCborHex bodyHashHex signingKeyBech32 = do
@@ -65,11 +55,9 @@ signTransaction txCborHex bodyHashHex signingKeyBech32 = do
                   do
                     let
                       vkeyWitnessHex = vkeyWitnessCborHex signatureBytes
-                    patchResult <- liftEffect
-                      (Exception.try (patchSignedTxCborImpl txCborHex vkeyWitnessHex))
-                    pure case patchResult of
+                    pure case Cbor.patchSignedTxCbor txCborHex vkeyWitnessHex of
                       Left err ->
-                        Left ("Failed to patch transaction CBOR: " <> Exception.message err)
+                        Left ("Failed to patch transaction CBOR: " <> err)
                       Right patched ->
                         Right
                           { bodyHashHex
