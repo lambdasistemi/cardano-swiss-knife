@@ -1,0 +1,28 @@
+{
+  "name": "cardano-swiss-knife",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:lib": "npx spago build -p cardano-addresses",
+    "build:app": "npx spago build -p cardano-addresses-browser",
+    "test": "npx spago test -p cardano-addresses-test",
+    "bundle": "npx esbuild output/Main/index.js --bundle --outfile=dist/app.js --format=esm --minify",
+    "bundle:lib": "npx esbuild output/Cardano.Address/index.js --bundle --outfile=dist/cardano-addresses.js --format=esm --minify"
+  },
+  "dependencies": {
+    "@bjorn3/browser_wasi_shim": "^0.4.2",
+    "@noble/hashes": "^1.7.0",
+    "@scure/base": "^1.2.0",
+    "@scure/bip39": "^1.5.0",
+    "bech32": "^2.0.0",
+    "events": "^3.3.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.54.1",
+    "esbuild": "^0.24.0",
+    "purescript": "^0.15.16",
+    "purs-tidy": "^0.11.1",
+    "serve": "^14.2.4",
+    "spago": "^1.0.4"
+  }
+}

@@ -1,0 +1,32 @@
+cabal-version:      3.0
+name:               cardano-addresses-browser-vectors
+version:            0.1.0.0
+build-type:         Simple
+license:            Apache-2.0
+author:             cardano-addresses-browser contributors
+maintainer:         noreply@example.invalid
+category:           Test
+synopsis:           Golden vector generator for cardano-addresses-browser
+description:
+    Generates checked-in golden fixtures for the browser workspace from
+    the upstream Haskell `cardano-addresses` implementation.
+homepage:           https://github.com/lambdasistemi/cardano-addresses-browser
+bug-reports:        https://github.com/lambdasistemi/cardano-addresses-browser/issues
+extra-source-files:
+    app/Main.hs
+
+executable cardano-addresses-browser-vectors
+  main-is:          Main.hs
+  hs-source-dirs:   app
+  default-language: GHC2021
+  ghc-options:      -Wall
+  build-depends:
+      aeson >= 2.0 && < 2.3
+    , base >= 4.18 && < 5
+    , bech32 >= 1.1 && < 1.2
+    , bytestring >= 0.11 && < 0.13
+    , cardano-addresses >= 4.0 && < 4.1
+    , cborg >= 0.2 && < 0.3
+    , containers >= 0.6 && < 0.7
+    , memory >= 0.18 && < 0.19
+    , text >= 2.0 && < 2.2

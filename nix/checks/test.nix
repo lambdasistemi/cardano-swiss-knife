@@ -1,0 +1,3 @@
+{ purescript }:
+
+purescript.test-build

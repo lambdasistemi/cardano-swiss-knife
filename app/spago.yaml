@@ -1,0 +1,17 @@
+package:
+  name: cardano-addresses-browser
+  dependencies:
+    - aff
+    - aff-promise
+    - arrays
+    - cardano-addresses
+    - console
+    - either
+    - effect
+    - foreign
+    - halogen
+    - maybe
+    - prelude
+    - strings
+  build:
+    strict: true

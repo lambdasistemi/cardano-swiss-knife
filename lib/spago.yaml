@@ -1,0 +1,16 @@
+package:
+  name: cardano-addresses
+  dependencies:
+    - aff
+    - aff-promise
+    - arrays
+    - arraybuffer-types
+    - either
+    - effect
+    - integers
+    - maybe
+    - nullable
+    - prelude
+    - strings
+  build:
+    strict: true

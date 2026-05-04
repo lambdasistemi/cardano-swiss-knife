@@ -1,0 +1,3 @@
+{ purescript }:
+
+purescript.lib-build
