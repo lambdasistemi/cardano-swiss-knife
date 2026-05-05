@@ -53,4 +53,5 @@ GitHub Pages serves the static site from `main`. The published artifact contains
 - the app at `/`
 - the documentation site at `/docs/`
 
-Pull requests can also publish disposable preview builds to `surge.sh`.
+Pull requests can also publish disposable preview builds to the shared
+`preview.dev.plutimus.com` host.

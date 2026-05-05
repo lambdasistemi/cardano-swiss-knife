@@ -46,18 +46,22 @@ const runInspector = async (stdinText) => {
     wasi_snapshot_preview1: wasi.wasiImport,
   });
 
-  let exitOk = true;
+  let exitCode = 0;
   try {
-    wasi.start(instance);
+    exitCode = wasi.start(instance);
   } catch (err) {
-    exitOk = false;
+    exitCode = 1;
     stderrLines.push(String(err));
+  }
+
+  if (exitCode !== 0 && stderrLines.length === 0) {
+    stderrLines.push(`WASI process exited with code ${exitCode}.`);
   }
 
   return {
     stdout: stdoutLines.join("\n"),
     stderr: stderrLines.join("\n"),
-    exitOk,
+    exitOk: exitCode === 0,
   };
 };
 

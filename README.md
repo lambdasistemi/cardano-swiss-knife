@@ -33,13 +33,15 @@ For local browser testing you need both WASM artifacts available under `dist/was
 
 ## Preview Deployments
 
-Pull requests can publish a disposable preview to `surge.sh` at:
+Pull requests publish disposable previews to the shared host at:
 
 ```text
-https://lambdasistemi-cardano-swiss-knife-pr-<PR_NUMBER>.surge.sh
+https://preview.dev.plutimus.com/lambdasistemi/cardano-swiss-knife/pr-<PR_NUMBER>/
 ```
 
-The preview workflow comments that URL back onto the PR when the `SURGE_TOKEN` repository secret is configured.
+The preview workflow builds `site-root/`, copies it into the shared preview
+storage on the self-hosted runner machine, and comments that URL back onto the
+PR. No external deploy token is required.
 
 ## Repository Shape
 

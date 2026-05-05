@@ -70,6 +70,7 @@ bundle-lib:
   npx esbuild output/Cardano.Address/index.js --bundle --outfile=dist/cardano-addresses.js --format=esm --minify
 
 dev:
+  just wasm-assets
   just build
   npx esbuild output/Main/index.js --bundle --outfile=dist/app.js --format=esm --serve=0.0.0.0:8080 --servedir=dist --alias:fs=./app/shims/fs.cjs --alias:path=./app/shims/path.cjs
 
