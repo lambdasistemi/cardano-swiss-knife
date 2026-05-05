@@ -91,7 +91,12 @@ jobs:
           mkdir -p "$preview_parent"
           rm -rf "$preview_tmp"
           mkdir -p "$preview_tmp"
-          cp -RL --no-preserve=mode,ownership site-root/. "$preview_tmp"/
+          (cd site-root && find . -type d -print) | while IFS= read -r path; do
+            mkdir -p "$preview_tmp/$path"
+          done
+          (cd site-root && find . -type f -print) | while IFS= read -r path; do
+            install -m 664 "site-root/$path" "$preview_tmp/$path"
+          done
           rm -rf "$preview_dir"
           mv "$preview_tmp" "$preview_dir"
           echo "preview_url=https://preview.dev.plutimus.com/${{ github.repository_owner }}/${{ github.event.repository.name }}/pr-${{ github.event.number }}/" >> "$GITHUB_OUTPUT"
