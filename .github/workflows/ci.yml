@@ -15,6 +15,11 @@ on:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
 jobs:
   check-and-build:
     if: github.event_name != 'pull_request' || github.event.action != 'closed'
@@ -80,65 +85,18 @@ jobs:
           chmod -R u+w site-root
           cp -R site/* site-root/docs/
 
-      - name: Deploy to shared preview host
-        id: deploy_preview
-        run: |
-          preview_parent="/opt/services/previews/${{ github.repository_owner }}/${{ github.event.repository.name }}"
-          preview_dir="$preview_parent/pr-${{ github.event.number }}"
-          preview_tmp="${preview_dir}.tmp-${{ github.run_id }}-${{ github.run_attempt }}"
-          trap 'rm -rf "$preview_tmp"' EXIT
-          umask 0002
-          mkdir -p "$preview_parent"
-          rm -rf "$preview_tmp"
-          mkdir -p "$preview_tmp"
-          (cd site-root && find . -type d -print) | while IFS= read -r path; do
-            mkdir -p "$preview_tmp/$path"
-          done
-          (cd site-root && find . -type f -print) | while IFS= read -r path; do
-            install -m 664 "site-root/$path" "$preview_tmp/$path"
-          done
-          rm -rf "$preview_dir"
-          mv "$preview_tmp" "$preview_dir"
-          echo "preview_url=https://preview.dev.plutimus.com/${{ github.repository_owner }}/${{ github.event.repository.name }}/pr-${{ github.event.number }}/" >> "$GITHUB_OUTPUT"
-
-      - name: Comment preview URL on PR
-        uses: actions/github-script@v7
+      - name: Publish shared preview
+        uses: paolino/dev-assets/static-preview@main
         with:
-          script: |
-            const url = ${{ toJSON(steps.deploy_preview.outputs.preview_url) }};
-            const marker = '<!-- shared-preview-url -->';
-            const body = `${marker}\nPreview: ${url}`;
-            const { data: comments } = await github.rest.issues.listComments({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-            });
-            const existing = comments.find(comment => comment.body && comment.body.includes(marker));
-            if (existing) {
-              await github.rest.issues.updateComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                comment_id: existing.id,
-                body,
-              });
-            } else {
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.issue.number,
-                body,
-              });
-            }
+          path: site-root
+          comment-marker: "<!-- shared-preview-url -->"
 
   pr-preview-cleanup:
     if: github.event_name == 'pull_request' && github.event.action == 'closed'
     runs-on: nixos
 
     steps:
-      - name: Remove preview directory
-        run: |
-          preview_dir="/opt/services/previews/${{ github.repository_owner }}/${{ github.event.repository.name }}/pr-${{ github.event.number }}"
-          preview_repo_dir="/opt/services/previews/${{ github.repository_owner }}/${{ github.event.repository.name }}"
-          rm -rf "$preview_dir"
-          rmdir --ignore-fail-on-non-empty "$preview_repo_dir" 2>/dev/null || true
-          rmdir --ignore-fail-on-non-empty "/opt/services/previews/${{ github.repository_owner }}" 2>/dev/null || true
+      - name: Remove shared preview
+        uses: paolino/dev-assets/static-preview@main
+        with:
+          mode: cleanup

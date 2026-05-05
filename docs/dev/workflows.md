@@ -32,7 +32,7 @@ The preview workflow:
 1. builds the app bundle
 2. builds the MkDocs site
 3. assembles one writable static tree
-4. copies it into `/opt/services/previews/lambdasistemi/cardano-swiss-knife/pr-<PR_NUMBER>/`
+4. calls `paolino/dev-assets/static-preview` to copy it into `/opt/services/previews/lambdasistemi/cardano-swiss-knife/pr-<PR_NUMBER>/`
 5. upserts the preview URL as a PR comment
 
 The preview host is served by the same `nixos` self-hosted runner machine, so
