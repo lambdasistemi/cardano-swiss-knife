@@ -90,7 +90,6 @@ jobs:
           mkdir -p "$preview_parent"
           rm -rf "$preview_tmp"
           cp -R site-root "$preview_tmp"
-          chgrp -R github-runners "$preview_tmp"
           chmod -R g+rwX "$preview_tmp"
           find "$preview_tmp" -type d -exec chmod g+s {} +
           rm -rf "$preview_dir"
