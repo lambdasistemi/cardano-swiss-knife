@@ -85,7 +85,8 @@ jobs:
         run: |
           preview_parent="/opt/services/previews/${{ github.repository_owner }}/${{ github.event.repository.name }}"
           preview_dir="$preview_parent/pr-${{ github.event.number }}"
-          preview_tmp="${preview_dir}.tmp"
+          preview_tmp="${preview_dir}.tmp-${{ github.run_id }}-${{ github.run_attempt }}"
+          trap 'rm -rf "$preview_tmp"' EXIT
           umask 0002
           mkdir -p "$preview_parent"
           rm -rf "$preview_tmp"
