@@ -90,9 +90,8 @@ jobs:
           umask 0002
           mkdir -p "$preview_parent"
           rm -rf "$preview_tmp"
-          cp -R site-root "$preview_tmp"
-          chmod -R g+rwX "$preview_tmp"
-          find "$preview_tmp" -type d -exec chmod g+s {} +
+          mkdir -p "$preview_tmp"
+          cp -RL --no-preserve=mode,ownership site-root/. "$preview_tmp"/
           rm -rf "$preview_dir"
           mv "$preview_tmp" "$preview_dir"
           echo "preview_url=https://preview.dev.plutimus.com/${{ github.repository_owner }}/${{ github.event.repository.name }}/pr-${{ github.event.number }}/" >> "$GITHUB_OUTPUT"
