@@ -1,0 +1,11 @@
+package:
+  name: rdf-editor
+  description: Generic CodeMirror-backed RDF text editor for Turtle and JSON.
+  dependencies:
+    - prelude
+    - effect
+
+workspace:
+  packageSet:
+    registry: 72.1.0
+  extraPackages: {}
