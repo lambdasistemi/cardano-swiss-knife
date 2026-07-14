@@ -1,4 +1,4 @@
-{ pkgs, checks, system, repoRoot, playwrightBrowsers, txInspectorUi, inspectorSource, protocolRegistry }:
+{ pkgs, checks, system, repoRoot, playwrightBrowsers, txInspectorUi, inspectorSource, protocolRegistry, uxJudgeSource }:
 
 let
   lib = import ./lib.nix { inherit pkgs system; };
@@ -12,5 +12,8 @@ in
   "ci-playwright" = import ./playwright.nix { inherit lib; };
   "ci-inspector-playwright" = import ./inspector-playwright.nix {
     inherit pkgs repoRoot playwrightBrowsers txInspectorUi inspectorSource protocolRegistry;
+  };
+  "ci-ux-capture" = import ./ux-capture.nix {
+    inherit pkgs playwrightBrowsers txInspectorUi uxJudgeSource;
   };
 }

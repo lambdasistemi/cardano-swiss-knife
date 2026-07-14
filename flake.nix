@@ -64,6 +64,7 @@
             src = ./docs/inspector;
           };
           playwrightBrowsers = pkgs.playwright-driver.browsers;
+          uxJudgeSource = ./tools/ux-judge;
           test-vectors-json = pkgs.runCommand "cardano-addresses-browser-test-vectors" {} ''
             mkdir -p $out
             ${haskellProject.packages.test-vectors-exe}/bin/cardano-addresses-browser-vectors > $out/vectors.json
@@ -79,7 +80,7 @@
             inherit pkgs repoRoot purescript packages playwrightBrowsers testVectorsPath wasmBinary txInspectorWasmBinary;
           };
           apps = import ./nix/apps {
-            inherit pkgs checks system repoRoot playwrightBrowsers txInspectorUi inspectorSource protocolRegistry;
+            inherit pkgs checks system repoRoot playwrightBrowsers txInspectorUi inspectorSource protocolRegistry uxJudgeSource;
           };
         in
         {
