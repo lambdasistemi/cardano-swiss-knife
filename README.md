@@ -63,4 +63,4 @@ tests/        Playwright browser coverage
 - Honest capability boundaries around inspection, signing, validation, and mutation
 
 ## License
-No license has been declared in this repository yet.
+This project is licensed under the [MIT License](LICENSE).

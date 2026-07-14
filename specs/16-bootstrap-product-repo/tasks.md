@@ -2,8 +2,8 @@
 
 ## Slice 1 — License the repository
 
-- [ ] T001-S1 Add the decided MIT license and README license statement.
-- [ ] T002-S1 Run the repository gate and commit the reviewed slice.
+- [X] T001-S1 Add the decided MIT license and README license statement.
+- [X] T002-S1 Run the repository gate and commit the reviewed slice.
 
 ## Slice 2 — Refresh inspector and repair transaction rendering
 
