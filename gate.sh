@@ -2,4 +2,11 @@
 set -euo pipefail
 
 git diff --check
-nix develop --quiet -c just ci
+nix build .#checks.x86_64-linux.test --no-link
+nix run .#ci-check
+nix run .#ci-haskell-quality
+nix run .#ci-check-vectors
+nix run .#ci-build
+nix develop github:paolino/dev-assets?dir=mkdocs --quiet -c mkdocs build --strict
+nix run .#ci-test
+nix run .#ci-playwright
