@@ -81,6 +81,8 @@
           };
           apps = import ./nix/apps {
             inherit pkgs checks system repoRoot playwrightBrowsers txInspectorUi inspectorSource protocolRegistry uxJudgeSource;
+            combinedSite = packages.combined-site;
+            webDist = packages.web-dist;
           };
         in
         {
@@ -91,6 +93,7 @@
           packages.tx-inspector-wasm = txInspectorWasmBinary;
           packages.tx-inspector-ui = packages.tx-inspector-ui;
           packages.web-dist = packages.web-dist;
+          packages.combined-site = packages.combined-site;
           checks = checks;
           inherit apps;
           devShells.default = pkgs.mkShell {

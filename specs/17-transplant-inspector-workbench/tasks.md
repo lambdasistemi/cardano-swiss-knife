@@ -38,11 +38,11 @@
 
 ## Slice 5 — Publish the combined site
 
-- [ ] T015-S5 Build a combined artifact with the existing shell at `/`, the
+- [X] T015-S5 Build a combined artifact with the existing shell at `/`, the
   workbench at `/inspector/`, and direct inspector route entry points intact.
-- [ ] T016-S5 Publish the combined artifact from both Pages and pull-request
+- [X] T016-S5 Publish the combined artifact from both Pages and pull-request
   preview workflows while retaining MkDocs under `/docs/`.
-- [ ] T017-S5 Prove combined routes and compressed WASM assets locally and pass
+- [X] T017-S5 Prove combined routes and compressed WASM assets locally and pass
   the final extended gate.
 - [ ] T018-S5 Record parity evidence in the living PR body and smoke-check the
   published preview at the final head.
