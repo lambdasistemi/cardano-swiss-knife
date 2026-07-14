@@ -10,14 +10,14 @@
 
 ## Slice 2 — Build the transplanted workbench
 
-- [ ] T004-S2 Copy `docs/inspector` application sources and static inputs without
+- [X] T004-S2 Copy `docs/inspector` application sources and static inputs without
   generated JS, WASM, tests, or the protocol registry tree.
-- [ ] T005-S2 Copy `packages/purescript-rdf-editor` and port the parameterized
+- [X] T005-S2 Copy `packages/purescript-rdf-editor` and port the parameterized
   `nix/wasm-ui.nix` builder.
-- [ ] T006-S2 Consume decoder WASM, RDF-shapes WASM, and exactly
+- [X] T006-S2 Consume decoder WASM, RDF-shapes WASM, and exactly
   `packages.${system}.protocol-registry`; adapt registry imports without changing
   workbench behavior.
-- [ ] T007-S2 Build and inspect `tx-inspector-ui`, prove forbidden artifacts are
+- [X] T007-S2 Build and inspect `tx-inspector-ui`, prove forbidden artifacts are
   untracked, and pass the full gate.
 
 ## Slice 3 — Transplant the browser parity suites

@@ -32,7 +32,7 @@
     };
   };
 
-  outputs = inputs@{ self, nixpkgs, flake-parts, haskellNix, mkSpagoDerivation, purescript-overlay, cardano-addresses, cardano-ledger-inspector, ... }:
+  outputs = inputs@{ self, nixpkgs, flake-parts, haskellNix, mkSpagoDerivation, purescript-overlay, cardano-addresses, cardano-ledger-inspector, rdf-shapes-wasm, ... }:
     flake-parts.lib.mkFlake { inherit inputs; } {
       systems = [ "x86_64-linux" "aarch64-darwin" "x86_64-darwin" ];
       perSystem = { system, ... }:
@@ -51,7 +51,16 @@
             inherit indexState pkgs;
           };
           wasmBinary = cardano-addresses.packages.${system}.wasm;
-          txInspectorWasmBinary = cardano-ledger-inspector.packages.${system}."wasm-tx-inspector";
+          txInspectorWasmBinary = cardano-ledger-inspector.packages.${system}.wasm-tx-inspector;
+          txInspectorUi = import ./nix/wasm-ui.nix {
+            inherit system nixpkgs purescript-overlay mkSpagoDerivation;
+            wasmArtifact = cardano-ledger-inspector.packages.${system}.wasm-tx-inspector;
+            wasmArtifactName = "wasm-tx-inspector";
+            rdfShapesWasmPkg = rdf-shapes-wasm.packages.${system}.wasm-pkg;
+            protocolRegistry = cardano-ledger-inspector.packages.${system}.protocol-registry;
+            editorPackageSrc = ./packages/purescript-rdf-editor;
+            src = ./docs/inspector;
+          };
           playwrightBrowsers = pkgs.playwright-driver.browsers;
           test-vectors-json = pkgs.runCommand "cardano-addresses-browser-test-vectors" {} ''
             mkdir -p $out
@@ -62,7 +71,7 @@
             inherit pkgs repoRoot wasmBinary txInspectorWasmBinary;
           };
           packages = import ./nix/packages {
-            inherit pkgs repoRoot purescript haskellProject playwrightBrowsers testVectorsPath;
+            inherit pkgs repoRoot purescript haskellProject playwrightBrowsers testVectorsPath txInspectorUi;
           };
           checks = import ./nix/checks {
             inherit pkgs repoRoot purescript packages playwrightBrowsers testVectorsPath wasmBinary txInspectorWasmBinary;
@@ -77,6 +86,7 @@
           packages.test-vectors = test-vectors-json;
           packages.wasm = wasmBinary;
           packages.tx-inspector-wasm = txInspectorWasmBinary;
+          packages.tx-inspector-ui = packages.tx-inspector-ui;
           packages.web-dist = packages.web-dist;
           checks = checks;
           inherit apps;
