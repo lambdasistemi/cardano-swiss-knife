@@ -22,7 +22,13 @@
       url = "github:paolino/cardano-addresses/001-wasm-target";
     };
     cardano-ledger-inspector = {
-      url = "github:lambdasistemi/cardano-ledger-inspector";
+      url = "github:lambdasistemi/cardano-ledger-inspector/c3ccd8d8f8c009dadf7573c09b308990c097d755";
+      inputs.rdf-shapes-wasm.follows = "rdf-shapes-wasm";
+    };
+    rdf-shapes-wasm = {
+      url = "github:lambdasistemi/rdf-shapes-wasm/1240e4e58061836264d955b70c49c7195480f3b4";
+      inputs.purescript-overlay.follows = "purescript-overlay";
+      inputs.mkSpagoDerivation.follows = "mkSpagoDerivation";
     };
   };
 
