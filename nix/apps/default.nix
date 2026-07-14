@@ -1,4 +1,4 @@
-{pkgs, checks, system}:
+{ pkgs, checks, system, repoRoot, playwrightBrowsers, txInspectorUi, inspectorSource, protocolRegistry }:
 
 let
   lib = import ./lib.nix { inherit pkgs system; };
@@ -10,4 +10,7 @@ in
   "ci-check-vectors" = import ./check-vectors.nix { inherit lib; };
   "ci-test" = import ./test.nix { inherit lib; };
   "ci-playwright" = import ./playwright.nix { inherit lib; };
+  "ci-inspector-playwright" = import ./inspector-playwright.nix {
+    inherit pkgs repoRoot playwrightBrowsers txInspectorUi inspectorSource protocolRegistry;
+  };
 }
