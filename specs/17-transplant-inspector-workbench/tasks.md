@@ -2,11 +2,11 @@
 
 ## Slice 1 — Pin the workbench artifact inputs
 
-- [ ] T001-S1 Refresh `cardano-ledger-inspector` to the inspector source snapshot,
+- [X] T001-S1 Refresh `cardano-ledger-inspector` to the inspector source snapshot,
   not earlier than the protocol-registry export commit.
-- [ ] T002-S1 Add and lock the explicit `rdf-shapes-wasm` flake input at the
+- [X] T002-S1 Add and lock the explicit `rdf-shapes-wasm` flake input at the
   inspector-compatible revision.
-- [ ] T003-S1 Prove both lock revisions and pass the inherited full gate.
+- [X] T003-S1 Prove both lock revisions and pass the inherited full gate.
 
 ## Slice 2 — Build the transplanted workbench
 
