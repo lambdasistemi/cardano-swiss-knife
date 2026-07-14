@@ -30,11 +30,11 @@
 
 ## Slice 4 — Transplant and prove the UX judge loop
 
-- [ ] T012-S4 Copy `tools/ux-judge` and retarget its default and documentation to
+- [X] T012-S4 Copy `tools/ux-judge` and retarget its default and documentation to
   the Cardano Swiss Knife `/inspector/` surface.
-- [ ] T013-S4 Provide a Nix-backed browser runtime and named deterministic UX
+- [X] T013-S4 Provide a Nix-backed browser runtime and named deterministic UX
   capture check.
-- [ ] T014-S4 Run the capture check, the full scoring loop, and the extended gate.
+- [X] T014-S4 Run the capture check, the full scoring loop, and the extended gate.
 
 ## Slice 5 — Publish the combined site
 
