@@ -47,6 +47,8 @@
           };
           indexState = "2026-04-05T22:14:51Z";
           repoRoot = ./.;
+          inspectorSource = cardano-ledger-inspector.outPath;
+          protocolRegistry = cardano-ledger-inspector.packages.${system}.protocol-registry;
           haskellProject = import ./nix/project.nix {
             inherit indexState pkgs;
           };
@@ -57,7 +59,7 @@
             wasmArtifact = cardano-ledger-inspector.packages.${system}.wasm-tx-inspector;
             wasmArtifactName = "wasm-tx-inspector";
             rdfShapesWasmPkg = rdf-shapes-wasm.packages.${system}.wasm-pkg;
-            protocolRegistry = cardano-ledger-inspector.packages.${system}.protocol-registry;
+            inherit protocolRegistry;
             editorPackageSrc = ./packages/purescript-rdf-editor;
             src = ./docs/inspector;
           };
@@ -77,7 +79,7 @@
             inherit pkgs repoRoot purescript packages playwrightBrowsers testVectorsPath wasmBinary txInspectorWasmBinary;
           };
           apps = import ./nix/apps {
-            inherit pkgs checks system;
+            inherit pkgs checks system repoRoot playwrightBrowsers txInspectorUi inspectorSource protocolRegistry;
           };
         in
         {

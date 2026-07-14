@@ -22,11 +22,11 @@
 
 ## Slice 3 — Transplant the browser parity suites
 
-- [ ] T008-S3 Copy the two inspector Playwright suites and their configuration.
-- [ ] T009-S3 Supply engine fixtures from the inspector flake source and registry
+- [X] T008-S3 Copy the two inspector Playwright suites and their configuration.
+- [X] T009-S3 Supply engine fixtures from the inspector flake source and registry
   fixtures from the protocol-registry package without vendoring either.
-- [ ] T010-S3 Expose the inspector Playwright check through a named Nix CI app.
-- [ ] T011-S3 Run the complete transplanted suite and the extended full gate.
+- [X] T010-S3 Expose the inspector Playwright check through a named Nix CI app.
+- [X] T011-S3 Run the complete transplanted suite and the extended full gate.
 
 ## Slice 4 — Transplant and prove the UX judge loop
 
