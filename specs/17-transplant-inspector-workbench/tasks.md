@@ -44,5 +44,5 @@
   preview workflows while retaining MkDocs under `/docs/`.
 - [X] T017-S5 Prove combined routes and compressed WASM assets locally and pass
   the final extended gate.
-- [ ] T018-S5 Record parity evidence in the living PR body and smoke-check the
+- [X] T018-S5 Record parity evidence in the living PR body and smoke-check the
   published preview at the final head.
