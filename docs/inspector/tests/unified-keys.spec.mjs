@@ -198,6 +198,7 @@ test("keys is reachable in the exact partial navigation without mobile overflow"
     "Addresses",
     "Keys",
     "Scripts",
+    "Vault",
     "Library",
     "Settings",
   ]);

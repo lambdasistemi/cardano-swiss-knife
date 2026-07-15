@@ -1,6 +1,4 @@
-// Thin wrappers over localStorage so the project ID persists across
-// page reloads. No cross-tab sync — if you want that, listen to the
-// 'storage' event in a later iteration.
+// Thin wrappers over localStorage for non-secret shell preferences.
 
 export const downloadJsonImpl = (filename) => (contents) => () => {
   const blob = new Blob([contents], { type: "application/json" });
@@ -38,6 +36,10 @@ export const readFileInputTextImpl = (inputId) => async () => {
   const text = await file.text();
   input.value = "";
   return text;
+};
+
+export const removeItemImpl = (key) => () => {
+  window.localStorage.removeItem(key);
 };
 
 export const setItemImpl = (key) => (value) => () => {

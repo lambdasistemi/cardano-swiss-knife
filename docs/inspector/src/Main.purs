@@ -39,6 +39,7 @@ import Routing (Route(..))
 import Routing as Routing
 import Shell as Shell
 import Theme as Theme
+import Vault as Vault
 import Halogen as H
 import Halogen.Aff as HA
 import Halogen.HTML as HH
@@ -55,31 +56,20 @@ import Web.HTML.Window as Window
 import Web.UIEvent.MouseEvent (MouseEvent)
 import Web.UIEvent.MouseEvent as MouseEvent
 
-blockfrostKey :: String
-blockfrostKey = "blockfrost_project_id"
-
-koiosKey :: String
-koiosKey = "koios_bearer_token"
-
 providerKey :: String
 providerKey = "provider"
 
 networkKey :: String
 networkKey = "network"
 
-persistKeysStorageKey :: String
-persistKeysStorageKey = "persist_api_keys"
-
 main :: Effect Unit
 main = HA.runHalogenAff do
+  liftEffect do
+    Storage.removeItem "blockfrost_project_id"
+    Storage.removeItem "koios_bearer_token"
+    Storage.removeItem "persist_api_keys"
   body    <- HA.awaitBody
   app     <- HA.selectElement (QuerySelector "#app")
-  persist <- liftEffect (Storage.getItem persistKeysStorageKey)
-  let persistInitial = persist == "true"
-  bf   <- liftEffect
-    (if persistInitial then Storage.getItem blockfrostKey else pure "")
-  kOS  <- liftEffect
-    (if persistInitial then Storage.getItem koiosKey else pure "")
   prov <- liftEffect (Storage.getItem providerKey)
   net  <- liftEffect (Storage.getItem networkKey)
   route <- liftEffect Routing.currentRoute
@@ -98,11 +88,8 @@ main = HA.runHalogenAff do
         Nothing -> body
   runUI
     ( inspectorComponent
-        { bf
-        , koios: kOS
-        , prov: initialProv
+        { prov: initialProv
         , network: initialNetwork
-        , persistKeys: persistInitial
         , route
         , routeBase
         , theme
@@ -191,7 +178,6 @@ type State =
   { provider :: Provider
   , blockfrostKey :: String
   , koiosBearer :: String
-  , persistKeys :: Boolean
   , mode :: Mode
   , network :: Network
   , txHash :: String
@@ -269,6 +255,18 @@ type State =
   , verificationKeyInput :: String
   , signatureInput :: String
   , verificationResult :: Maybe (Either String Boolean)
+  , vaultPassphraseInput :: String
+  , showVaultPassphrase :: Boolean
+  , vaultFileName :: String
+  , vaultUnlocked :: Boolean
+  , vaultEntries :: Array Vault.VaultEntry
+  , vaultDirty :: Boolean
+  , vaultStatusMessage :: Maybe String
+  , vaultErrorMessage :: Maybe String
+  , mnemonicVaultLabelInput :: String
+  , restoreVaultLabelInput :: String
+  , signingVaultLabelInput :: String
+  , providerVaultLabelInput :: String
   , route :: Route
   , routeBase :: String
   , theme :: Theme.Theme
@@ -321,11 +319,8 @@ type AnnotationDraft =
   }
 
 type InitialKeys =
-  { bf :: String
-  , koios :: String
-  , prov :: Provider
+  { prov :: Provider
   , network :: Network
-  , persistKeys :: Boolean
   , route :: Route
   , routeBase :: String
   , theme :: Theme.Theme
@@ -337,7 +332,6 @@ data Action
   | SetBlockfrostKey String
   | SetKoiosBearer String
   | SelectProvider Provider
-  | TogglePersist Boolean
   | SelectMode Mode
   | SelectNetwork Network
   | SetTxHash String
@@ -416,6 +410,28 @@ data Action
   | SetVerificationKey String
   | SetSignature String
   | CopyKeyValue String
+  | SetVaultPassphrase String
+  | ToggleVaultPassphrase
+  | CreateVault
+  | OpenVault
+  | ExportVault
+  | LockVault
+  | SetMnemonicVaultLabel String
+  | SetRestoreVaultLabel String
+  | SetSigningVaultLabel String
+  | SetProviderVaultLabel String
+  | SaveGeneratedMnemonicToVault
+  | SaveRestoreMnemonicToVault
+  | SaveSigningKeyToVault
+  | SaveDerivedKeyToVault Vault.VaultKind String String
+  | SaveProviderSecretToVault
+  | PeekVaultEntryInRestore String
+  | PopVaultEntryInRestore String
+  | PeekVaultEntryInSigning String
+  | PopVaultEntryInSigning String
+  | PeekVaultEntryInProvider String
+  | PopVaultEntryInProvider String
+  | DeleteVaultEntry String
   | Navigate Route MouseEvent
   | ToggleTheme
 
@@ -428,9 +444,8 @@ inspectorComponent initial =
   H.mkComponent
     { initialState: \_ ->
         { provider: initial.prov
-        , blockfrostKey: initial.bf
-        , koiosBearer: initial.koios
-        , persistKeys: initial.persistKeys
+        , blockfrostKey: ""
+        , koiosBearer: ""
         , mode: ByHash
         , network: initial.network
         , txHash: ""
@@ -508,6 +523,18 @@ inspectorComponent initial =
         , verificationKeyInput: ""
         , signatureInput: ""
         , verificationResult: Nothing
+        , vaultPassphraseInput: ""
+        , showVaultPassphrase: false
+        , vaultFileName: defaultVaultFileName
+        , vaultUnlocked: false
+        , vaultEntries: []
+        , vaultDirty: false
+        , vaultStatusMessage: Nothing
+        , vaultErrorMessage: Nothing
+        , mnemonicVaultLabelInput: ""
+        , restoreVaultLabelInput: ""
+        , signingVaultLabelInput: ""
+        , providerVaultLabelInput: ""
         , route: initial.route
         , routeBase: initial.routeBase
         , theme: initial.theme
@@ -534,6 +561,7 @@ inspectorComponent initial =
               RouteAddresses -> renderAddresses state
               RouteKeys -> renderKeys state
               RouteScripts -> renderScripts state
+              RouteVault -> renderVault state
               RouteSettings -> renderSettings state
               RouteLibrary -> renderLibrary state
           ]
@@ -612,7 +640,10 @@ inspectorComponent initial =
               , keyButton false (if state.showGeneratedMnemonic then "Hide phrase" else "Show phrase") ToggleGeneratedMnemonic
               , keyButton false "Copy phrase" CopyKeyMnemonic
               , keyButton false "Use in Restore" UseGeneratedMnemonic
+              , keyButton false "Save to vault" SaveGeneratedMnemonicToVault
               ]
+          , keyTextField "Vault item name" state.mnemonicVaultLabelInput SetMnemonicVaultLabel
+          , renderVaultInlineStatus state
           ]
       , toolCard "key-card" "mnemonic-output"
           [ toolHeading "Generated phrase" "Recovery phrases are hidden by default and are never persisted."
@@ -654,6 +685,7 @@ inspectorComponent initial =
     HH.div [ classNames [ "key-grid" ] ]
       [ toolCard "key-card" "restore-input"
           [ toolHeading "Restore and build" "Choose the wallet family first, then derive the matching keys or address locally from a recovery phrase."
+          , renderVaultShelf "vault-shelf--restore" restoreAcceptedKinds state.vaultEntries PeekVaultEntryInRestore PopVaultEntryInRestore
           , HH.div [ classNames [ "key-actions" ] ]
               [ renderRestoreFamilyButton state.restoreFamily RestoreShelley
               , renderRestoreFamilyButton state.restoreFamily RestoreIcarus
@@ -700,6 +732,10 @@ inspectorComponent initial =
               numberField "Protocol magic" state.legacyCustomMagicInput SetLegacyCustomMagic
             else HH.text ""
           , toolKeyValue "Path" (keyRestorePath state)
+          , keyTextField "Vault item name" state.restoreVaultLabelInput SetRestoreVaultLabel
+          , HH.div [ classNames [ "key-actions" ] ]
+              [ keyButton false "Save phrase to vault" SaveRestoreMnemonicToVault ]
+          , renderVaultInlineStatus state
           ]
       , toolCard "key-card" "restore-output"
           [ toolHeading (if state.restoreFamily == RestoreShelley then "Derived addresses and keys" else "Derived address") "Outputs update whenever the phrase, family, role, network, or index changes."
@@ -776,11 +812,11 @@ inspectorComponent initial =
         ( renderShelleyAddresses state.shelleyAddressesResult <>
             [ HH.div [ classNames [ "key-actions" ] ]
                 [ keyButton false (if state.showDerivedKeys then "Hide private keys" else "Show private keys") ToggleDerivedKeys ]
-            , renderSecretKey state.showDerivedKeys "Root private key" keys.rootKeyBech32
-            , renderSecretKey state.showDerivedKeys "Account private key" keys.accountKeyBech32
-            , renderSecretKey state.showDerivedKeys "Address private key" keys.addressKeyBech32
+            , renderVaultSecretKey state.showDerivedKeys Vault.VaultRootPrivateKey "Root private key" keys.rootKeyBech32
+            , renderVaultSecretKey state.showDerivedKeys Vault.VaultAccountPrivateKey "Account private key" keys.accountKeyBech32
+            , renderVaultSecretKey state.showDerivedKeys Vault.VaultAddressPrivateKey "Address private key" keys.addressKeyBech32
             , renderPublicKey "Address public key" keys.addressPublicKeyBech32
-            , renderSecretKey state.showDerivedKeys "Stake private key" keys.stakeKeyBech32
+            , renderVaultSecretKey state.showDerivedKeys Vault.VaultStakePrivateKey "Stake private key" keys.stakeKeyBech32
             , renderPublicKey "Stake public key" keys.stakePublicKeyBech32
             ]
         )
@@ -809,6 +845,19 @@ inspectorComponent initial =
           HH.div [ classNames [ "privacy-note" ] ]
             [ HH.text "Private key hidden for this card. Use Show or Copy." ]
       , keyCopyButton value
+      ]
+
+  renderVaultSecretKey visible kind label value =
+    keyOutputCard label
+      [ if visible then
+          HH.code [ classNames [ "key-output-value" ] ] [ HH.text value ]
+        else
+          HH.div [ classNames [ "privacy-note" ] ]
+            [ HH.text "Private key hidden for this card. Use Show or Copy." ]
+      , HH.div [ classNames [ "key-actions" ] ]
+          [ keyCopyButton value
+          , keyButton false "Save to vault" (SaveDerivedKeyToVault kind label value)
+          ]
       ]
 
   renderPublicKey label value =
@@ -908,7 +957,11 @@ inspectorComponent initial =
               ]
           , keyTextarea "Payload" 5 state.signingPayloadInput SetSigningPayload
           , HH.div [ classNames [ "key-actions" ] ]
-              [ keyButton false (if state.showSigningKey then "Hide signing key" else "Show signing key") ToggleSigningKey ]
+              [ keyButton false (if state.showSigningKey then "Hide signing key" else "Show signing key") ToggleSigningKey
+              , keyButton false "Save signing key to vault" SaveSigningKeyToVault
+              ]
+          , keyTextField "Vault item name" state.signingVaultLabelInput SetSigningVaultLabel
+          , renderVaultShelf "vault-shelf--signing" signingAcceptedKinds state.vaultEntries PeekVaultEntryInSigning PopVaultEntryInSigning
           , if state.showSigningKey then
               keyTextarea "Signing key" 4 state.signingKeyInput SetSigningKey
             else
@@ -921,6 +974,7 @@ inspectorComponent initial =
                     , HE.onValueInput SetSigningKey
                     ]
                 ]
+          , renderVaultInlineStatus state
           ]
       , keyRegion "Signature" [ renderKeySigningResult state.signingResult ]
       , keyRegion "Verify signature"
@@ -1386,13 +1440,102 @@ inspectorComponent initial =
               [ HH.h1_ [ HH.text "Settings" ]
               , HH.p_
                   [ HH.text
-                      "Configure the chain-data provider, network, and credential persistence used by transaction decoding."
+                      "Configure the chain-data provider and network used by transaction decoding. Credentials stay memory-only unless saved in the encrypted vault."
                   ]
               ]
           ]
       , HH.div
           [ classNames [ "settings-layout" ] ]
           [ renderProvider state ]
+      ]
+
+  renderVault state =
+    HH.div
+      [ classNames [ "app-shell", "tool-page", "vault-page" ] ]
+      [ toolIntro "Vault" "Open one encrypted local file for secret material. Decrypted values remain only in this browser tab's memory."
+      , HH.div [ classNames [ "vault-layout" ] ]
+          [ toolCard "vault-control-card" "vault-controls"
+              [ toolHeading "Encrypted vault" "Version 1 PBKDF2-SHA-256 and AES-GCM vault files remain compatible with the legacy shell."
+              , HH.label [ classNames [ "key-field" ] ]
+                  [ HH.span [ classNames [ "field-label" ] ] [ HH.text "Vault passphrase" ]
+                  , HH.input
+                      [ HP.type_ (if state.showVaultPassphrase then HP.InputText else HP.InputPassword)
+                      , HP.value state.vaultPassphraseInput
+                      , HH.attr (HH.AttrName "aria-label") "Vault passphrase"
+                      , HE.onValueInput SetVaultPassphrase
+                      ]
+                  ]
+              , HH.div [ classNames [ "key-actions", "vault-actions" ] ]
+                  [ keyButton false (if state.showVaultPassphrase then "Hide passphrase" else "Show passphrase") ToggleVaultPassphrase
+                  , keyButton true "Create vault" CreateVault
+                  , keyButton false "Open vault" OpenVault
+                  , keyButton false "Download backup" ExportVault
+                  , keyButton false "Lock vault" LockVault
+                  ]
+              , HH.div [ classNames [ "vault-summary" ] ]
+                  [ toolKeyValue "State" (vaultStateLabel state)
+                  , toolKeyValue "Entries" (show (Array.length state.vaultEntries))
+                  , toolKeyValue "Vault file" state.vaultFileName
+                  , toolKeyValue "Persisted" (if state.vaultDirty then "No, write failed" else "Yes")
+                  ]
+              , renderVaultInlineStatus state
+              ]
+          , toolCard "vault-entries-card" "vault-entries"
+              [ toolHeading "Encrypted entries" "Only non-secret metadata is rendered while the vault is unlocked."
+              , renderVaultEntries state
+              ]
+          ]
+      ]
+
+  renderVaultEntries state =
+    if not state.vaultUnlocked then
+      toolEmpty "Create or open a vault to inspect entry metadata."
+    else if Array.null state.vaultEntries then
+      toolEmpty "The unlocked vault is empty. Save a secret from Keys or Settings."
+    else
+      HH.div [ classNames [ "vault-entry-list" ] ]
+        (map renderVaultMetadataEntry (Array.reverse state.vaultEntries))
+
+  renderVaultMetadataEntry entry =
+    HH.div [ classNames [ "vault-entry" ] ]
+      [ HH.div_
+          [ HH.strong_ [ HH.text entry.label ]
+          , HH.p [ classNames [ "vault-kind" ] ] [ HH.text entry.kind ]
+          , HH.p [ classNames [ "vault-created" ] ] [ HH.text entry.createdAt ]
+          ]
+      , keyButton false "Delete" (DeleteVaultEntry entry.id)
+      ]
+
+  renderVaultInlineStatus state = case state.vaultErrorMessage, state.vaultStatusMessage of
+    Just err, _ ->
+      HH.div
+        [ classNames [ "tool-error", "vault-alert" ]
+        , HH.attr (HH.AttrName "role") "alert"
+        ]
+        [ HH.text err ]
+    Nothing, Just status -> HH.div [ classNames [ "privacy-note", "vault-status" ] ] [ HH.text status ]
+    Nothing, Nothing -> HH.text ""
+
+  renderVaultShelf className acceptedKinds entries peekAction popAction =
+    let compatible = Array.reverse (vaultEntriesForKinds acceptedKinds entries)
+    in
+      if Array.null compatible then
+        HH.div [ classNames [ "privacy-note", "vault-shelf-empty" ] ]
+          [ HH.text "No compatible entries in the unlocked vault." ]
+      else
+        HH.div [ classNames [ "vault-shelf", className ] ]
+          (map (renderVaultShelfEntry peekAction popAction) compatible)
+
+  renderVaultShelfEntry peekAction popAction entry =
+    HH.div [ classNames [ "vault-entry" ] ]
+      [ HH.div_
+          [ HH.strong_ [ HH.text entry.label ]
+          , HH.p [ classNames [ "vault-kind" ] ] [ HH.text (vaultKindLabel entry.kind) ]
+          ]
+      , HH.div [ classNames [ "key-actions" ] ]
+          [ keyButton false "Peek" (peekAction entry.id)
+          , keyButton false "Pop" (popAction entry.id)
+          ]
       ]
 
   renderLibrary state =
@@ -1722,11 +1865,7 @@ inspectorComponent initial =
           , renderConfigRow
               "vpn_key"
               "Credentials"
-              ( if state.persistKeys then
-                  "Persistent browser storage"
-                else
-                  "Session only"
-              )
+              "Memory only / encrypted vault"
           ]
       ]
 
@@ -2747,7 +2886,7 @@ inspectorComponent initial =
       [ HH.div
           [ classNames [ "panel-heading" ] ]
           [ HH.h2_ [ HH.text "Chain data" ]
-          , HH.p_ [ HH.text "Credentials stay in memory unless persistence is enabled." ]
+          , HH.p_ [ HH.text "Credentials stay in memory and can persist only in the encrypted vault." ]
           ]
       , HH.fieldset
           [ classNames [ "control-group" ] ]
@@ -2789,6 +2928,7 @@ inspectorComponent initial =
                   [ HP.type_ HP.InputPassword
                   , HP.placeholder "mainnet... / preprod... / preview..."
                   , HP.value state.blockfrostKey
+                  , HH.attr (HH.AttrName "aria-label") "Blockfrost project ID"
                   , HE.onValueInput SetBlockfrostKey
                   ]
               Koios ->
@@ -2796,9 +2936,15 @@ inspectorComponent initial =
                   [ HP.type_ HP.InputPassword
                   , HP.placeholder "eyJhbGciOi..."
                   , HP.value state.koiosBearer
+                  , HH.attr (HH.AttrName "aria-label") "Koios bearer token"
                   , HE.onValueInput SetKoiosBearer
                   ]
           ]
+      , keyTextField "Vault item name" state.providerVaultLabelInput SetProviderVaultLabel
+      , HH.div [ classNames [ "key-actions" ] ]
+          [ keyButton false "Save secret to vault" SaveProviderSecretToVault ]
+      , renderVaultShelf "vault-shelf--provider" (providerAcceptedKinds state.provider) state.vaultEntries PeekVaultEntryInProvider PopVaultEntryInProvider
+      , renderVaultInlineStatus state
       , HH.fieldset
           [ classNames [ "control-group" ] ]
           [ HH.legend_ [ HH.text "Network" ]
@@ -2808,34 +2954,6 @@ inspectorComponent initial =
               , networkRadio state Preprod "preprod"
               , networkRadio state Preview "preview"
               ]
-          ]
-      , renderPersistToggle state
-      ]
-
-  renderPersistToggle state =
-    HH.div
-      [ classNames [ "persist-block" ] ]
-      [ HH.label
-          [ classNames [ "switch-row" ] ]
-          [ HH.input
-              [ HP.type_ HP.InputCheckbox
-              , HH.attr (HH.AttrName "role") "switch"
-              , HP.checked state.persistKeys
-              , HE.onChecked TogglePersist
-              ]
-          , HH.element (HH.ElemName "md-switch")
-              [ classNames [ "persist-md-switch" ]
-              , HH.attr (HH.AttrName "aria-hidden") "true"
-              , HH.attr (HH.AttrName "tabindex") "-1"
-              ]
-              []
-          , HH.span_ [ HH.text "Persist API credentials" ]
-          ]
-      , HH.p
-          [ classNames [ "warning-note" ] ]
-          [ HH.strong_ [ HH.text "Warning: " ]
-          , HH.text
-              "when enabled, credentials are saved in localStorage in cleartext. When disabled, they stay in memory only."
           ]
       ]
 
@@ -4782,6 +4900,118 @@ inspectorComponent initial =
     SetVerificationKey value -> H.modify_ _ { verificationKeyInput = value } *> refreshKeyVerification
     SetSignature value -> H.modify_ _ { signatureInput = value } *> refreshKeyVerification
     CopyKeyValue value -> H.liftAff (Clipboard.copy value)
+    SetVaultPassphrase value ->
+      H.modify_ _ { vaultPassphraseInput = value, vaultErrorMessage = Nothing, vaultStatusMessage = Nothing }
+    ToggleVaultPassphrase ->
+      H.modify_ \state -> state { showVaultPassphrase = not state.showVaultPassphrase }
+    CreateVault -> do
+      state <- H.get
+      if String.trim state.vaultPassphraseInput == "" then
+        vaultError "Enter a vault passphrase before creating a vault."
+      else do
+        result <- H.liftAff (attempt (Vault.createVaultFile defaultVaultFileName state.vaultPassphraseInput []))
+        case result of
+          Left err -> vaultError ("Vault creation failed: " <> message err)
+          Right fileName -> H.modify_ _
+            { vaultFileName = fileName
+            , vaultUnlocked = true
+            , vaultEntries = []
+            , vaultDirty = false
+            , vaultErrorMessage = Nothing
+            , vaultStatusMessage = Just ("Created encrypted vault " <> fileName <> ".")
+            }
+    OpenVault -> do
+      state <- H.get
+      if String.trim state.vaultPassphraseInput == "" then
+        vaultError "Enter the vault passphrase before opening a vault file."
+      else do
+        result <- H.liftAff (attempt (Vault.importVaultFile state.vaultPassphraseInput))
+        case result of
+          Left err -> vaultError ("Vault import failed: " <> message err)
+          Right imported ->
+            if imported.canceled then
+              H.modify_ _ { vaultErrorMessage = Nothing, vaultStatusMessage = Just "Vault import canceled." }
+            else
+              H.modify_ _
+                { vaultFileName = imported.fileName
+                , vaultUnlocked = true
+                , vaultEntries = imported.entries
+                , vaultDirty = false
+                , vaultErrorMessage = Nothing
+                , vaultStatusMessage = Just ("Opened encrypted vault " <> imported.fileName <> ".")
+                }
+    ExportVault -> do
+      state <- H.get
+      if not state.vaultUnlocked then
+        vaultError "Open or create a vault before downloading a backup."
+      else if String.trim state.vaultPassphraseInput == "" then
+        vaultError "Enter the vault passphrase before downloading a backup."
+      else do
+        result <- H.liftAff (attempt (Vault.exportVaultFile state.vaultFileName state.vaultPassphraseInput state.vaultEntries))
+        case result of
+          Left err -> vaultError ("Vault export failed: " <> message err)
+          Right _ -> H.modify_ _
+            { vaultDirty = false
+            , vaultErrorMessage = Nothing
+            , vaultStatusMessage = Just ("Downloaded encrypted vault backup " <> state.vaultFileName <> ".")
+            }
+    LockVault ->
+      H.modify_ _
+        { vaultPassphraseInput = ""
+        , showVaultPassphrase = false
+        , vaultUnlocked = false
+        , vaultEntries = []
+        , vaultDirty = false
+        , vaultErrorMessage = Nothing
+        , vaultStatusMessage = Just "Vault locked. Decrypted entries were cleared from memory."
+        }
+    SetMnemonicVaultLabel value -> H.modify_ _ { mnemonicVaultLabelInput = value }
+    SetRestoreVaultLabel value -> H.modify_ _ { restoreVaultLabelInput = value }
+    SetSigningVaultLabel value -> H.modify_ _ { signingVaultLabelInput = value }
+    SetProviderVaultLabel value -> H.modify_ _ { providerVaultLabelInput = value }
+    SaveGeneratedMnemonicToVault -> do
+      state <- H.get
+      case state.generatedMnemonic of
+        Nothing -> vaultError "Generate a mnemonic before saving it to the vault."
+        Just words ->
+          saveVaultEntry Vault.VaultMnemonic
+            (vaultEntryLabel state.mnemonicVaultLabelInput (show (Array.length words) <> "-word mnemonic"))
+            (String.joinWith " " words)
+    SaveRestoreMnemonicToVault -> do
+      state <- H.get
+      let phrase = String.trim state.restorePhrase
+      if phrase == "" then vaultError "Enter a recovery phrase before saving it to the vault."
+      else saveVaultEntry Vault.VaultMnemonic (vaultEntryLabel state.restoreVaultLabelInput "Restore phrase") phrase
+    SaveSigningKeyToVault -> do
+      state <- H.get
+      let secret = String.trim state.signingKeyInput
+      if secret == "" then vaultError "Enter a signing key before saving it to the vault."
+      else saveVaultEntry Vault.VaultSigningKey (vaultEntryLabel state.signingVaultLabelInput "Signing key") secret
+    SaveDerivedKeyToVault kind label value -> saveVaultEntry kind label value
+    SaveProviderSecretToVault -> do
+      state <- H.get
+      let secret = providerSecret state
+      if String.trim secret == "" then vaultError ("Enter a " <> providerSecretLabel state.provider <> " before saving it to the vault.")
+      else saveVaultEntry (providerVaultKind state.provider) (vaultEntryLabel state.providerVaultLabelInput (providerSecretLabel state.provider)) secret
+    PeekVaultEntryInRestore entryId -> useVaultEntry restoreAcceptedKinds entryId \entry -> do
+      H.modify_ _ { restorePhrase = entry.value }
+      refreshKeyDerivation
+    PopVaultEntryInRestore entryId -> popVaultEntry restoreAcceptedKinds entryId \entry -> do
+      H.modify_ _ { restorePhrase = entry.value }
+      refreshKeyDerivation
+    PeekVaultEntryInSigning entryId -> useVaultEntry signingAcceptedKinds entryId \entry ->
+      H.modify_ _ { signingKeyInput = entry.value } *> refreshKeySigning
+    PopVaultEntryInSigning entryId -> popVaultEntry signingAcceptedKinds entryId \entry ->
+      H.modify_ _ { signingKeyInput = entry.value } *> refreshKeySigning
+    PeekVaultEntryInProvider entryId -> do
+      state <- H.get
+      useVaultEntry (providerAcceptedKinds state.provider) entryId setProviderEntry
+    PopVaultEntryInProvider entryId -> do
+      state <- H.get
+      popVaultEntry (providerAcceptedKinds state.provider) entryId setProviderEntry
+    DeleteVaultEntry entryId -> do
+      state <- H.get
+      persistVaultEntries (Array.filter (\entry -> entry.id /= entryId) state.vaultEntries) "Removed entry from the vault."
     SetAddressInput value ->
       H.modify_ _ { addressInput = value, addressResult = Nothing }
     InspectAddress -> do
@@ -4821,33 +5051,15 @@ inspectorComponent initial =
       H.modify_ _ { theme = nextTheme }
     SetBlockfrostKey s -> do
       H.modify_ _ { blockfrostKey = s }
-      persist <- H.gets _.persistKeys
-      when persist (liftEffect (Storage.setItem blockfrostKey s))
     SetKoiosBearer s -> do
       if looksLikeBlockfrostProjectId s then do
         H.modify_ _ { provider = Blockfrost, blockfrostKey = s, fetchError = Nothing }
         liftEffect (Storage.setItem providerKey (Provider.providerName Blockfrost))
-        persist <- H.gets _.persistKeys
-        when persist (liftEffect (Storage.setItem blockfrostKey s))
       else do
         H.modify_ _ { koiosBearer = s }
-        persist <- H.gets _.persistKeys
-        when persist (liftEffect (Storage.setItem koiosKey s))
     SelectProvider p -> do
       H.modify_ _ { provider = p, fetchError = Nothing }
       liftEffect (Storage.setItem providerKey (Provider.providerName p))
-    TogglePersist on -> do
-      H.modify_ _ { persistKeys = on }
-      liftEffect (Storage.setItem persistKeysStorageKey (if on then "true" else "false"))
-      st <- H.get
-      liftEffect
-        if on
-          then do
-            Storage.setItem blockfrostKey st.blockfrostKey
-            Storage.setItem koiosKey st.koiosBearer
-          else do
-            Storage.setItem blockfrostKey ""
-            Storage.setItem koiosKey ""
     SelectMode m -> H.modify_ _ { mode = m, fetchError = Nothing, copiedPath = Nothing }
     SelectNetwork n -> do
       H.modify_ _ { network = n, fetchError = Nothing, copiedPath = Nothing }
@@ -5339,6 +5551,123 @@ inspectorComponent initial =
       H.modify_ _ { resultTab = tab }
     ChangeInput ->
       H.modify_ _ { loadFormExpanded = true, copied = false, copiedPath = Nothing }
+
+  vaultError errorMessage =
+    H.modify_ _ { vaultErrorMessage = Just errorMessage, vaultStatusMessage = Nothing }
+
+  saveVaultEntry kind label value = do
+    state <- H.get
+    if not state.vaultUnlocked then
+      vaultError "Open or create a vault before saving secrets."
+    else do
+      entry <- liftEffect (Vault.createVaultEntry kind label value)
+      persistVaultEntries (Array.snoc state.vaultEntries entry) ("Saved " <> entry.label <> " into the vault.")
+
+  persistVaultEntries entries successMessage = do
+    state <- H.get
+    if not state.vaultUnlocked then
+      vaultError "Open or create a vault before saving secrets."
+    else if String.trim state.vaultPassphraseInput == "" then
+      vaultError "Enter the vault passphrase before saving changes."
+    else do
+      result <- H.liftAff (attempt (Vault.persistVaultFile state.vaultFileName state.vaultPassphraseInput entries))
+      case result of
+        Left err -> H.modify_ _
+          { vaultEntries = entries
+          , vaultDirty = true
+          , vaultErrorMessage = Just ("Vault save failed: " <> message err)
+          , vaultStatusMessage = Nothing
+          }
+        Right fileName -> H.modify_ _
+          { vaultFileName = fileName
+          , vaultEntries = entries
+          , vaultDirty = false
+          , vaultErrorMessage = Nothing
+          , vaultStatusMessage = Just successMessage
+          }
+
+  useVaultEntry acceptedKinds entryId consume = do
+    state <- H.get
+    if not state.vaultUnlocked then
+      vaultError "Open a vault before loading secrets."
+    else case Array.find (\entry -> entry.id == entryId) state.vaultEntries of
+      Nothing -> vaultError "Selected vault entry was not found."
+      Just entry ->
+        if not (Array.elem entry.kind acceptedKinds) then
+          vaultError "Selected vault entry is not compatible with this tool."
+        else do
+          consume entry
+          H.modify_ _ { vaultErrorMessage = Nothing, vaultStatusMessage = Just ("Loaded " <> entry.label <> " into memory.") }
+
+  popVaultEntry acceptedKinds entryId consume = do
+    state <- H.get
+    if not state.vaultUnlocked then
+      vaultError "Open a vault before loading secrets."
+    else case Array.find (\entry -> entry.id == entryId) state.vaultEntries of
+      Nothing -> vaultError "Selected vault entry was not found."
+      Just entry ->
+        if not (Array.elem entry.kind acceptedKinds) then
+          vaultError "Selected vault entry is not compatible with this tool."
+        else do
+          persistVaultEntries (Array.filter (\candidate -> candidate.id /= entryId) state.vaultEntries) ("Popped " <> entry.label <> " from the vault.")
+          consume entry
+
+  setProviderEntry entry = do
+    provider <- H.gets _.provider
+    case provider of
+      Blockfrost -> H.modify_ _ { blockfrostKey = entry.value }
+      Koios -> H.modify_ _ { koiosBearer = entry.value }
+
+  restoreAcceptedKinds = [ Vault.kindTag Vault.VaultMnemonic ]
+
+  signingAcceptedKinds =
+    [ Vault.kindTag Vault.VaultSigningKey
+    , Vault.kindTag Vault.VaultRootPrivateKey
+    , Vault.kindTag Vault.VaultAccountPrivateKey
+    , Vault.kindTag Vault.VaultAddressPrivateKey
+    , Vault.kindTag Vault.VaultStakePrivateKey
+    ]
+
+  providerAcceptedKinds = case _ of
+    Blockfrost -> [ Vault.kindTag Vault.VaultBlockfrostProjectId ]
+    Koios -> [ Vault.kindTag Vault.VaultKoiosBearerToken ]
+
+  vaultEntriesForKinds acceptedKinds =
+    Array.filter (\entry -> Array.elem entry.kind acceptedKinds)
+
+  providerVaultKind = case _ of
+    Blockfrost -> Vault.VaultBlockfrostProjectId
+    Koios -> Vault.VaultKoiosBearerToken
+
+  providerSecretLabel = case _ of
+    Blockfrost -> "Blockfrost project ID"
+    Koios -> "Koios bearer token"
+
+  providerSecret state = case state.provider of
+    Blockfrost -> String.trim state.blockfrostKey
+    Koios -> String.trim state.koiosBearer
+
+  vaultEntryLabel custom fallback =
+    let normalized = String.trim custom
+    in if normalized == "" then fallback else normalized
+
+  vaultKindLabel kind
+    | kind == Vault.kindTag Vault.VaultMnemonic = Vault.labelForKind Vault.VaultMnemonic
+    | kind == Vault.kindTag Vault.VaultSigningKey = Vault.labelForKind Vault.VaultSigningKey
+    | kind == Vault.kindTag Vault.VaultRootPrivateKey = Vault.labelForKind Vault.VaultRootPrivateKey
+    | kind == Vault.kindTag Vault.VaultAccountPrivateKey = Vault.labelForKind Vault.VaultAccountPrivateKey
+    | kind == Vault.kindTag Vault.VaultAddressPrivateKey = Vault.labelForKind Vault.VaultAddressPrivateKey
+    | kind == Vault.kindTag Vault.VaultStakePrivateKey = Vault.labelForKind Vault.VaultStakePrivateKey
+    | kind == Vault.kindTag Vault.VaultBlockfrostProjectId = Vault.labelForKind Vault.VaultBlockfrostProjectId
+    | kind == Vault.kindTag Vault.VaultKoiosBearerToken = Vault.labelForKind Vault.VaultKoiosBearerToken
+    | otherwise = kind
+
+  defaultVaultFileName = "cardano-swiss-knife.vault.json"
+
+  vaultStateLabel state
+    | state.vaultUnlocked && state.vaultDirty = "Unlocked, modified in memory"
+    | state.vaultUnlocked = "Unlocked"
+    | otherwise = "Locked"
 
   updateAnnotationDraft update =
     H.modify_ \st -> st { annotationDraft = map update st.annotationDraft }
