@@ -2,7 +2,7 @@
 
 ## Static assets
 
-The browser bundle and the two WASM binaries are versioned as build outputs and served as static files.
+The browser bundle and its three hashed WASM families—address operations, ledger inspection, and RDF-shapes validation—are served as static files from the unified Nix artifact.
 
 ## In-memory state
 

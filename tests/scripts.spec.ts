@@ -20,12 +20,11 @@ const invalidTemplateJson =
   '{"cosigners":{"cosigner#0":"11840384ddea20045a0c7cc4bebccae1beacd2496c44ee527c3ac14a196056cdbafa73dfc71f106449ebf1913d8ab698738ff5dfc6f3259f0bfdfc62ea684b3c","cosigner#1":"11840384ddea20045a0c7cc4bebccae1beacd2496c44ee527c3ac14a196056cdbafa73dfc71f106449ebf1913d8ab698738ff5dfc6f3259f0bfdfc62ea684b3c"},"template":{"all":["cosigner#0","cosigner#1"]}}';
 
 test("scripts page analyzes valid native script CBOR", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/scripts");
 
-  await page.getByRole("button", { name: /Scripts Hash native scripts/ }).click();
-  await expect(page.getByRole("heading", { name: "Native Scripts" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Native scripts" })).toBeVisible();
 
-  await page.getByPlaceholder("8200581c...").fill(validScriptCborHex);
+  await page.getByLabel("Native script CBOR hex").fill(validScriptCborHex);
 
   await expect(page.getByText("Signature", { exact: true })).toBeVisible();
   await expect(page.getByText("valid", { exact: true })).toBeVisible();
@@ -34,15 +33,12 @@ test("scripts page analyzes valid native script CBOR", async ({ page }) => {
 });
 
 test("scripts page authors native scripts from JSON", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/scripts");
 
-  await page.getByRole("button", { name: /Scripts Hash native scripts/ }).click();
-  await expect(page.getByRole("heading", { name: "Native Scripts" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Native scripts" })).toBeVisible();
 
-  await page.getByRole("button", { name: "JSON", exact: true }).click();
-  await page
-    .getByPlaceholder('{"all":["addr_vkh1...",{"active_from":120}]}')
-    .fill(validScriptJson);
+  await page.getByRole("tab", { name: "JSON", exact: true }).click();
+  await page.getByLabel("Native script JSON").fill(validScriptJson);
 
   await expect(page.getByText("Signature", { exact: true })).toBeVisible();
   await expect(page.getByText(validScriptJson, { exact: true })).toBeVisible();
@@ -51,15 +47,12 @@ test("scripts page authors native scripts from JSON", async ({ page }) => {
 });
 
 test("scripts page analyzes ScriptTemplate JSON", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/scripts");
 
-  await page.getByRole("button", { name: /Scripts Hash native scripts/ }).click();
-  await expect(page.getByRole("heading", { name: "Native Scripts" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Native scripts" })).toBeVisible();
 
-  await page.getByRole("button", { name: "Template JSON" }).click();
-  await page
-    .getByPlaceholder('{"cosigners":{"cosigner#0":"<xpub-hex>"},"template":"cosigner#0"}')
-    .fill(validTemplateJson);
+  await page.getByRole("tab", { name: "Template JSON" }).click();
+  await page.getByLabel("ScriptTemplate JSON").fill(validTemplateJson);
 
   await expect(
     page.locator("div").filter({ hasText: /^Template validationvalid$/ }).getByRole("code"),
@@ -69,15 +62,12 @@ test("scripts page analyzes ScriptTemplate JSON", async ({ page }) => {
 });
 
 test("scripts page surfaces ScriptTemplate validation failures", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/scripts");
 
-  await page.getByRole("button", { name: /Scripts Hash native scripts/ }).click();
-  await expect(page.getByRole("heading", { name: "Native Scripts" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Native scripts" })).toBeVisible();
 
-  await page.getByRole("button", { name: "Template JSON" }).click();
-  await page
-    .getByPlaceholder('{"cosigners":{"cosigner#0":"<xpub-hex>"},"template":"cosigner#0"}')
-    .fill(invalidTemplateJson);
+  await page.getByRole("tab", { name: "Template JSON" }).click();
+  await page.getByLabel("ScriptTemplate JSON").fill(invalidTemplateJson);
 
   await expect(page.getByText("error", { exact: true })).toBeVisible();
   await expect(
@@ -91,12 +81,11 @@ test("scripts page surfaces ScriptTemplate validation failures", async ({ page }
 });
 
 test("scripts page shows validation warnings for awkward scripts", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/scripts");
 
-  await page.getByRole("button", { name: /Scripts Hash native scripts/ }).click();
-  await expect(page.getByRole("heading", { name: "Native Scripts" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Native scripts" })).toBeVisible();
 
-  await page.getByPlaceholder("8200581c...").fill(warningScriptCborHex);
+  await page.getByLabel("Native script CBOR hex").fill(warningScriptCborHex);
 
   await expect(page.getByText("Any", { exact: true })).toBeVisible();
   await expect(page.getByText("warning", { exact: true })).toBeVisible();

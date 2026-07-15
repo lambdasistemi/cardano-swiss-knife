@@ -18,7 +18,7 @@ if (!signingVector) {
   throw new Error("Missing signing fixture: message-sign-address-hex");
 }
 
-const txCbor = fs
+const baseTxCbor = fs
   .readFileSync(
     path.join(
       process.cwd(),
@@ -29,6 +29,9 @@ const txCbor = fs
     "utf8",
   )
   .trim();
+
+const addressSignerHash =
+  "3207c32d806ec2cabc78ff7ed869bd3098b7db93c43cc8aa93ab59eb";
 
 const BREAK = Symbol("break");
 
@@ -42,6 +45,129 @@ const hexToBytes = (hex: string) => {
     normalized.match(/../g)!.map((chunk) => Number.parseInt(chunk, 16)),
   );
 };
+
+const readCborLength = (
+  bytes: Uint8Array,
+  start: number,
+  additional: number,
+) => {
+  let offset = start;
+  if (additional < 24) return { length: additional, offset };
+  if (additional === 24) return { length: bytes[offset], offset: offset + 1 };
+  if (additional === 25) {
+    return {
+      length: (bytes[offset] << 8) | bytes[offset + 1],
+      offset: offset + 2,
+    };
+  }
+  if (additional === 26) {
+    return {
+      length:
+        bytes[offset] * 0x1000000 +
+        (bytes[offset + 1] << 16) +
+        (bytes[offset + 2] << 8) +
+        bytes[offset + 3],
+      offset: offset + 4,
+    };
+  }
+  if (additional === 27) {
+    let length = 0n;
+    for (let index = 0; index < 8; index += 1) {
+      length = (length << 8n) | BigInt(bytes[offset + index]);
+    }
+    return { length: Number(length), offset: offset + 8 };
+  }
+  if (additional === 31) return { length: null, offset };
+  throw new Error(`Unsupported CBOR additional info: ${additional}`);
+};
+
+const skipCborItem = (bytes: Uint8Array, start: number): number => {
+  const initial = bytes[start];
+  const major = initial >> 5;
+  const additional = initial & 0x1f;
+  const decoded = readCborLength(bytes, start + 1, additional);
+  let offset = decoded.offset;
+
+  if (major === 0 || major === 1 || major === 7) return offset;
+  if (major === 2 || major === 3) {
+    if (decoded.length !== null) return offset + decoded.length;
+    while (bytes[offset] !== 0xff) offset = skipCborItem(bytes, offset);
+    return offset + 1;
+  }
+  if (major === 4) {
+    if (decoded.length === null) {
+      while (bytes[offset] !== 0xff) offset = skipCborItem(bytes, offset);
+      return offset + 1;
+    }
+    for (let index = 0; index < decoded.length; index += 1) {
+      offset = skipCborItem(bytes, offset);
+    }
+    return offset;
+  }
+  if (major === 5) {
+    if (decoded.length === null) {
+      while (bytes[offset] !== 0xff) {
+        offset = skipCborItem(bytes, offset);
+        offset = skipCborItem(bytes, offset);
+      }
+      return offset + 1;
+    }
+    for (let index = 0; index < decoded.length; index += 1) {
+      offset = skipCborItem(bytes, offset);
+      offset = skipCborItem(bytes, offset);
+    }
+    return offset;
+  }
+  if (major === 6) return skipCborItem(bytes, offset);
+  throw new Error(`Unsupported CBOR major type: ${major}`);
+};
+
+const addRequiredSigner = (txHex: string, signerHashHex: string) => {
+  const bytes = hexToBytes(txHex);
+  if (bytes[0] !== 0x84) {
+    throw new Error("Expected the signing fixture to be a four-item transaction array.");
+  }
+  const bodyStart = 1;
+  const bodyHeader = bytes[bodyStart];
+  const bodyMajor = bodyHeader >> 5;
+  const bodyCount = bodyHeader & 0x1f;
+  if (bodyMajor !== 5 || bodyCount >= 23) {
+    throw new Error("Expected the signing fixture body to use a short definite map.");
+  }
+
+  let offset = bodyStart + 1;
+  let insertionOffset: number | null = null;
+  for (let index = 0; index < bodyCount; index += 1) {
+    const keyOffset = offset;
+    const keyByte = bytes[keyOffset];
+    if (keyByte > 0x17) {
+      throw new Error("Expected the signing fixture body to use small integer keys.");
+    }
+    if (keyByte === 14) {
+      throw new Error("Signing fixture already declares the derived signer.");
+    }
+    if (insertionOffset === null && keyByte > 14) insertionOffset = keyOffset;
+    offset = skipCborItem(bytes, keyOffset);
+    offset = skipCborItem(bytes, offset);
+  }
+  if (insertionOffset === null) insertionOffset = offset;
+
+  const requiredSigner = Uint8Array.from([
+    0x0e,
+    0x81,
+    0x58,
+    0x1c,
+    ...hexToBytes(signerHashHex),
+  ]);
+  const patched = new Uint8Array(bytes.length + requiredSigner.length);
+  patched.set(bytes.slice(0, insertionOffset), 0);
+  patched[bodyStart] = bodyHeader + 1;
+  patched.set(requiredSigner, insertionOffset);
+  patched.set(bytes.slice(insertionOffset), insertionOffset + requiredSigner.length);
+  return Array.from(patched, (byte) => byte.toString(16).padStart(2, "0")).join("");
+};
+
+const txCbor = addRequiredSigner(baseTxCbor, addressSignerHash);
 
 const readCbor = (bytes: Uint8Array) => {
   let offset = 0;
@@ -213,91 +339,69 @@ const countVkeyWitnesses = (txHex: string) => {
   return witnesses.length;
 };
 
-test("transactions page stores the Blockfrost project ID in the encrypted vault and hides it for CBOR input", async ({
+test("workbench stores the Blockfrost project ID in the encrypted vault and hides it for CBOR input", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/vault");
 
-  await page.getByRole("button", { name: /Vault Encrypted file storage/ }).click();
-  await page
-    .getByPlaceholder("Strong passphrase for the vault file")
-    .fill("correct horse battery staple");
+  await page.getByLabel("Vault passphrase").fill("correct horse battery staple");
   await page.getByRole("button", { name: "Create vault" }).click();
-  await expect(
-    page.locator(".kv-row").filter({ has: page.getByText("State") }).getByText("Unlocked"),
-  ).toBeVisible();
+  await expect(page.locator(".vault-summary")).toContainText("Unlocked");
 
   await page
-    .getByRole("button", { name: /Transactions Inspect and sign/ })
+    .getByRole("navigation", { name: "Primary" })
+    .getByRole("link", { name: "Settings" })
     .click();
 
-  const inspectCard = page
-    .locator("section.card")
-    .filter({ has: page.getByText("Inspect transaction") });
-
-  const credentialInput = inspectCard.getByPlaceholder("mainnet...");
-  await inspectCard.getByRole("button", { name: "Show credential" }).click();
+  const credentialInput = page.getByLabel("Blockfrost project ID");
   await credentialInput.fill("mainnet_vault_project_id");
-  await inspectCard.getByPlaceholder("Blockfrost project ID").fill("Ops Blockfrost");
-  await inspectCard.getByRole("button", { name: "Save secret to vault" }).click();
+  await page.getByLabel("Vault item name").fill("Ops Blockfrost");
+  await page.getByRole("button", { name: "Save secret to vault" }).click();
   await expect(page.getByText("Saved Ops Blockfrost into the vault.")).toBeVisible();
 
   await credentialInput.fill("");
-  const firstVaultEntry = inspectCard.locator(".vault-entry").first();
+  const firstVaultEntry = page.locator(".vault-shelf--provider .vault-entry").first();
   await expect(firstVaultEntry.getByText("Ops Blockfrost", { exact: true })).toBeVisible();
   await firstVaultEntry.getByRole("button", { name: "Pop" }).click();
   await expect(credentialInput).toHaveValue("mainnet_vault_project_id");
   await expect(
-    inspectCard.locator(".vault-entry").getByText("Ops Blockfrost", { exact: true }),
+    page.locator(".vault-shelf--provider .vault-entry").getByText("Ops Blockfrost", { exact: true }),
   ).toHaveCount(0);
 
-  await inspectCard.getByRole("button", { name: "CBOR hex" }).click();
-  await expect(credentialInput).toBeHidden();
+  await page.getByRole("navigation", { name: "Primary" }).getByRole("link", { name: "Workbench" }).click();
+  await page.getByRole("tab", { name: "Paste CBOR" }).click();
+  await expect(page.getByLabel("Blockfrost project ID")).toHaveCount(0);
 });
 
 test("transaction signing can load a private key from the vault", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/vault");
 
-  await page.getByRole("button", { name: /Vault Encrypted file storage/ }).click();
-  await page
-    .getByPlaceholder("Strong passphrase for the vault file")
-    .fill("correct horse battery staple");
+  await page.getByLabel("Vault passphrase").fill("correct horse battery staple");
   await page.getByRole("button", { name: "Create vault" }).click();
 
-  await page.getByRole("button", { name: /Signing Sign and verify/ }).click();
-  const signingCard = page
-    .locator("section.card")
-    .filter({ has: page.getByText("Sign payload") });
+  await page.getByRole("navigation", { name: "Primary" }).getByRole("link", { name: "Keys" }).click();
+  await page.getByRole("tab", { name: "Sign & verify", exact: true }).click();
+  const signingCard = page.getByRole("region", { name: "Sign payload" });
 
   await signingCard.getByRole("button", { name: "Show signing key" }).click();
-  await signingCard
-    .getByPlaceholder("addr_xsk1... or stake_xsk1...")
-    .fill(signingVector.signingKeyBech32);
-  await signingCard.getByPlaceholder("Signing key").fill("Ops tx signer");
+  await signingCard.getByLabel("Signing key").fill(signingVector.signingKeyBech32);
+  await signingCard.getByLabel("Vault item name").fill("Ops tx signer");
   await signingCard.getByRole("button", { name: "Save signing key to vault" }).click();
   await expect(page.getByText("Saved Ops tx signer into the vault.")).toBeVisible();
 
-  await page
-    .getByRole("button", { name: /Transactions Inspect and sign/ })
-    .click();
+  await page.getByRole("navigation", { name: "Primary" }).getByRole("link", { name: "Workbench" }).click();
+  await page.getByRole("tab", { name: "Paste CBOR" }).click();
+  await page.getByPlaceholder("Paste Conway transaction CBOR hex").fill(txCbor);
+  await page.getByRole("button", { name: "Decode", exact: true }).click();
 
-  const inspectCard = page
-    .locator("section.card")
-    .filter({ has: page.getByText("Inspect transaction") });
-  await inspectCard.getByRole("button", { name: "CBOR hex" }).click();
-  await inspectCard.getByPlaceholder("84a40081825820...").fill(txCbor);
-  await inspectCard.getByRole("button", { name: "Inspect transaction" }).click();
-
-  const signCard = page
-    .locator("section.card")
-    .filter({ has: page.getByText("Sign transaction body") });
+  const signCard = page.getByRole("region", { name: "Sign transaction body" });
   await expect(signCard).not.toContainText("Inspect a transaction first", {
     timeout: 20000,
   });
 
-  const txSigningInput = signCard.getByPlaceholder("addr_xsk1... or stake_xsk1...");
+  const txSigningInput = signCard.getByLabel("Transaction signing key");
   await signCard.getByRole("button", { name: "Show signing key" }).click();
   await txSigningInput.fill("");
 
@@ -339,59 +443,44 @@ test("transactions page signs into transaction CBOR and keeps detached witness d
       },
     });
   });
-  await page.goto("/");
+  await page.goto("/inspect");
+  await page.getByRole("tab", { name: "Paste CBOR" }).click();
+  await page.getByPlaceholder("Paste Conway transaction CBOR hex").fill(txCbor);
+  await page.getByRole("button", { name: "Decode", exact: true }).click();
 
-  await page
-    .getByRole("button", { name: /Transactions Inspect and sign/ })
-    .click();
-  await expect(page.locator(".page-title")).toHaveText("Transaction Workbench");
-
-  const inspectCard = page
-    .locator("section.card")
-    .filter({ has: page.getByText("Inspect transaction") });
-  await inspectCard.getByRole("button", { name: "CBOR hex" }).click();
-  await inspectCard.getByPlaceholder("84a40081825820...").fill(txCbor);
-  await inspectCard
-    .getByRole("button", { name: "Inspect transaction" })
-    .click();
-
-  const signCard = page
-    .locator("section.card")
-    .filter({ has: page.getByText("Sign transaction body") });
+  const signCard = page.getByRole("region", { name: "Sign transaction body" });
   await expect(signCard).not.toContainText("Inspect a transaction first", {
     timeout: 20000,
   });
   await expect(
-    page.locator(".kv-label", { hasText: "Transaction ID" }),
+    page.getByText("Transaction ID", { exact: true }),
   ).toBeVisible();
 
   await signCard.getByRole("button", { name: "Show signing key" }).click();
+  await signCard.getByLabel("Transaction signing key").fill(signingVector.signingKeyBech32);
   await signCard
-    .getByPlaceholder("addr_xsk1... or stake_xsk1...")
-    .fill(signingVector.signingKeyBech32);
-  await signCard
-    .getByRole("button", { name: /Create detached witness|Create signed transaction/ })
+    .getByRole("button", { name: "Create signed transaction" })
     .click();
 
   await expect(
     signCard.getByText(signingVector.verificationKeyBech32),
   ).toBeVisible();
-  await expect(signCard.getByText("VKey witness CBOR")).toBeVisible();
+  await expect(signCard.getByText("Detached vkey witness CBOR")).toBeVisible();
 
   const signedTxCard = signCard
-    .locator(".output-card")
-    .filter({ has: page.getByText("Signed transaction CBOR") });
+    .locator(".signing-output-card")
+    .filter({ has: page.getByText("Patched signed transaction CBOR") });
   await expect(signedTxCard).toBeVisible();
 
-  const signedTxHex = (await signedTxCard.locator(".output-value").textContent())?.trim();
+  const signedTxHex = (await signedTxCard.locator(".signing-output-value").textContent())?.trim();
   if (!signedTxHex) {
     throw new Error("Signed transaction CBOR result is missing.");
   }
 
   const witnessCard = signCard
-    .locator(".output-card")
-    .filter({ has: page.getByText("VKey witness CBOR") });
-  const witnessHex = (await witnessCard.locator(".output-value").textContent())?.trim();
+    .locator(".signing-output-card")
+    .filter({ has: page.getByText("Detached vkey witness CBOR") });
+  const witnessHex = (await witnessCard.locator(".signing-output-value").textContent())?.trim();
   if (!witnessHex) {
     throw new Error("Detached witness CBOR result is missing.");
   }
@@ -416,31 +505,19 @@ test("transactions page signs into transaction CBOR and keeps detached witness d
 test("transaction signing stays disabled until inspection finishes", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/inspect");
+  await page.getByRole("tab", { name: "Paste CBOR" }).click();
+  await page.getByPlaceholder("Paste Conway transaction CBOR hex").fill(txCbor);
 
-  await page
-    .getByRole("button", { name: /Transactions Inspect and sign/ })
-    .click();
-
-  const inspectCard = page
-    .locator("section.card")
-    .filter({ has: page.getByText("Inspect transaction") });
-  await inspectCard.getByRole("button", { name: "CBOR hex" }).click();
-  await inspectCard.getByPlaceholder("84a40081825820...").fill(txCbor);
-
-  const signCard = page
-    .locator("section.card")
-    .filter({ has: page.getByText("Sign transaction body") });
+  const signCard = page.getByRole("region", { name: "Sign transaction body" });
   await signCard.getByRole("button", { name: "Show signing key" }).click();
-  await signCard
-    .getByPlaceholder("addr_xsk1... or stake_xsk1...")
-    .fill(signingVector.signingKeyBech32);
+  await signCard.getByLabel("Transaction signing key").fill(signingVector.signingKeyBech32);
 
   const signButton = signCard.getByRole("button", {
-    name: /Create detached witness|Create signed transaction/,
+    name: "Create signed transaction",
   });
 
-  await inspectCard.getByRole("button", { name: "Inspect transaction" }).click();
+  await page.getByRole("button", { name: "Decode", exact: true }).click();
   await expect(signButton).toBeDisabled();
 
   await expect(signCard).not.toContainText("Inspect a transaction first", {

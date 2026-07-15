@@ -378,7 +378,7 @@ async function createVaultAndSaveDerivedAddressKey(page) {
 async function openWorkbench(page) {
   await page
     .getByRole("navigation", { name: "Primary" })
-    .getByRole("link", { name: "Inspect", exact: true })
+    .getByRole("link", { name: "Workbench", exact: true })
     .click();
   await expect(page).toHaveURL(/\/inspect\/?$/);
 }

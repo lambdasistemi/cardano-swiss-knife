@@ -1,4 +1,4 @@
-{ pkgs, repoRoot, wasmBinary, txInspectorWasmBinary }:
+{ pkgs, repoRoot, txInspectorUi }:
 
 let
   nodejs = pkgs.nodejs_22;
@@ -96,15 +96,7 @@ in
     '';
   };
 
-  app-build = mkWorkspaceDerivation {
-    name = "cardano-addresses-app-build";
-    spagoYaml = repoRoot + /app/spago.yaml;
-    buildPhase = ''
-      cd app
-      ln -sfn ../node_modules node_modules
-      spago build --pure -p cardano-addresses-browser
-    '';
-  };
+  app-build = txInspectorUi;
 
   test-build = mkWorkspaceDerivation {
     name = "cardano-addresses-test-build";
@@ -116,29 +108,11 @@ in
     '';
   };
 
-  web-dist = mkWorkspaceDerivation {
-    name = "cardano-addresses-web-dist";
-    spagoYaml = repoRoot + /app/spago.yaml;
-    buildPhase = ''
-      cd app
-      ln -sfn ../node_modules node_modules
-      spago build --pure -p cardano-addresses-browser
-      mkdir -p ../dist
-      esbuild ../output/Main/index.js \
-        --bundle \
-        --outfile=../dist/app.js \
-        --format=esm \
-        --minify \
-        --alias:fs=./shims/fs.cjs \
-        --alias:path=./shims/path.cjs
-      cd ..
-    '';
-    installPhase = ''
-      mkdir -p $out/wasm
-      cp ${repoRoot}/dist/index.html $out/index.html
-      cp dist/app.js $out/
-      cp ${wasmBinary}/cardano-addresses.wasm $out/wasm/cardano-addresses.wasm
-      cp ${txInspectorWasmBinary}/wasm-tx-inspector.wasm $out/wasm/wasm-tx-inspector.wasm
-    '';
-  };
+  web-dist = pkgs.runCommand "cardano-swiss-knife-web-dist" { } ''
+    mkdir -p "$out"
+    cp -a ${txInspectorUi}/. "$out/"
+    chmod u+w "$out"
+    mkdir "$out/inspector"
+    cp -a ${txInspectorUi}/. "$out/inspector/"
+  '';
 }

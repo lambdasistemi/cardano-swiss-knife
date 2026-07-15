@@ -27,15 +27,16 @@ let
       port_file="$work_tree/port"
       server_log="$work_tree/server.log"
 
-      diff -qr --exclude=inspector ${webDist} "$site"
+      diff -qr ${webDist} "$site"
+      diff -qr --exclude=inspector ${txInspectorUi} "$site"
       diff -qr ${txInspectorUi} "$site/inspector"
-      echo "artifact comparison: root web-dist and inspector trees are byte-identical"
+      echo "artifact comparison: canonical and compatibility trees come from the same inspector UI artifact"
 
       test -f "$site/index.html"
-      test -f "$site/app.js"
-      test -f "$site/wasm/cardano-addresses.wasm"
-      test -f "$site/wasm/wasm-tx-inspector.wasm"
-      grep -q '<title>cardano-swiss-knife</title>' "$site/index.html"
+      test -f "$site/index.js"
+      test -f "$site/material.js"
+      test -f "$site/styles.css"
+      grep -q '<title>Cardano transaction inspector</title>' "$site/index.html"
 
       test -f "$site/inspector/index.html"
       test -f "$site/inspector/index.js"
@@ -44,12 +45,12 @@ let
       grep -q '<title>Cardano transaction inspector</title>' "$site/inspector/index.html"
 
       shopt -s nullglob
-      address_wasm=("$site"/inspector/cardano-addresses.*.wasm)
-      inspector_wasm=("$site"/inspector/inspector.*.wasm)
-      rdf_wasm=("$site"/inspector/rdf_shapes_wasm_bg.*.wasm)
-      all_wasm=("$site"/inspector/*.wasm)
-      all_wasm_gz=("$site"/inspector/*.wasm.gz)
-      all_wasm_br=("$site"/inspector/*.wasm.br)
+      address_wasm=("$site"/cardano-addresses.*.wasm)
+      inspector_wasm=("$site"/inspector.*.wasm)
+      rdf_wasm=("$site"/rdf_shapes_wasm_bg.*.wasm)
+      all_wasm=("$site"/*.wasm)
+      all_wasm_gz=("$site"/*.wasm.gz)
+      all_wasm_br=("$site"/*.wasm.br)
 
       [[ ''${#address_wasm[@]} -eq 1 ]]
       [[ ''${#inspector_wasm[@]} -eq 1 ]]
@@ -58,12 +59,16 @@ let
       [[ ''${#all_wasm_gz[@]} -eq 3 ]]
       [[ ''${#all_wasm_br[@]} -eq 3 ]]
       for wasm in "''${all_wasm[@]}"; do
+        name=$(basename "$wasm")
         test -f "$wasm.gz"
         test -f "$wasm.br"
-        test -f "${txInspectorUi}/$(basename "$wasm")"
-        cmp "$wasm" "${txInspectorUi}/$(basename "$wasm")"
-        cmp "$wasm.gz" "${txInspectorUi}/$(basename "$wasm").gz"
-        cmp "$wasm.br" "${txInspectorUi}/$(basename "$wasm").br"
+        test -f "${txInspectorUi}/$name"
+        cmp "$wasm" "${txInspectorUi}/$name"
+        cmp "$wasm.gz" "${txInspectorUi}/$name.gz"
+        cmp "$wasm.br" "${txInspectorUi}/$name.br"
+        cmp "$wasm" "$site/inspector/$name"
+        cmp "$wasm.gz" "$site/inspector/$name.gz"
+        cmp "$wasm.br" "$site/inspector/$name.br"
       done
       echo "WASM counts: base=''${#all_wasm[@]} gzip=''${#all_wasm_gz[@]} brotli=''${#all_wasm_br[@]}"
 
@@ -101,6 +106,13 @@ let
       base_url="http://127.0.0.1:$(<"$port_file")"
       routes=(
         "/"
+        "/inspect"
+        "/settings"
+        "/library"
+        "/addresses"
+        "/keys"
+        "/scripts"
+        "/vault"
         "/inspector/"
         "/inspector/inspect"
         "/inspector/settings"
@@ -112,6 +124,13 @@ let
       )
       expected_files=(
         "$site/index.html"
+        "$site/inspect/index.html"
+        "$site/settings/index.html"
+        "$site/library/index.html"
+        "$site/addresses/index.html"
+        "$site/keys/index.html"
+        "$site/scripts/index.html"
+        "$site/vault/index.html"
         "$site/inspector/index.html"
         "$site/inspector/inspect/index.html"
         "$site/inspector/settings/index.html"
@@ -133,6 +152,9 @@ let
       done
 
       assets=(
+        "/index.js"
+        "/material.js"
+        "/styles.css"
         "/inspector/index.js"
         "/inspector/material.js"
         "/inspector/styles.css"
@@ -140,6 +162,9 @@ let
       for wasm in "''${all_wasm[@]}"; do
         name=$(basename "$wasm")
         assets+=(
+          "/$name"
+          "/$name.gz"
+          "/$name.br"
           "/inspector/$name"
           "/inspector/$name.gz"
           "/inspector/$name.br"
@@ -150,7 +175,7 @@ let
           --write-out '%{http_code}' "$base_url$asset")
         [[ "$status" == "200" ]]
       done
-      echo "inspector assets: all expected JS, CSS, WASM, gzip, and Brotli files returned HTTP 200"
+      echo "unified assets: canonical and compatibility JS, CSS, WASM, gzip, and Brotli files returned HTTP 200"
     '';
   };
 in

@@ -19,16 +19,17 @@ just assemble-site
 just test
 ```
 
-## Browser assets
+## Browser artifact
 
-The app needs two WASM artifacts:
+The unified MD3 app ships three WASM families:
 
-- `cardano-addresses.wasm`
-- `wasm-tx-inspector.wasm`
+- `cardano-addresses.*.wasm`
+- `inspector.*.wasm`
+- `rdf_shapes_wasm_bg.*.wasm`
 
-The Nix `web-dist` package assembles those assets automatically. `just assemble-site` produces a writable `site-root/` directory with:
+The Nix `web-dist` package builds the app and assembles those assets automatically at both the canonical root routes and the `/inspector/` compatibility routes. `just assemble-site` produces a writable `site-root/` directory with:
 
-- the app at `/`
+- the same app at `/` and `/inspector/`
 - the docs manual at `/docs/`
 
 ## Local serving
@@ -39,7 +40,7 @@ For quick local UI checks:
 npx serve site-root -l 34173
 ```
 
-Or use the app-only bundle while iterating on the UI:
+Or build and serve the app-only Nix artifact on port 8080:
 
 ```bash
 just dev

@@ -1,7 +1,7 @@
 # Nix Layout
 
-This directory contains the flake-owned build, check, and CI wiring for
-`cardano-addresses-browser`.
+This directory contains the flake-owned build, check, and CI wiring for the
+unified cardano-swiss-knife MD3 application.
 
 The design has three goals:
 
@@ -16,7 +16,7 @@ The flake wires the Nix modules in this order:
 1. `nix/project.nix`
    Builds the Haskell vector generator with `haskell.nix`.
 2. `nix/purescript.nix`
-   Builds the PureScript library, app, tests, and bundled web distribution.
+   Builds the shared PureScript library and tests, and publishes the unified inspector UI as the web distribution.
 3. `nix/packages/default.nix`
    Exposes user-facing flake packages such as `web-dist`.
 4. `nix/checks/default.nix`
@@ -61,6 +61,8 @@ Responsibilities:
   - `app-build`
   - `test-build`
   - `web-dist`
+
+`app-build` is the unified `docs/inspector` MD3 build. `web-dist` publishes that one build at canonical root routes and at `/inspector/` compatibility routes, including the address, ledger-inspector, and RDF-shapes WASM families.
 
 Important design choice:
 

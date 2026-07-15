@@ -5,12 +5,5 @@
   inherit testVectorsPath;
   test-vectors-exe = haskellProject.packages.test-vectors-exe;
   tx-inspector-ui = txInspectorUi;
-  combined-site = pkgs.runCommand "combined-site" { } ''
-    mkdir -p "$out"
-    cp -a ${purescript.web-dist}/. "$out/"
-    test ! -e "$out/inspector"
-    chmod u+w "$out"
-    mkdir "$out/inspector"
-    cp -a ${txInspectorUi}/. "$out/inspector/"
-  '';
+  combined-site = purescript.web-dist;
 }

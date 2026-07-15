@@ -18,18 +18,18 @@ const byronExpectedAddress =
 const byronCustomExpectedAddress =
   "xnFfw9Z3oh5idKW2ehvM1HJFgir7frn86jNL7jGsiFS3KTyyEAvcNEhsBv3NADSKyLnFF3NMhGoKzeCkcZY9stkQK8h96MoFL2snVCoH4";
 
-test("legacy page constructs Icarus and Byron bootstrap addresses", async ({
+test("keys expert tab constructs Icarus and Byron bootstrap addresses", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/keys");
 
-  await expect(page.getByRole("heading", { name: "Project Overview" })).toBeVisible();
-  await page.getByRole("button", { name: /Expert Manual bootstrap xpubs/ }).click();
+  await expect(page.getByRole("heading", { name: "Keys", exact: true })).toBeVisible();
+  await page.getByRole("tab", { name: "Expert", exact: true }).click();
   await expect(
-    page.locator("h2.page-title", { hasText: "Manual Bootstrap Construction" }),
+    page.getByRole("heading", { name: "Manual bootstrap construction" }),
   ).toBeVisible();
 
-  const addressXPubArea = page.getByPlaceholder("addr_xvk1...");
+  const addressXPubArea = page.getByLabel("Address xpub");
   await addressXPubArea.fill(icarusAddressXPub);
   await expect(page.getByText(icarusExpectedAddress)).toBeVisible();
 
@@ -38,13 +38,13 @@ test("legacy page constructs Icarus and Byron bootstrap addresses", async ({
   await expect(page.getByText(icarusCustomExpectedAddress)).toBeVisible();
 
   await page.getByRole("button", { name: "Byron" }).click();
-  await page.getByPlaceholder("root_xvk1...").fill(byronRootXPub);
-  await page.getByPlaceholder("0H/0").fill("0H/14");
+  await page.getByLabel("Root xpub").fill(byronRootXPub);
+  await page.getByLabel("Byron path").fill("0H/14");
   await addressXPubArea.fill(byronCustomAddressXPub);
   await expect(page.getByText(byronCustomExpectedAddress)).toBeVisible();
 
   await page.getByRole("button", { name: "Mainnet" }).click();
-  await page.getByPlaceholder("0H/0").fill("0H/0");
+  await page.getByLabel("Byron path").fill("0H/0");
   await addressXPubArea.fill(byronAddressXPub);
   await expect(page.getByText(byronExpectedAddress)).toBeVisible();
 });

@@ -147,7 +147,7 @@ test("addresses and scripts stay reachable in the responsive MD3 shell", async (
   await page.goto("/inspect");
 
   const navigation = page.getByRole("navigation", { name: "Primary" });
-  for (const destination of ["Inspect", "Addresses", "Scripts", "Library", "Settings"]) {
+  for (const destination of ["Workbench", "Addresses", "Scripts", "Library", "Settings"]) {
     await expect(
       navigation.getByRole("link", { name: destination, exact: true }),
     ).toBeVisible();

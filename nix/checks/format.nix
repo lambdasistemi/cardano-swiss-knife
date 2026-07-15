@@ -11,7 +11,7 @@ pkgs.runCommand "cardano-addresses-browser-format-check"
     cp -R ${repoRoot} source
     chmod -R u+w source
     cd source
-    purs-tidy check "lib/src/**/*.purs" "app/src/**/*.purs"
+    purs-tidy check "lib/src/**/*.purs"
     mkdir -p $out
     touch $out/passed
   ''
