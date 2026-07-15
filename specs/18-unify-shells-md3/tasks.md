@@ -49,10 +49,10 @@
 
 **Independent proof**: RED-first browser cases round-trip each supported secret kind, reload and inspect storage, scrub legacy keys, and exercise locked/error behavior without exposing a secret.
 
-- [ ] T013-S4 [P] [US2] Add RED-first vault compatibility, reload/storage-audit, legacy-key-scrub, and error-path cases in `docs/inspector/tests/unified-vault.spec.mjs` and `docs/inspector/tests/tx-identify.spec.mjs`; register them in `docs/inspector/playwright.config.mjs`.
-- [ ] T014-S4 [US2] Reuse the existing encrypted file format and WebCrypto boundary in `docs/inspector/src/Vault.purs` and `docs/inspector/src/Vault.js`; add Vault create/open/save/lock plus compatible load/pop shelves to `docs/inspector/src/Main.purs`.
-- [ ] T015-S4 [US2] Remove provider credential get/set and persistence-toggle behavior, preserve only non-secret preferences, and implement deletion-only migration for `blockfrost_project_id`, `koios_bearer_token`, and `persist_api_keys` in `docs/inspector/src/FFI/Storage.purs`, `docs/inspector/src/FFI/Storage.js`, and `docs/inspector/src/Main.purs`.
-- [ ] T016-S4 [US1] Complete Vault routing/navigation/styles in `docs/inspector/src/Routing.purs`, `docs/inspector/src/Routing.js`, `docs/inspector/src/Shell.purs`, and `docs/inspector/dist/styles.css`; prove focused cases, source/browser storage audits, `nix run .#ci-inspector-playwright`, and `./gate.sh`.
+- [X] T013-S4 [P] [US2] Add RED-first vault compatibility, reload/storage-audit, legacy-key-scrub, and error-path cases in `docs/inspector/tests/unified-vault.spec.mjs` and `docs/inspector/tests/tx-identify.spec.mjs`; register them in `docs/inspector/playwright.config.mjs`.
+- [X] T014-S4 [US2] Reuse the existing encrypted file format and WebCrypto boundary in `docs/inspector/src/Vault.purs` and `docs/inspector/src/Vault.js`; add Vault create/open/save/lock plus compatible load/pop shelves to `docs/inspector/src/Main.purs`.
+- [X] T015-S4 [US2] Remove provider credential get/set and persistence-toggle behavior, preserve only non-secret preferences, and implement deletion-only migration for `blockfrost_project_id`, `koios_bearer_token`, and `persist_api_keys` in `docs/inspector/src/FFI/Storage.purs`, `docs/inspector/src/FFI/Storage.js`, and `docs/inspector/src/Main.purs`.
+- [X] T016-S4 [US1] Complete Vault routing/navigation/styles in `docs/inspector/src/Routing.purs`, `docs/inspector/src/Routing.js`, `docs/inspector/src/Shell.purs`, and `docs/inspector/dist/styles.css`; prove focused cases, source/browser storage audits, `nix run .#ci-inspector-playwright`, and `./gate.sh`.
 
 **Commit**: `feat: make vault the only secret store` with `Tasks: T013, T014, T015, T016`.
 

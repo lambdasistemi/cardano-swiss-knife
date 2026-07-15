@@ -15,6 +15,7 @@ data Route
   | RouteAddresses
   | RouteKeys
   | RouteScripts
+  | RouteVault
   | RouteSettings
   | RouteLibrary
 
@@ -26,6 +27,7 @@ routePath = case _ of
   RouteAddresses -> "addresses"
   RouteKeys -> "keys"
   RouteScripts -> "scripts"
+  RouteVault -> "vault"
   RouteSettings -> "settings"
   RouteLibrary -> "library"
 
@@ -38,7 +40,7 @@ currentRoute = do
     "addresses" -> RouteAddresses
     "keys" -> RouteKeys
     "scripts" -> RouteScripts
-    "vault" -> RouteInspect
+    "vault" -> RouteVault
     _ -> RouteInspect
 
 currentBasePath :: Effect String

@@ -2,6 +2,7 @@ module FFI.Storage
   ( downloadJson
   , fetchText
   , getItem
+  , removeItem
   , readFileInputText
   , setItem
   ) where
@@ -16,6 +17,7 @@ foreign import downloadJsonImpl :: String -> String -> Effect Unit
 foreign import fetchTextImpl :: String -> Effect (Promise String)
 foreign import getItemImpl :: String -> Effect String
 foreign import readFileInputTextImpl :: String -> Effect (Promise String)
+foreign import removeItemImpl :: String -> Effect Unit
 foreign import setItemImpl :: String -> String -> Effect Unit
 
 downloadJson :: String -> String -> Effect Unit
@@ -29,6 +31,9 @@ getItem = getItemImpl
 
 readFileInputText :: String -> Aff String
 readFileInputText = toAffE <<< readFileInputTextImpl
+
+removeItem :: String -> Effect Unit
+removeItem = removeItemImpl
 
 setItem :: String -> String -> Effect Unit
 setItem = setItemImpl

@@ -1224,7 +1224,6 @@ async function configureChainData(page, options = {}) {
     network = "mainnet",
     blockfrostKey = "mainnet-test-project",
     koiosBearer = "koios-test-token",
-    persist = false,
   } = options;
 
   await page.goto("/settings");
@@ -1236,9 +1235,6 @@ async function configureChainData(page, options = {}) {
       .fill(blockfrostKey);
   } else {
     await page.getByPlaceholder("eyJhbGciOi...").fill(koiosBearer);
-  }
-  if (persist) {
-    await page.getByRole("switch", { name: "Persist API credentials" }).check();
   }
 }
 
@@ -1726,8 +1722,8 @@ test("MD3 shell routes topbar nav and theme toggle", async ({ page }) => {
   await expect(page.locator(".provider-panel")).toBeVisible();
   await expect(page.getByRole("radio", { name: "Blockfrost" })).toBeVisible();
   await expect(page.getByRole("radio", { name: "Koios" })).toBeVisible();
-  await expect(page.getByRole("switch", { name: "Persist API credentials" })).toBeVisible();
-  await expect(page.getByText("cleartext", { exact: false })).toBeVisible();
+  await expect(page.getByRole("switch", { name: "Persist API credentials" })).toHaveCount(0);
+  await expect(page.getByText("Credentials stay in memory and can persist only in the encrypted vault.")).toBeVisible();
 
   await navigation.getByRole("link", { name: "Library" }).click();
   await expect(page).toHaveURL(/\/library$/);
@@ -1787,7 +1783,7 @@ test("MD3 inspector surfaces expose tokenized panels and controls", async ({
   await expect(providerPanel).toHaveAttribute("data-md3-surface", "provider");
   await expect(page.getByRole("radio", { name: "Blockfrost" })).toBeVisible();
   await expect(page.getByRole("radio", { name: "mainnet" })).toBeVisible();
-  await expect(page.getByRole("switch", { name: "Persist API credentials" })).toBeVisible();
+  await expect(page.getByRole("switch", { name: "Persist API credentials" })).toHaveCount(0);
 
   await expectColorToken(
     page,
