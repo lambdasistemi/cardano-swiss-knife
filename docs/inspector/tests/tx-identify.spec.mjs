@@ -1073,7 +1073,7 @@ async function expectCQuisitorInspectSurface(page, route, testInfo, captureEvide
 
     const topbar = page.getByRole("banner");
     await expect(topbar.getByText("Ledger Inspector", { exact: true })).toBeVisible();
-    await expect(topbar.getByRole("navigation").getByRole("link", { name: "Inspect" })).toHaveAttribute(
+    await expect(topbar.getByRole("navigation").getByRole("link", { name: "Workbench" })).toHaveAttribute(
       "aria-current",
       "page",
     );
@@ -1239,7 +1239,7 @@ async function configureChainData(page, options = {}) {
 }
 
 async function openInspectViaShell(page) {
-  await page.getByRole("banner").getByRole("link", { name: "Inspect" }).click();
+  await page.getByRole("banner").getByRole("link", { name: "Workbench" }).click();
   await expect(page).toHaveURL(/\/inspect$/);
 }
 
@@ -1697,7 +1697,7 @@ test("MD3 shell routes topbar nav and theme toggle", async ({ page }) => {
   await expect(
     topbar.getByText("Ledger Inspector", { exact: true }),
   ).toBeVisible();
-  await expect(navigation.getByRole("link", { name: "Inspect" })).toBeVisible();
+  await expect(navigation.getByRole("link", { name: "Workbench" })).toBeVisible();
   await expect(navigation.getByRole("link", { name: "Settings" })).toBeVisible();
   await expect(navigation.getByRole("link", { name: "Library" })).toBeVisible();
   await expect(page.getByRole("tab", { name: "Paste CBOR" })).toBeVisible();
@@ -1763,7 +1763,7 @@ test("MD3 shell keeps route navigation inside deployed subpaths", async ({
     }
 
     const navigation = page.getByRole("banner").getByRole("navigation");
-    await navigation.getByRole("link", { name: "Inspect" }).click();
+    await navigation.getByRole("link", { name: "Workbench" }).click();
     await expect(page.getByRole("tab", { name: "Paste CBOR" })).toBeVisible();
     expect(page.url().startsWith(`${baseUrl}inspect`)).toBe(true);
     expect(new URL(page.url()).pathname).not.toBe("/inspect");

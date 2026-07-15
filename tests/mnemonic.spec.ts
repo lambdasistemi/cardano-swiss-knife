@@ -3,14 +3,15 @@ import { expect, test } from "@playwright/test";
 test("mnemonic page generates mnemonics independently and can hand them off to restore", async ({
   page,
 }) => {
-  const restorePhraseField = page.locator(
-    '[placeholder="abandon abandon ... or use the generated phrase"]',
-  );
+  const restorePhraseField = page.getByLabel("Recovery phrase");
 
-  await page.goto("/");
+  await page.goto("/keys");
 
-  await page.getByRole("button", { name: /Mnemonic Generate and hand off/ }).click();
-  await expect(page.locator(".page-title")).toHaveText("Mnemonic Tools");
+  await expect(page.getByRole("heading", { name: "Keys", exact: true })).toBeVisible();
+  const tabs = page.getByRole("tablist", { name: "Key tools" });
+  const mnemonicTab = tabs.getByRole("tab", { name: "Mnemonic", exact: true });
+  const restoreTab = tabs.getByRole("tab", { name: "Restore", exact: true });
+  await expect(mnemonicTab).toHaveAttribute("aria-selected", "true");
 
   await page.getByRole("button", { name: "12 words" }).click();
   await page.getByRole("button", { name: "Generate phrase" }).click();
@@ -24,14 +25,12 @@ test("mnemonic page generates mnemonics independently and can hand them off to r
   await page.getByRole("button", { name: "Show phrase" }).click();
   await expect(page.locator(".mnemonic-word")).toHaveCount(12);
 
-  await page.getByRole("button", { name: /Restore Choose family first/ }).click();
-  await expect(page.locator(".page-title")).toHaveText("Restore And Build");
+  await restoreTab.click();
+  await expect(restoreTab).toHaveAttribute("aria-selected", "true");
   await expect(restorePhraseField).toHaveValue("");
 
-  await page.getByRole("button", { name: /Mnemonic Generate and hand off/ }).click();
-  await expect(page.locator(".page-title")).toHaveText("Mnemonic Tools");
+  await mnemonicTab.click();
   await page.getByRole("button", { name: "Use in Restore" }).click();
-  await page.getByRole("button", { name: /Restore Choose family first/ }).click();
-  await expect(page.locator(".page-title")).toHaveText("Restore And Build");
+  await restoreTab.click();
   await expect(restorePhraseField).toHaveValue(/.+/);
 });

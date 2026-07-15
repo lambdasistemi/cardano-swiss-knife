@@ -4,9 +4,9 @@
 
 The deployed site is a static bundle:
 
-- HTML and CSS shell in `dist/`
-- PureScript application bundle compiled to `dist/app.js`
-- WASM binaries under `dist/wasm/`
+- the unified MD3 HTML and CSS shell built from `docs/inspector/`
+- one PureScript application bundle, `index.js`
+- hashed address, ledger-inspector, and RDF-shapes WASM families
 
 No server-side application is required for the core product.
 
@@ -14,7 +14,7 @@ No server-side application is required for the core product.
 
 ### Browser shell
 
-The Halogen application in `app/` coordinates navigation, form state, vault usage, and rendering.
+The Halogen application in `docs/inspector/` coordinates navigation, form state, vault usage, and rendering.
 
 ### Address engine
 
@@ -50,7 +50,7 @@ Those provider credentials are UI inputs, not backend secrets. They belong in th
 
 GitHub Pages serves the static site from `main`. The published artifact contains:
 
-- the app at `/`
+- the same app at canonical root routes and `/inspector/` compatibility routes
 - the documentation site at `/docs/`
 
 Pull requests can also publish disposable preview builds to the shared

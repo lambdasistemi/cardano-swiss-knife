@@ -3227,6 +3227,7 @@ inspectorComponent initial =
           [ classNames [ "signing-output-content" ] ]
           [ HH.h3_ [ HH.text label ]
           , HH.code [ classNames [ "signing-output-value" ] ] [ HH.text value ]
+          , keyCopyButton value
           ]
       ]
 

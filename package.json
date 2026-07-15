@@ -4,9 +4,7 @@
   "type": "module",
   "scripts": {
     "build:lib": "npx spago build -p cardano-addresses",
-    "build:app": "npx spago build -p cardano-addresses-browser",
     "test": "npx spago test -p cardano-addresses-test",
-    "bundle": "npx esbuild output/Main/index.js --bundle --outfile=dist/app.js --format=esm --minify",
     "bundle:lib": "npx esbuild output/Cardano.Address/index.js --bundle --outfile=dist/cardano-addresses.js --format=esm --minify"
   },
   "dependencies": {

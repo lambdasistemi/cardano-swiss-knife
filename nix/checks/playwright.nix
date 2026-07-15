@@ -15,11 +15,8 @@ pkgs.runCommand "cardano-addresses-browser-playwright-check"
     cd source
     ln -s ${purescript.playwrightNodeModules}/node_modules node_modules
     rm -rf dist
-    mkdir -p dist/wasm
-    cp ${purescript.web-dist}/index.html dist/index.html
-    cp ${purescript.web-dist}/app.js dist/app.js
-    cp ${wasmBinary}/cardano-addresses.wasm dist/wasm/cardano-addresses.wasm
-    cp ${txInspectorWasmBinary}/wasm-tx-inspector.wasm dist/wasm/wasm-tx-inspector.wasm
+    mkdir -p dist
+    cp -a ${purescript.web-dist}/. dist/
     export HOME=$(mktemp -d)
     export PLAYWRIGHT_BROWSERS_PATH="${playwrightBrowsers}"
     export PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1

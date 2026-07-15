@@ -26,14 +26,10 @@ const byronAddress =
 test("derivation page is reactive and hides values in private mode", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/keys");
+  await page.getByRole("tab", { name: "Restore", exact: true }).click();
 
-  await page.getByRole("button", { name: /Restore Choose family first/ }).click();
-  await expect(page.locator("h2.page-title", { hasText: "Restore And Build" })).toBeVisible();
-
-  const mnemonicInput = page.locator(
-    'input[type="password"][placeholder="abandon abandon ... or use the generated phrase"]',
-  );
+  const mnemonicInput = page.getByLabel("Recovery phrase");
   await mnemonicInput.fill(mnemonic);
 
   await expect(page.getByText("Private key hidden for this card. Use Show or Copy.").first()).toBeVisible();
@@ -50,14 +46,10 @@ test("derivation page is reactive and hides values in private mode", async ({
 test("restore page switches family semantics from the same mnemonic", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/keys");
+  await page.getByRole("tab", { name: "Restore", exact: true }).click();
 
-  await page.getByRole("button", { name: /Restore Choose family first/ }).click();
-  await expect(page.locator("h2.page-title", { hasText: "Restore And Build" })).toBeVisible();
-
-  const mnemonicInput = page.locator(
-    'input[type="password"][placeholder="abandon abandon ... or use the generated phrase"]',
-  );
+  const mnemonicInput = page.getByLabel("Recovery phrase");
   await mnemonicInput.fill(mnemonic);
 
   await page.getByRole("button", { name: "Show private keys" }).click();
@@ -75,14 +67,10 @@ test("restore page switches family semantics from the same mnemonic", async ({
 test("restore page builds Shelley addresses for the selected network while keeping public outputs visible", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/keys");
+  await page.getByRole("tab", { name: "Restore", exact: true }).click();
 
-  await page.getByRole("button", { name: /Restore Choose family first/ }).click();
-  await expect(page.locator(".page-title")).toHaveText("Restore And Build");
-
-  const mnemonicInput = page.locator(
-    'input[type="password"][placeholder="abandon abandon ... or use the generated phrase"]',
-  );
+  const mnemonicInput = page.getByLabel("Recovery phrase");
   await mnemonicInput.fill(mnemonic);
 
   await expect(page.getByText(shelleyMainnetPayment)).toBeVisible();

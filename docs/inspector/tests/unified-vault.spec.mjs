@@ -209,7 +209,7 @@ test("vault direct entry creates, opens, exports, locks, and reimports the legac
   await expect(page.getByRole("heading", { name: "Vault", exact: true })).toBeVisible();
   const navigation = page.getByRole("navigation", { name: "Primary" });
   expect(await navigation.getByRole("link").allTextContents()).toEqual([
-    "Inspect",
+    "Workbench",
     "Addresses",
     "Keys",
     "Scripts",

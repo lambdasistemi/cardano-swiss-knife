@@ -16,7 +16,7 @@ The main CI workflow validates:
 
 The Pages workflow deploys the combined static artifact from `main`:
 
-- app bundle at `/`
+- the unified MD3 app at canonical root routes and `/inspector/` compatibility routes
 - documentation at `/docs/`
 
 ## Shared PR previews
@@ -29,7 +29,7 @@ https://preview.dev.plutimus.com/lambdasistemi/cardano-swiss-knife/pr-<PR_NUMBER
 
 The preview workflow:
 
-1. builds the app bundle
+1. builds the unified MD3 app with the canonical Nix `web-dist` package
 2. builds the MkDocs site
 3. assembles one writable static tree
 4. calls `paolino/dev-assets/static-preview` to copy it into `/opt/services/previews/lambdasistemi/cardano-swiss-knife/pr-<PR_NUMBER>/`

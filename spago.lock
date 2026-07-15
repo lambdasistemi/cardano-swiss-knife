@@ -22,28 +22,6 @@
           "dependencies": []
         }
       },
-      "cardano-addresses-browser": {
-        "path": "app",
-        "core": {
-          "dependencies": [
-            "aff",
-            "aff-promise",
-            "arrays",
-            "cardano-addresses",
-            "console",
-            "effect",
-            "either",
-            "foreign",
-            "halogen",
-            "maybe",
-            "prelude",
-            "strings"
-          ]
-        },
-        "test": {
-          "dependencies": []
-        }
-      },
       "cardano-addresses-test": {
         "path": "test",
         "core": {

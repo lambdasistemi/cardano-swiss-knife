@@ -194,7 +194,7 @@ test("keys is reachable in the exact partial navigation without mobile overflow"
 
   const navigation = page.getByRole("navigation", { name: "Primary" });
   expect(await navigation.getByRole("link").allTextContents()).toEqual([
-    "Inspect",
+    "Workbench",
     "Addresses",
     "Keys",
     "Scripts",

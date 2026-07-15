@@ -22,9 +22,9 @@ let
       }
       trap cleanup EXIT
 
-      mkdir -p "$work_tree/ux-judge" "$work_tree/site/inspector"
+      mkdir -p "$work_tree/ux-judge" "$work_tree/site"
       cp -R ${uxJudgeSource}/. "$work_tree/ux-judge/"
-      cp -R ${txInspectorUi}/. "$work_tree/site/inspector/"
+      cp -R ${txInspectorUi}/. "$work_tree/site/"
       chmod -R u+w "$work_tree"
 
       ln -s \
@@ -42,7 +42,7 @@ let
         )
       fi
       export UX_CAPTURE_PORT
-      export UX_BASE_URL="http://127.0.0.1:$UX_CAPTURE_PORT/inspector/"
+      export UX_BASE_URL="http://127.0.0.1:$UX_CAPTURE_PORT/"
 
       python -m http.server "$UX_CAPTURE_PORT" \
         --bind 127.0.0.1 \
