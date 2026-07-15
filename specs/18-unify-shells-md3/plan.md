@@ -67,8 +67,9 @@ Make the MD3 workspace consume the local address package, bundle the address WAS
 - `lib/src/Cardano/Address/Wasm.js`
 - `flake.nix`
 - `nix/wasm-ui.nix`
+- `nix/apps/combined-site-smoke.nix`
 
-**Proof**: `nix build .#tx-inspector-ui --no-link`, `nix run .#ci-inspector-playwright`, then `./gate.sh`.
+**Proof**: `nix build .#tx-inspector-ui --no-link`, `nix run .#ci-inspector-playwright`, `nix run .#ci-combined-site-smoke`, then `./gate.sh`.
 
 ## Slice 2 — Migrate Addresses and Scripts
 

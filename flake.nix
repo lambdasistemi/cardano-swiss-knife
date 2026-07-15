@@ -59,7 +59,9 @@
             wasmArtifact = cardano-ledger-inspector.packages.${system}.wasm-tx-inspector;
             wasmArtifactName = "wasm-tx-inspector";
             rdfShapesWasmPkg = rdf-shapes-wasm.packages.${system}.wasm-pkg;
+            addressWasmArtifact = wasmBinary;
             inherit protocolRegistry;
+            addressPackageSrc = ./lib;
             editorPackageSrc = ./packages/purescript-rdf-editor;
             src = ./docs/inspector;
           };

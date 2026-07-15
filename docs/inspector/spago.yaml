@@ -5,6 +5,7 @@ package:
     - effect
     - aff
     - aff-promise
+    - cardano-addresses
     - console
     - halogen
     - maybe
@@ -25,5 +26,7 @@ workspace:
   packageSet:
     registry: 72.1.0
   extraPackages:
+    cardano-addresses:
+      path: ../../lib
     rdf-editor:
       path: ../../packages/purescript-rdf-editor

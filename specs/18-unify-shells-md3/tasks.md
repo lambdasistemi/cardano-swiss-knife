@@ -10,10 +10,10 @@
 
 **Independent proof**: A browser test first fails because a deep compatibility route cannot load the address WASM, then passes against the unified inspector artifact; the inspector build and existing suites remain green.
 
-- [ ] T001-S1 [US1] Add the failing deep-route address-WASM browser case, then retain it as regression coverage in `docs/inspector/tests/tx-identify.spec.mjs`.
-- [ ] T002-S1 [US4] Wire `docs/inspector/spago.yaml`, `docs/inspector/spago.lock`, `docs/inspector/package.json`, and `docs/inspector/package-lock.json` to the local `lib` package and its runtime dependencies.
-- [ ] T003-S1 [US1] Publish a base-path-safe address-WASM URL from `docs/inspector/src/bootstrap.js`; consume it while preserving Node fallback in `lib/src/Cardano/Address/Bootstrap.js`, `lib/src/Cardano/Address/Derivation.js`, `lib/src/Cardano/Address/Inspect.js`, `lib/src/Cardano/Address/Signing.js`, and `lib/src/Cardano/Address/Wasm.js`; add compatible direct-route generation in `docs/inspector/src/Routing.purs` and `docs/inspector/src/Routing.js`.
-- [ ] T004-S1 [US1] Package the unified runtime and its route assets in `flake.nix` and `nix/wasm-ui.nix`; prove `nix build .#tx-inspector-ui --no-link`, `nix run .#ci-inspector-playwright`, and `./gate.sh`.
+- [X] T001-S1 [US1] Add the failing deep-route address-WASM browser case, then retain it as regression coverage in `docs/inspector/tests/tx-identify.spec.mjs`.
+- [X] T002-S1 [US4] Wire `docs/inspector/spago.yaml`, `docs/inspector/spago.lock`, `docs/inspector/package.json`, and `docs/inspector/package-lock.json` to the local `lib` package and its runtime dependencies.
+- [X] T003-S1 [US1] Publish a base-path-safe address-WASM URL from `docs/inspector/src/bootstrap.js`; consume it while preserving Node fallback in `lib/src/Cardano/Address/Bootstrap.js`, `lib/src/Cardano/Address/Derivation.js`, `lib/src/Cardano/Address/Inspect.js`, `lib/src/Cardano/Address/Signing.js`, and `lib/src/Cardano/Address/Wasm.js`; add compatible direct-route generation in `docs/inspector/src/Routing.purs` and `docs/inspector/src/Routing.js`.
+- [X] T004-S1 [US1] Package the unified runtime and its route assets in `flake.nix`, `nix/wasm-ui.nix`, and `nix/apps/combined-site-smoke.nix`; prove `nix build .#tx-inspector-ui --no-link`, `nix run .#ci-inspector-playwright`, `nix run .#ci-combined-site-smoke`, and `./gate.sh`.
 
 **Commit**: `build: unify MD3 runtime foundation` with `Tasks: T001, T002, T003, T004`.
 
