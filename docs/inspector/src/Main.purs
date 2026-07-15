@@ -2,7 +2,12 @@ module Main (main) where
 
 import Prelude
 
+import Cardano.Address.Bootstrap as Bootstrap
+import Cardano.Address.Derivation as Derivation
+import Cardano.Address.Shelley as Shelley
+import Cardano.Address.Signing as Signing
 import Cardano.Address.Script as Script
+import Cardano.Mnemonic as Mnemonic
 import Control.Promise (Promise, toAff)
 import Data.Array as Array
 import Data.Either (Either(..))
@@ -125,6 +130,14 @@ data ScriptInputMode = ScriptInputCbor | ScriptInputJson | ScriptInputTemplate
 
 derive instance eqScriptInputMode :: Eq ScriptInputMode
 
+data KeyTab = KeyMnemonic | KeyRestore | KeyExpert | KeySigning
+
+derive instance eqKeyTab :: Eq KeyTab
+
+data RestoreFamily = RestoreShelley | RestoreIcarus | RestoreByron
+
+derive instance eqRestoreFamily :: Eq RestoreFamily
+
 type RawAddressInfo =
   { addressStyle :: String
   , addressType :: Int
@@ -223,6 +236,39 @@ type State =
   , scriptInput :: String
   , scriptResult :: Maybe (Either String Script.ScriptAnalysis)
   , scriptTemplateResult :: Maybe (Either String Script.ScriptTemplateAnalysis)
+  , keyTab :: KeyTab
+  , mnemonicWordCount :: Int
+  , generatedMnemonic :: Maybe (Array String)
+  , showGeneratedMnemonic :: Boolean
+  , showRestorePhrase :: Boolean
+  , showDerivedKeys :: Boolean
+  , restorePhrase :: String
+  , restoreFamily :: RestoreFamily
+  , shelleyNetwork :: Shelley.ShelleyNetwork
+  , shelleyCustomNetworkTagInput :: String
+  , accountIndexInput :: String
+  , addressIndexInput :: String
+  , derivationRole :: Derivation.Role
+  , derivationResult :: Maybe (Either String Derivation.DerivedKeys)
+  , shelleyAddressesResult :: Maybe (Either String Shelley.ShelleyAddresses)
+  , familyRestoreResult :: Maybe (Either String String)
+  , legacyStyle :: Bootstrap.LegacyStyle
+  , legacyNetwork :: Bootstrap.LegacyNetwork
+  , legacyAddressXPubInput :: String
+  , legacyRootXPubInput :: String
+  , legacyDerivationPathInput :: String
+  , legacyCustomMagicInput :: String
+  , legacyResult :: Maybe (Either String String)
+  , signingPayloadMode :: Signing.PayloadMode
+  , signingPayloadInput :: String
+  , showSigningKey :: Boolean
+  , signingKeyInput :: String
+  , signingResult :: Maybe (Either String Signing.SignResult)
+  , verifyPayloadMode :: Signing.PayloadMode
+  , verifyPayloadInput :: String
+  , verificationKeyInput :: String
+  , signatureInput :: String
+  , verificationResult :: Maybe (Either String Boolean)
   , route :: Route
   , routeBase :: String
   , theme :: Theme.Theme
@@ -337,6 +383,39 @@ data Action
   | InspectAddress
   | SetScriptInputMode ScriptInputMode
   | SetScriptInput String
+  | SelectKeyTab KeyTab
+  | SetKeyMnemonicWordCount Int
+  | GenerateKeyMnemonic
+  | CopyKeyMnemonic
+  | ToggleGeneratedMnemonic
+  | UseGeneratedMnemonic
+  | ToggleRestorePhrase
+  | ToggleDerivedKeys
+  | SetRestorePhrase String
+  | SetRestoreFamily RestoreFamily
+  | SetShelleyNetwork Shelley.ShelleyNetwork
+  | SelectShelleyCustomNetwork
+  | SetShelleyCustomNetworkTag String
+  | SetAccountIndex String
+  | SetAddressIndex String
+  | SetDerivationRole Derivation.Role
+  | SetLegacyStyle Bootstrap.LegacyStyle
+  | SetLegacyNetwork Bootstrap.LegacyNetwork
+  | SelectLegacyCustomNetwork
+  | SetLegacyAddressXPub String
+  | SetLegacyRootXPub String
+  | SetLegacyDerivationPath String
+  | SetLegacyCustomMagic String
+  | SetSigningPayloadMode Signing.PayloadMode
+  | SetSigningPayload String
+  | ToggleSigningKey
+  | SetSigningKey String
+  | UseSigningResultForVerification
+  | SetVerifyPayloadMode Signing.PayloadMode
+  | SetVerifyPayload String
+  | SetVerificationKey String
+  | SetSignature String
+  | CopyKeyValue String
   | Navigate Route MouseEvent
   | ToggleTheme
 
@@ -396,6 +475,39 @@ inspectorComponent initial =
         , scriptInput: ""
         , scriptResult: Nothing
         , scriptTemplateResult: Nothing
+        , keyTab: KeyMnemonic
+        , mnemonicWordCount: 24
+        , generatedMnemonic: Nothing
+        , showGeneratedMnemonic: false
+        , showRestorePhrase: false
+        , showDerivedKeys: false
+        , restorePhrase: ""
+        , restoreFamily: RestoreShelley
+        , shelleyNetwork: Shelley.ShelleyMainnet
+        , shelleyCustomNetworkTagInput: "3"
+        , accountIndexInput: "0"
+        , addressIndexInput: "0"
+        , derivationRole: Derivation.UTxOExternal
+        , derivationResult: Nothing
+        , shelleyAddressesResult: Nothing
+        , familyRestoreResult: Nothing
+        , legacyStyle: Bootstrap.LegacyIcarus
+        , legacyNetwork: Bootstrap.LegacyMainnet
+        , legacyAddressXPubInput: ""
+        , legacyRootXPubInput: ""
+        , legacyDerivationPathInput: "0H/0"
+        , legacyCustomMagicInput: "4242"
+        , legacyResult: Nothing
+        , signingPayloadMode: Signing.PayloadText
+        , signingPayloadInput: ""
+        , showSigningKey: false
+        , signingKeyInput: ""
+        , signingResult: Nothing
+        , verifyPayloadMode: Signing.PayloadText
+        , verifyPayloadInput: ""
+        , verificationKeyInput: ""
+        , signatureInput: ""
+        , verificationResult: Nothing
         , route: initial.route
         , routeBase: initial.routeBase
         , theme: initial.theme
@@ -420,6 +532,7 @@ inspectorComponent initial =
           [ case state.route of
               RouteInspect -> renderInspector state
               RouteAddresses -> renderAddresses state
+              RouteKeys -> renderKeys state
               RouteScripts -> renderScripts state
               RouteSettings -> renderSettings state
               RouteLibrary -> renderLibrary state
@@ -457,6 +570,405 @@ inspectorComponent initial =
                 [ renderResult state ]
             ]
         ]
+
+  renderKeys state =
+    HH.div
+      [ classNames [ "app-shell", "tool-page", "keys-page" ] ]
+      [ toolIntro "Keys" "Generate recovery phrases, restore wallet keys and addresses, construct bootstrap addresses, and sign or verify raw payloads locally."
+      , HH.div
+          [ classNames [ "key-tabs" ]
+          , HH.attr (HH.AttrName "role") "tablist"
+          , HH.attr (HH.AttrName "aria-label") "Key tools"
+          ]
+          [ renderKeyTab state.keyTab KeyMnemonic "Mnemonic"
+          , renderKeyTab state.keyTab KeyRestore "Restore"
+          , renderKeyTab state.keyTab KeyExpert "Expert"
+          , renderKeyTab state.keyTab KeySigning "Sign & verify"
+          ]
+      , case state.keyTab of
+          KeyMnemonic -> renderKeyMnemonic state
+          KeyRestore -> renderKeyRestore state
+          KeyExpert -> renderKeyExpert state
+          KeySigning -> renderKeySigning state
+      ]
+
+  renderKeyTab active target label =
+    HH.button
+      [ classNames (if active == target then [ "key-tab", "is-selected" ] else [ "key-tab" ])
+      , HH.attr (HH.AttrName "role") "tab"
+      , HH.attr (HH.AttrName "aria-selected") (if active == target then "true" else "false")
+      , HE.onClick (\_ -> SelectKeyTab target)
+      ]
+      [ HH.text label ]
+
+  renderKeyMnemonic state =
+    HH.div [ classNames [ "key-grid" ] ]
+      [ toolCard "key-card" "mnemonic-input"
+          [ toolHeading "Mnemonic generation" "Choose a BIP-39 word count, generate locally, then reveal, copy, or hand the phrase to Restore."
+          , HH.div [ classNames [ "key-actions" ] ]
+              (map (renderWordCountButton state.mnemonicWordCount) keyMnemonicWordCounts)
+          , HH.div [ classNames [ "key-actions" ] ]
+              [ keyButton true "Generate phrase" GenerateKeyMnemonic
+              , keyButton false (if state.showGeneratedMnemonic then "Hide phrase" else "Show phrase") ToggleGeneratedMnemonic
+              , keyButton false "Copy phrase" CopyKeyMnemonic
+              , keyButton false "Use in Restore" UseGeneratedMnemonic
+              ]
+          ]
+      , toolCard "key-card" "mnemonic-output"
+          [ toolHeading "Generated phrase" "Recovery phrases are hidden by default and are never persisted."
+          , renderGeneratedKeyMnemonic state.showGeneratedMnemonic state.generatedMnemonic
+          ]
+      ]
+
+  renderWordCountButton active count =
+    HH.button
+      [ classNames (if active == count then [ "key-button", "is-selected" ] else [ "key-button" ])
+      , HE.onClick (\_ -> SetKeyMnemonicWordCount count)
+      ]
+      [ HH.text (show count <> " words") ]
+
+  keyButton primary label action =
+    HH.button
+      [ classNames (if primary then [ "key-button", "key-button-primary" ] else [ "key-button" ])
+      , HE.onClick (\_ -> action)
+      ]
+      [ HH.text label ]
+
+  renderGeneratedKeyMnemonic visible = case _ of
+    Nothing -> toolEmpty "No recovery phrase generated yet."
+    Just words ->
+      if not visible then
+        HH.div [ classNames [ "privacy-note" ] ]
+          [ HH.text ("Phrase hidden. " <> show (Array.length words) <> " words are available for clipboard copy.") ]
+      else
+        HH.div [ classNames [ "mnemonic-grid" ] ]
+          (Array.mapWithIndex renderKeyMnemonicWord words)
+
+  renderKeyMnemonicWord index word =
+    HH.div [ classNames [ "mnemonic-word" ] ]
+      [ HH.span [ classNames [ "mnemonic-index" ] ] [ HH.text (show (index + 1) <> ".") ]
+      , HH.code [ classNames [ "mnemonic-value" ] ] [ HH.text word ]
+      ]
+
+  renderKeyRestore state =
+    HH.div [ classNames [ "key-grid" ] ]
+      [ toolCard "key-card" "restore-input"
+          [ toolHeading "Restore and build" "Choose the wallet family first, then derive the matching keys or address locally from a recovery phrase."
+          , HH.div [ classNames [ "key-actions" ] ]
+              [ renderRestoreFamilyButton state.restoreFamily RestoreShelley
+              , renderRestoreFamilyButton state.restoreFamily RestoreIcarus
+              , renderRestoreFamilyButton state.restoreFamily RestoreByron
+              ]
+          , HH.div [ classNames [ "key-actions" ] ]
+              [ keyButton false (if state.showRestorePhrase then "Hide recovery phrase" else "Show recovery phrase") ToggleRestorePhrase ]
+          , renderRestorePhraseInput state
+          , HH.div [ classNames [ "key-controls" ] ]
+              [ numberField "Account index" state.accountIndexInput SetAccountIndex
+              , numberField "Address index" state.addressIndexInput SetAddressIndex
+              ]
+          , if keyFamilyUsesRole state.restoreFamily then
+              HH.div [ classNames [ "key-actions" ] ]
+                (map (renderDerivationRoleButton state.derivationRole) (keyRolesForFamily state.restoreFamily))
+            else HH.text ""
+          , if state.restoreFamily == RestoreShelley then
+              HH.div [ classNames [ "key-actions" ] ]
+                [ renderShelleyNetworkButton state.shelleyNetwork Shelley.ShelleyMainnet
+                , renderShelleyNetworkButton state.shelleyNetwork Shelley.ShelleyPreprod
+                , renderShelleyNetworkButton state.shelleyNetwork Shelley.ShelleyPreview
+                , HH.button
+                    [ classNames (if keyIsShelleyCustom state.shelleyNetwork then [ "key-button", "is-selected" ] else [ "key-button" ])
+                    , HE.onClick (\_ -> SelectShelleyCustomNetwork)
+                    ]
+                    [ HH.text "Custom" ]
+                ]
+            else
+              HH.div [ classNames [ "key-actions" ] ]
+                [ renderLegacyNetworkButton state.legacyNetwork Bootstrap.LegacyMainnet
+                , renderLegacyNetworkButton state.legacyNetwork Bootstrap.LegacyStaging
+                , renderLegacyNetworkButton state.legacyNetwork Bootstrap.LegacyTestnet
+                , renderLegacyNetworkButton state.legacyNetwork Bootstrap.LegacyPreprod
+                , renderLegacyNetworkButton state.legacyNetwork Bootstrap.LegacyPreview
+                , HH.button
+                    [ classNames (if keyIsLegacyCustom state.legacyNetwork then [ "key-button", "is-selected" ] else [ "key-button" ])
+                    , HE.onClick (\_ -> SelectLegacyCustomNetwork)
+                    ]
+                    [ HH.text "Custom" ]
+                ]
+          , if state.restoreFamily == RestoreShelley && keyIsShelleyCustom state.shelleyNetwork then
+              numberField "Network tag" state.shelleyCustomNetworkTagInput SetShelleyCustomNetworkTag
+            else if state.restoreFamily /= RestoreShelley && keyIsLegacyCustom state.legacyNetwork then
+              numberField "Protocol magic" state.legacyCustomMagicInput SetLegacyCustomMagic
+            else HH.text ""
+          , toolKeyValue "Path" (keyRestorePath state)
+          ]
+      , toolCard "key-card" "restore-output"
+          [ toolHeading (if state.restoreFamily == RestoreShelley then "Derived addresses and keys" else "Derived address") "Outputs update whenever the phrase, family, role, network, or index changes."
+          , case state.restoreFamily of
+              RestoreShelley -> renderKeyShelleyResult state
+              _ -> renderKeyFamilyResult state.familyRestoreResult
+          ]
+      ]
+
+  renderRestorePhraseInput state =
+    HH.label [ classNames [ "key-field" ] ]
+      [ HH.span [ classNames [ "field-label" ] ] [ HH.text "Recovery phrase" ]
+      , if state.showRestorePhrase then
+          HH.textarea
+            [ HP.rows 5
+            , HP.value state.restorePhrase
+            , HH.attr (HH.AttrName "aria-label") "Recovery phrase"
+            , HE.onValueInput SetRestorePhrase
+            ]
+        else
+          HH.input
+            [ HP.type_ HP.InputPassword
+            , HP.value state.restorePhrase
+            , HH.attr (HH.AttrName "aria-label") "Recovery phrase"
+            , HE.onValueInput SetRestorePhrase
+            ]
+      ]
+
+  numberField label value action =
+    HH.label [ classNames [ "key-field" ] ]
+      [ HH.span [ classNames [ "field-label" ] ] [ HH.text label ]
+      , HH.input
+          [ HP.type_ HP.InputNumber
+          , HP.min 0.0
+          , HP.value value
+          , HH.attr (HH.AttrName "aria-label") label
+          , HE.onValueInput action
+          ]
+      ]
+
+  renderRestoreFamilyButton active target =
+    HH.button
+      [ classNames (if active == target then [ "key-button", "is-selected" ] else [ "key-button" ])
+      , HE.onClick (\_ -> SetRestoreFamily target)
+      ]
+      [ HH.text (keyRestoreFamilyLabel target) ]
+
+  renderDerivationRoleButton active target =
+    HH.button
+      [ classNames (if active == target then [ "key-button", "is-selected" ] else [ "key-button" ])
+      , HE.onClick (\_ -> SetDerivationRole target)
+      ]
+      [ HH.text (Derivation.roleLabel target) ]
+
+  renderShelleyNetworkButton active target =
+    HH.button
+      [ classNames (if active == target then [ "key-button", "is-selected" ] else [ "key-button" ])
+      , HE.onClick (\_ -> SetShelleyNetwork target)
+      ]
+      [ HH.text (Shelley.shelleyNetworkLabel target) ]
+
+  renderLegacyNetworkButton active target =
+    HH.button
+      [ classNames (if active == target then [ "key-button", "is-selected" ] else [ "key-button" ])
+      , HE.onClick (\_ -> SetLegacyNetwork target)
+      ]
+      [ HH.text (keyLegacyNetworkLabel target) ]
+
+  renderKeyShelleyResult state = case state.derivationResult of
+    Nothing -> toolEmpty "Paste a valid recovery phrase to derive Shelley keys and addresses."
+    Just (Left err) -> toolError err
+    Just (Right keys) ->
+      HH.div [ classNames [ "key-results" ] ]
+        ( renderShelleyAddresses state.shelleyAddressesResult <>
+            [ HH.div [ classNames [ "key-actions" ] ]
+                [ keyButton false (if state.showDerivedKeys then "Hide private keys" else "Show private keys") ToggleDerivedKeys ]
+            , renderSecretKey state.showDerivedKeys "Root private key" keys.rootKeyBech32
+            , renderSecretKey state.showDerivedKeys "Account private key" keys.accountKeyBech32
+            , renderSecretKey state.showDerivedKeys "Address private key" keys.addressKeyBech32
+            , renderPublicKey "Address public key" keys.addressPublicKeyBech32
+            , renderSecretKey state.showDerivedKeys "Stake private key" keys.stakeKeyBech32
+            , renderPublicKey "Stake public key" keys.stakePublicKeyBech32
+            ]
+        )
+
+  renderShelleyAddresses = case _ of
+    Nothing -> []
+    Just (Left err) -> [ toolError err ]
+    Just (Right addresses) ->
+      [ renderMaybeAddress "Payment address" addresses.paymentAddressBech32
+      , renderMaybeAddress "Base address" addresses.delegationAddressBech32
+      , renderPublicKey "Reward address" addresses.rewardAddressBech32
+      ]
+
+  renderMaybeAddress label = case _ of
+    Nothing -> keyOutputCard label
+      [ HH.div [ classNames [ "privacy-note" ] ]
+          [ HH.text "Unavailable when the selected role does not derive a payment credential." ]
+      ]
+    Just value -> renderPublicKey label value
+
+  renderSecretKey visible label value =
+    keyOutputCard label
+      [ if visible then
+          HH.code [ classNames [ "key-output-value" ] ] [ HH.text value ]
+        else
+          HH.div [ classNames [ "privacy-note" ] ]
+            [ HH.text "Private key hidden for this card. Use Show or Copy." ]
+      , keyCopyButton value
+      ]
+
+  renderPublicKey label value =
+    keyOutputCard label
+      [ HH.code [ classNames [ "key-output-value" ] ] [ HH.text value ]
+      , keyCopyButton value
+      ]
+
+  keyOutputCard label children =
+    HH.div [ classNames [ "key-output-card" ] ]
+      [ HH.h3_ [ HH.text label ], HH.div [ classNames [ "key-output-body" ] ] children ]
+
+  keyCopyButton value =
+    HH.button [ classNames [ "key-copy" ], HE.onClick (\_ -> CopyKeyValue value) ] [ HH.text "Copy" ]
+
+  renderKeyFamilyResult = case _ of
+    Nothing -> toolEmpty "Paste a valid recovery phrase to derive a bootstrap address."
+    Just (Left err) -> toolError err
+    Just (Right address) -> renderPublicKey "Base58 address" address
+
+  renderKeyExpert state =
+    HH.div [ classNames [ "key-grid" ] ]
+      [ toolCard "key-card" "expert-input"
+          [ toolHeading "Manual bootstrap construction" "Construct Icarus or Byron bootstrap addresses from explicit extended public keys."
+          , HH.div [ classNames [ "key-actions" ] ]
+              [ renderLegacyStyleButton state.legacyStyle Bootstrap.LegacyIcarus
+              , renderLegacyStyleButton state.legacyStyle Bootstrap.LegacyByron
+              ]
+          , HH.div [ classNames [ "key-actions" ] ]
+              [ renderLegacyNetworkButton state.legacyNetwork Bootstrap.LegacyMainnet
+              , renderLegacyNetworkButton state.legacyNetwork Bootstrap.LegacyStaging
+              , renderLegacyNetworkButton state.legacyNetwork Bootstrap.LegacyTestnet
+              , renderLegacyNetworkButton state.legacyNetwork Bootstrap.LegacyPreview
+              , renderLegacyNetworkButton state.legacyNetwork Bootstrap.LegacyPreprod
+              , HH.button
+                  [ classNames (if keyIsLegacyCustom state.legacyNetwork then [ "key-button", "is-selected" ] else [ "key-button" ])
+                  , HE.onClick (\_ -> SelectLegacyCustomNetwork)
+                  ]
+                  [ HH.text "Custom" ]
+              ]
+          , if keyIsLegacyCustom state.legacyNetwork then numberField "Protocol magic" state.legacyCustomMagicInput SetLegacyCustomMagic else HH.text ""
+          , keyTextarea "Address xpub" 4 state.legacyAddressXPubInput SetLegacyAddressXPub
+          , if state.legacyStyle == Bootstrap.LegacyByron then
+              HH.div_
+                [ keyTextarea "Root xpub" 4 state.legacyRootXPubInput SetLegacyRootXPub
+                , keyTextField "Byron path" state.legacyDerivationPathInput SetLegacyDerivationPath
+                ]
+            else HH.text ""
+          ]
+      , toolCard "key-card" "expert-output"
+          [ toolHeading "Bootstrap address" "The output updates as the network, path, or key material changes."
+          , case state.legacyResult of
+              Nothing -> toolEmpty "Enter an address xpub to construct a bootstrap address."
+              Just (Left err) -> toolError err
+              Just (Right address) -> renderPublicKey "Base58 address" address
+          ]
+      ]
+
+  renderLegacyStyleButton active target =
+    HH.button
+      [ classNames (if active == target then [ "key-button", "is-selected" ] else [ "key-button" ])
+      , HE.onClick (\_ -> SetLegacyStyle target)
+      ]
+      [ HH.text case target of
+          Bootstrap.LegacyIcarus -> "Icarus"
+          Bootstrap.LegacyByron -> "Byron"
+      ]
+
+  keyTextarea label rows value action =
+    HH.label [ classNames [ "key-field" ] ]
+      [ HH.span [ classNames [ "field-label" ] ] [ HH.text label ]
+      , HH.textarea
+          [ HP.rows rows
+          , HP.value value
+          , HH.attr (HH.AttrName "aria-label") label
+          , HE.onValueInput action
+          ]
+      ]
+
+  keyTextField label value action =
+    HH.label [ classNames [ "key-field" ] ]
+      [ HH.span [ classNames [ "field-label" ] ] [ HH.text label ]
+      , HH.input
+          [ HP.value value
+          , HH.attr (HH.AttrName "aria-label") label
+          , HE.onValueInput action
+          ]
+      ]
+
+  renderKeySigning state =
+    HH.div [ classNames [ "key-signing-grid" ] ]
+      [ keyRegion "Sign payload"
+          [ HH.p_ [ HH.text "Sign arbitrary text or hex bytes with an extended signing key. This does not build or sign transactions." ]
+          , HH.div [ classNames [ "key-actions" ] ]
+              [ renderSigningModeButton state.signingPayloadMode Signing.PayloadText SetSigningPayloadMode
+              , renderSigningModeButton state.signingPayloadMode Signing.PayloadHex SetSigningPayloadMode
+              ]
+          , keyTextarea "Payload" 5 state.signingPayloadInput SetSigningPayload
+          , HH.div [ classNames [ "key-actions" ] ]
+              [ keyButton false (if state.showSigningKey then "Hide signing key" else "Show signing key") ToggleSigningKey ]
+          , if state.showSigningKey then
+              keyTextarea "Signing key" 4 state.signingKeyInput SetSigningKey
+            else
+              HH.label [ classNames [ "key-field" ] ]
+                [ HH.span [ classNames [ "field-label" ] ] [ HH.text "Signing key" ]
+                , HH.input
+                    [ HP.type_ HP.InputPassword
+                    , HP.value state.signingKeyInput
+                    , HH.attr (HH.AttrName "aria-label") "Signing key"
+                    , HE.onValueInput SetSigningKey
+                    ]
+                ]
+          ]
+      , keyRegion "Signature" [ renderKeySigningResult state.signingResult ]
+      , keyRegion "Verify signature"
+          [ HH.p_ [ HH.text "Verify an Ed25519 signature against an extended verification key using the same payload bytes." ]
+          , HH.div [ classNames [ "key-actions" ] ]
+              [ renderSigningModeButton state.verifyPayloadMode Signing.PayloadText SetVerifyPayloadMode
+              , renderSigningModeButton state.verifyPayloadMode Signing.PayloadHex SetVerifyPayloadMode
+              , keyButton false "Use signed payload" UseSigningResultForVerification
+              ]
+          , keyTextarea "Verification payload" 5 state.verifyPayloadInput SetVerifyPayload
+          , keyTextarea "Verification key" 3 state.verificationKeyInput SetVerificationKey
+          , keyTextarea "Signature hex" 3 state.signatureInput SetSignature
+          , renderKeyVerificationResult state.verificationResult
+          ]
+      ]
+
+  keyRegion label children =
+    HH.element (HH.ElemName "md-elevated-card")
+      [ classNames [ "panel", "key-card" ]
+      , mdSurface "key-tool"
+      , HH.attr (HH.AttrName "role") "region"
+      , HH.attr (HH.AttrName "aria-label") label
+      ]
+      ([ HH.div [ classNames [ "panel-heading" ] ] [ HH.h2_ [ HH.text label ] ] ] <> children)
+
+  renderSigningModeButton active target action =
+    HH.button
+      [ classNames (if active == target then [ "key-button", "is-selected" ] else [ "key-button" ])
+      , HE.onClick (\_ -> action target)
+      ]
+      [ HH.text (Signing.payloadModeLabel target) ]
+
+  renderKeySigningResult = case _ of
+    Nothing -> toolEmpty "Provide a payload and supported extended signing key."
+    Just (Left err) -> toolError err
+    Just (Right result) -> HH.div [ classNames [ "key-results" ] ]
+      [ renderPublicKey "Verification key" result.verificationKeyBech32
+      , renderPublicKey "Signature (hex)" result.signatureHex
+      , renderPublicKey "Payload bytes (hex)" result.payloadHex
+      ]
+
+  renderKeyVerificationResult = case _ of
+    Nothing -> toolEmpty "Provide a payload, verification key, and signature."
+    Just (Left err) -> toolError err
+    Just (Right valid) -> keyOutputCard "Verification"
+      [ HH.div [ classNames [ "key-verification", if valid then "is-valid" else "is-invalid" ] ]
+          [ HH.text (if valid then "Valid signature" else "Invalid signature") ]
+      ]
 
   renderAddresses state =
     HH.div
@@ -659,6 +1171,197 @@ inspectorComponent initial =
     in case mode of
       ScriptInputTemplate -> if trimmed == "" then Nothing else Just (Script.analyzeScriptTemplateJson trimmed)
       _ -> Nothing
+
+  keyMnemonicWordCounts = [ 12, 15, 18, 21, 24 ]
+
+  keyNormalizeMnemonic value =
+    Array.filter (_ /= "")
+      (String.split (String.Pattern " ") (String.trim (Regex.replace whitespaceRegex " " value)))
+
+  keyParseIndex value = case Int.fromString (String.trim value) of
+    Just index | index >= 0 -> index
+    _ -> 0
+
+  keyNormalizeIndex value = show (keyParseIndex value)
+
+  keyRestoreFamilyLabel = case _ of
+    RestoreShelley -> "Shelley"
+    RestoreIcarus -> "Icarus"
+    RestoreByron -> "Byron"
+
+  keyFamilyUsesRole = case _ of
+    RestoreByron -> false
+    _ -> true
+
+  keyRolesForFamily = case _ of
+    RestoreShelley -> [ Derivation.UTxOExternal, Derivation.UTxOInternal, Derivation.Stake ]
+    RestoreIcarus -> [ Derivation.UTxOExternal, Derivation.UTxOInternal ]
+    RestoreByron -> []
+
+  keyNormalizeRole family role = case family of
+    RestoreShelley -> role
+    RestoreIcarus -> case role of
+      Derivation.Stake -> Derivation.UTxOExternal
+      other -> other
+    RestoreByron -> Derivation.UTxOExternal
+
+  keyRolePath = case _ of
+    Derivation.UTxOExternal -> "0"
+    Derivation.UTxOInternal -> "1"
+    Derivation.Stake -> "2"
+
+  keyRestorePath state = case state.restoreFamily of
+    RestoreShelley ->
+      "m / 1852' / 1815' / " <> state.accountIndexInput <> "' / "
+        <> keyRolePath state.derivationRole <> " / " <> state.addressIndexInput
+    RestoreIcarus ->
+      "m / 44' / 1815' / " <> state.accountIndexInput <> "' / "
+        <> keyRolePath (keyNormalizeRole RestoreIcarus state.derivationRole)
+        <> " / " <> state.addressIndexInput
+    RestoreByron -> "m / " <> state.accountIndexInput <> "' / " <> state.addressIndexInput
+
+  keyIcarusRole role = case keyNormalizeRole RestoreIcarus role of
+    Derivation.UTxOInternal -> Bootstrap.IcarusInternal
+    _ -> Bootstrap.IcarusExternal
+
+  keyIsLegacyCustom = case _ of
+    Bootstrap.LegacyCustom _ -> true
+    _ -> false
+
+  keyIsShelleyCustom = case _ of
+    Shelley.ShelleyCustom _ -> true
+    _ -> false
+
+  keyLegacyNetworkLabel = case _ of
+    Bootstrap.LegacyMainnet -> "Mainnet"
+    Bootstrap.LegacyStaging -> "Staging"
+    Bootstrap.LegacyTestnet -> "Testnet"
+    Bootstrap.LegacyPreview -> "Preview"
+    Bootstrap.LegacyPreprod -> "Preprod"
+    Bootstrap.LegacyCustom _ -> "Custom"
+
+  keyResolveLegacyNetwork state = case state.legacyNetwork of
+    Bootstrap.LegacyCustom _ -> case Int.fromString (String.trim state.legacyCustomMagicInput) of
+      Just magic | magic >= 0 -> Right (Bootstrap.LegacyCustom magic)
+      _ -> Left "Enter a non-negative integer for the protocol magic."
+    network -> Right network
+
+  keyPaymentXPub role keys = case role of
+    Derivation.Stake -> Nothing
+    _ -> Just keys.addressPublicKeyBech32
+
+  refreshKeyDerivation = do
+    state <- H.get
+    let
+      words = keyNormalizeMnemonic state.restorePhrase
+      accountIndex = keyParseIndex state.accountIndexInput
+      addressIndex = keyParseIndex state.addressIndexInput
+    if Array.null words then
+      H.modify_ _ { derivationResult = Nothing, shelleyAddressesResult = Nothing, familyRestoreResult = Nothing }
+    else if not (Mnemonic.validateMnemonic words) then
+      H.modify_ _
+        { derivationResult = if state.restoreFamily == RestoreShelley then Just (Left "Mnemonic is invalid. Check the word list and checksum.") else Nothing
+        , shelleyAddressesResult = Nothing
+        , familyRestoreResult = if state.restoreFamily == RestoreShelley then Nothing else Just (Left "Mnemonic is invalid. Check the word list and checksum.")
+        }
+    else case state.restoreFamily of
+      RestoreShelley -> do
+        outcome <- H.liftAff (attempt (Derivation.derivePipeline words accountIndex state.derivationRole addressIndex))
+        let
+          derivation = case outcome of
+            Left err -> Left ("Key derivation failed: " <> message err)
+            Right keys -> Right keys
+          addresses = case outcome of
+            Left _ -> Nothing
+            Right keys -> Just
+              ( Shelley.constructShelleyAddresses
+                  state.shelleyNetwork
+                  (keyPaymentXPub state.derivationRole keys)
+                  keys.stakePublicKeyBech32
+              )
+        H.modify_ _ { derivationResult = Just derivation, shelleyAddressesResult = addresses, familyRestoreResult = Nothing }
+      RestoreIcarus -> do
+        case keyResolveLegacyNetwork state of
+          Left err -> H.modify_ _ { derivationResult = Nothing, shelleyAddressesResult = Nothing, familyRestoreResult = Just (Left err) }
+          Right network -> do
+            outcome <- H.liftAff
+              (attempt (Bootstrap.constructIcarusAddressFromMnemonic network words accountIndex (keyIcarusRole state.derivationRole) addressIndex))
+            H.modify_ _
+              { derivationResult = Nothing
+              , shelleyAddressesResult = Nothing
+              , familyRestoreResult = Just case outcome of
+                  Left err -> Left ("Restore failed: " <> message err)
+                  Right address -> Right address
+              }
+      RestoreByron -> do
+        case keyResolveLegacyNetwork state of
+          Left err -> H.modify_ _ { derivationResult = Nothing, shelleyAddressesResult = Nothing, familyRestoreResult = Just (Left err) }
+          Right network -> do
+            outcome <- H.liftAff
+              (attempt (Bootstrap.constructByronAddressFromMnemonic network words accountIndex addressIndex))
+            H.modify_ _
+              { derivationResult = Nothing
+              , shelleyAddressesResult = Nothing
+              , familyRestoreResult = Just case outcome of
+                  Left err -> Left ("Restore failed: " <> message err)
+                  Right address -> Right address
+              }
+
+  refreshKeyLegacy = do
+    state <- H.get
+    if String.trim state.legacyAddressXPubInput == "" then
+      H.modify_ _ { legacyResult = Nothing }
+    else case keyResolveLegacyNetwork state of
+      Left err -> H.modify_ _ { legacyResult = Just (Left err) }
+      Right network -> case Bootstrap.parseBootstrapXPub state.legacyAddressXPubInput of
+        Left err -> H.modify_ _ { legacyResult = Just (Left err) }
+        Right addressXPub -> case state.legacyStyle of
+          Bootstrap.LegacyIcarus -> do
+            outcome <- H.liftAff (attempt (Bootstrap.constructIcarusAddress network addressXPub))
+            H.modify_ _
+              { legacyResult = Just case outcome of
+                  Left err -> Left (message err)
+                  Right address -> Right address
+              }
+          Bootstrap.LegacyByron ->
+            if String.trim state.legacyRootXPubInput == "" then
+              H.modify_ _ { legacyResult = Just (Left "Paste the root_xvk key for Byron bootstrap addresses.") }
+            else case Bootstrap.parseBootstrapXPub state.legacyRootXPubInput of
+              Left err -> H.modify_ _ { legacyResult = Just (Left err) }
+              Right rootXPub ->
+                if String.trim state.legacyDerivationPathInput == "" then
+                  H.modify_ _ { legacyResult = Just (Left "Enter a 2-segment Byron path like 0H/0.") }
+                else do
+                  outcome <- H.liftAff
+                    (attempt (Bootstrap.constructByronAddress network addressXPub rootXPub state.legacyDerivationPathInput))
+                  H.modify_ _
+                    { legacyResult = Just case outcome of
+                        Left err -> Left (message err)
+                        Right address -> Right address
+                    }
+
+  keySigningInputBlank mode value = case mode of
+    Signing.PayloadText -> String.trim value == ""
+    Signing.PayloadHex -> String.trim (Regex.replace whitespaceRegex "" value) == ""
+
+  refreshKeySigning = do
+    state <- H.get
+    if keySigningInputBlank state.signingPayloadMode state.signingPayloadInput || String.trim state.signingKeyInput == "" then
+      H.modify_ _ { signingResult = Nothing }
+    else do
+      result <- H.liftAff (Signing.signPayload state.signingPayloadMode state.signingPayloadInput state.signingKeyInput)
+      H.modify_ _ { signingResult = Just result }
+
+  refreshKeyVerification = do
+    state <- H.get
+    if keySigningInputBlank state.verifyPayloadMode state.verifyPayloadInput
+      || String.trim state.verificationKeyInput == ""
+      || String.trim state.signatureInput == "" then
+      H.modify_ _ { verificationResult = Nothing }
+    else do
+      result <- H.liftAff
+        (Signing.verifySignature state.verifyPayloadMode state.verifyPayloadInput state.verificationKeyInput state.signatureInput)
+      H.modify_ _ { verificationResult = Just result }
 
   isDecodedResult result =
     result.exitOk && (Json.inspect result.stdout).valid
@@ -3994,6 +4697,91 @@ inspectorComponent initial =
 
   handleAction = case _ of
     Initialize -> pure unit
+    SelectKeyTab tab -> H.modify_ _ { keyTab = tab }
+    SetKeyMnemonicWordCount count -> H.modify_ _ { mnemonicWordCount = count }
+    GenerateKeyMnemonic -> do
+      count <- H.gets _.mnemonicWordCount
+      words <- liftEffect (Mnemonic.generateMnemonic count)
+      H.modify_ _ { generatedMnemonic = Just words }
+    CopyKeyMnemonic -> do
+      generated <- H.gets _.generatedMnemonic
+      case generated of
+        Nothing -> pure unit
+        Just words -> H.liftAff (Clipboard.copy (String.joinWith " " words))
+    ToggleGeneratedMnemonic -> H.modify_ \state -> state { showGeneratedMnemonic = not state.showGeneratedMnemonic }
+    UseGeneratedMnemonic -> do
+      generated <- H.gets _.generatedMnemonic
+      case generated of
+        Nothing -> pure unit
+        Just words -> do
+          H.modify_ _ { restorePhrase = String.joinWith " " words }
+          refreshKeyDerivation
+    ToggleRestorePhrase -> H.modify_ \state -> state { showRestorePhrase = not state.showRestorePhrase }
+    ToggleDerivedKeys -> H.modify_ \state -> state { showDerivedKeys = not state.showDerivedKeys }
+    SetRestorePhrase value -> H.modify_ _ { restorePhrase = value } *> refreshKeyDerivation
+    SetRestoreFamily family -> do
+      role <- H.gets _.derivationRole
+      H.modify_ _ { restoreFamily = family, derivationRole = keyNormalizeRole family role }
+      refreshKeyDerivation
+    SetShelleyNetwork network -> H.modify_ _ { shelleyNetwork = network } *> refreshKeyDerivation
+    SelectShelleyCustomNetwork -> do
+      state <- H.get
+      let networkTag = case Int.fromString (String.trim state.shelleyCustomNetworkTagInput) of
+            Just value | value >= 0 && value <= 15 -> value
+            _ -> 3
+      H.modify_ _ { shelleyNetwork = Shelley.ShelleyCustom networkTag }
+      refreshKeyDerivation
+    SetShelleyCustomNetworkTag value -> do
+      state <- H.get
+      let network = case Int.fromString (String.trim value) of
+            Just networkTag | networkTag >= 0 && networkTag <= 15 -> Shelley.ShelleyCustom networkTag
+            _ -> state.shelleyNetwork
+      H.modify_ _ { shelleyCustomNetworkTagInput = value, shelleyNetwork = network }
+      refreshKeyDerivation
+    SetAccountIndex value -> H.modify_ _ { accountIndexInput = keyNormalizeIndex value } *> refreshKeyDerivation
+    SetAddressIndex value -> H.modify_ _ { addressIndexInput = keyNormalizeIndex value } *> refreshKeyDerivation
+    SetDerivationRole role -> H.modify_ _ { derivationRole = role } *> refreshKeyDerivation
+    SetLegacyStyle style -> H.modify_ _ { legacyStyle = style } *> refreshKeyLegacy
+    SetLegacyNetwork network -> do
+      H.modify_ _ { legacyNetwork = network }
+      refreshKeyDerivation
+      refreshKeyLegacy
+    SelectLegacyCustomNetwork -> do
+      state <- H.get
+      let magic = case Int.fromString (String.trim state.legacyCustomMagicInput) of
+            Just value | value >= 0 -> value
+            _ -> 4242
+      H.modify_ _ { legacyNetwork = Bootstrap.LegacyCustom magic }
+      refreshKeyDerivation
+      refreshKeyLegacy
+    SetLegacyAddressXPub value -> H.modify_ _ { legacyAddressXPubInput = value } *> refreshKeyLegacy
+    SetLegacyRootXPub value -> H.modify_ _ { legacyRootXPubInput = value } *> refreshKeyLegacy
+    SetLegacyDerivationPath value -> H.modify_ _ { legacyDerivationPathInput = value } *> refreshKeyLegacy
+    SetLegacyCustomMagic value -> do
+      H.modify_ _ { legacyCustomMagicInput = value }
+      refreshKeyDerivation
+      refreshKeyLegacy
+    SetSigningPayloadMode mode -> H.modify_ _ { signingPayloadMode = mode } *> refreshKeySigning
+    SetSigningPayload value -> H.modify_ _ { signingPayloadInput = value } *> refreshKeySigning
+    ToggleSigningKey -> H.modify_ \state -> state { showSigningKey = not state.showSigningKey }
+    SetSigningKey value -> H.modify_ _ { signingKeyInput = value } *> refreshKeySigning
+    UseSigningResultForVerification -> do
+      state <- H.get
+      case state.signingResult of
+        Just (Right result) -> do
+          H.modify_ _
+            { verifyPayloadMode = state.signingPayloadMode
+            , verifyPayloadInput = state.signingPayloadInput
+            , verificationKeyInput = result.verificationKeyBech32
+            , signatureInput = result.signatureHex
+            }
+          refreshKeyVerification
+        _ -> pure unit
+    SetVerifyPayloadMode mode -> H.modify_ _ { verifyPayloadMode = mode } *> refreshKeyVerification
+    SetVerifyPayload value -> H.modify_ _ { verifyPayloadInput = value } *> refreshKeyVerification
+    SetVerificationKey value -> H.modify_ _ { verificationKeyInput = value } *> refreshKeyVerification
+    SetSignature value -> H.modify_ _ { signatureInput = value } *> refreshKeyVerification
+    CopyKeyValue value -> H.liftAff (Clipboard.copy value)
     SetAddressInput value ->
       H.modify_ _ { addressInput = value, addressResult = Nothing }
     InspectAddress -> do
