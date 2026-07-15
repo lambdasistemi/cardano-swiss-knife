@@ -45,8 +45,10 @@ topbar active opts =
             , HH.attr (HH.AttrName "aria-label") "Primary"
             ]
             [ navLink opts.basePath RouteInspect active "Inspect" opts.onNavigate
-            , navLink opts.basePath RouteSettings active "Settings" opts.onNavigate
+            , navLink opts.basePath RouteAddresses active "Addresses" opts.onNavigate
+            , navLink opts.basePath RouteScripts active "Scripts" opts.onNavigate
             , navLink opts.basePath RouteLibrary active "Library" opts.onNavigate
+            , navLink opts.basePath RouteSettings active "Settings" opts.onNavigate
             ]
         , HH.element (HH.ElemName "md-icon-button")
             [ classNames [ "topbar-theme" ]

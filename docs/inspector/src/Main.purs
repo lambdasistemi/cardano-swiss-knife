@@ -2,14 +2,20 @@ module Main (main) where
 
 import Prelude
 
+import Cardano.Address.Script as Script
+import Control.Promise (Promise, toAff)
 import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Int as Int
 import Data.Maybe (Maybe(..))
+import Data.Nullable (Nullable, toMaybe)
 import Data.String (Pattern(..), Replacement(..), joinWith, replaceAll, split, trim) as String
 import Data.String.CodeUnits as StringCodeUnits
+import Data.String.Regex as Regex
+import Data.String.Regex.Flags (global, unicode)
+import Data.String.Regex.Unsafe (unsafeRegex)
 import Effect (Effect)
-import Effect.Aff (attempt)
+import Effect.Aff (Aff, attempt)
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class (liftEffect)
 import Effect.Exception (message)
@@ -115,6 +121,59 @@ data ValidationTone = ValidationPass | ValidationWarn | ValidationFail
 
 derive instance eqValidationTone :: Eq ValidationTone
 
+data ScriptInputMode = ScriptInputCbor | ScriptInputJson | ScriptInputTemplate
+
+derive instance eqScriptInputMode :: Eq ScriptInputMode
+
+type RawAddressInfo =
+  { addressStyle :: String
+  , addressType :: Int
+  , addressTypeLabel :: String
+  , networkTag :: Int
+  , networkTagLabel :: String
+  , stakeReference :: String
+  , spendingKeyHash :: Nullable String
+  , stakeKeyHash :: Nullable String
+  , spendingScriptHash :: Nullable String
+  , stakeScriptHash :: Nullable String
+  , extraDetails :: Array { label :: String, value :: String }
+  }
+
+type AddressInfo =
+  { addressStyle :: String
+  , addressType :: Int
+  , addressTypeLabel :: String
+  , networkTag :: Int
+  , networkTagLabel :: String
+  , stakeReference :: String
+  , spendingKeyHash :: Maybe String
+  , stakeKeyHash :: Maybe String
+  , spendingScriptHash :: Maybe String
+  , stakeScriptHash :: Maybe String
+  , extraDetails :: Array { label :: String, value :: String }
+  }
+
+inspectAddressWithSharedWasm :: String -> Aff AddressInfo
+inspectAddressWithSharedWasm value = do
+  browserWindow <- liftEffect window
+  let
+    browser = unsafeCoerce browserWindow
+      :: { inspectCardanoAddress :: String -> Promise RawAddressInfo }
+  raw <- toAff (browser.inspectCardanoAddress value)
+  pure
+    { addressStyle: raw.addressStyle
+    , addressType: raw.addressType
+    , addressTypeLabel: raw.addressTypeLabel
+    , networkTag: raw.networkTag
+    , networkTagLabel: raw.networkTagLabel
+    , stakeReference: raw.stakeReference
+    , spendingKeyHash: toMaybe raw.spendingKeyHash
+    , stakeKeyHash: toMaybe raw.stakeKeyHash
+    , spendingScriptHash: toMaybe raw.spendingScriptHash
+    , stakeScriptHash: toMaybe raw.stakeScriptHash
+    , extraDetails: raw.extraDetails
+    }
+
 type State =
   { provider :: Provider
   , blockfrostKey :: String
@@ -158,6 +217,12 @@ type State =
   , copiedPath :: Maybe String
   , browserPath :: String
   , fetchError :: Maybe String
+  , addressInput :: String
+  , addressResult :: Maybe (Either String AddressInfo)
+  , scriptInputMode :: ScriptInputMode
+  , scriptInput :: String
+  , scriptResult :: Maybe (Either String Script.ScriptAnalysis)
+  , scriptTemplateResult :: Maybe (Either String Script.ScriptTemplateAnalysis)
   , route :: Route
   , routeBase :: String
   , theme :: Theme.Theme
@@ -268,6 +333,10 @@ data Action
   | SetValidationFilter ValidationFilter
   | SelectResultTab ResultTab
   | ChangeInput
+  | SetAddressInput String
+  | InspectAddress
+  | SetScriptInputMode ScriptInputMode
+  | SetScriptInput String
   | Navigate Route MouseEvent
   | ToggleTheme
 
@@ -321,6 +390,12 @@ inspectorComponent initial =
         , copiedPath: Nothing
         , browserPath: "[]"
         , fetchError: Nothing
+        , addressInput: ""
+        , addressResult: Nothing
+        , scriptInputMode: ScriptInputCbor
+        , scriptInput: ""
+        , scriptResult: Nothing
+        , scriptTemplateResult: Nothing
         , route: initial.route
         , routeBase: initial.routeBase
         , theme: initial.theme
@@ -344,6 +419,8 @@ inspectorComponent initial =
           [ classNames [ "page-frame", "shell-main" ] ]
           [ case state.route of
               RouteInspect -> renderInspector state
+              RouteAddresses -> renderAddresses state
+              RouteScripts -> renderScripts state
               RouteSettings -> renderSettings state
               RouteLibrary -> renderLibrary state
           ]
@@ -380,6 +457,208 @@ inspectorComponent initial =
                 [ renderResult state ]
             ]
         ]
+
+  renderAddresses state =
+    HH.div
+      [ classNames [ "app-shell", "tool-page", "addresses-page" ] ]
+      [ toolIntro "Address inspection" "Decode Cardano addresses locally and inspect their style, network, credentials, and stake reference."
+      , HH.div
+          [ classNames [ "tool-layout" ] ]
+          [ toolCard "tool-input-panel" "input"
+              [ toolHeading "Cardano address" "Shelley bech32 and bootstrap base58 addresses are supported."
+              , HH.label
+                  [ classNames [ "field-stack" ] ]
+                  [ HH.span [ classNames [ "field-label" ] ] [ HH.text "Cardano address" ]
+                  , HH.textarea
+                      [ HP.rows 5
+                      , HP.value state.addressInput
+                      , HH.attr (HH.AttrName "aria-label") "Cardano address"
+                      , HE.onValueInput SetAddressInput
+                      ]
+                  ]
+              , HH.element (HH.ElemName "md-filled-button")
+                  [ classNames [ "primary-action" ]
+                  , HH.attr (HH.AttrName "role") "button"
+                  , mdControl "primary"
+                  , HE.onClick (\_ -> InspectAddress)
+                  ]
+                  [ HH.text "Inspect address" ]
+              ]
+          , HH.element (HH.ElemName "md-elevated-card")
+              [ classNames [ "panel", "tool-result-panel" ]
+              , mdSurface "result"
+              , HH.attr (HH.AttrName "role") "region"
+              , HH.attr (HH.AttrName "aria-label") "Address inspection result"
+              ]
+              [ HH.div [ classNames [ "panel-heading" ] ] [ HH.h2_ [ HH.text "Decoded address" ] ]
+              , renderAddressResult state.addressResult
+              ]
+          ]
+      ]
+
+  renderAddressResult = case _ of
+    Nothing -> toolEmpty "Paste an address and inspect it to see its ledger structure."
+    Just (Left err) -> toolError err
+    Just (Right info) ->
+      HH.div
+        [ classNames [ "tool-result-grid" ] ]
+        ( [ toolKeyValue "Style" info.addressStyle
+          , toolKeyValue "Header type" info.addressTypeLabel
+          , toolKeyValue "Header type code" (show info.addressType)
+          , toolKeyValue "Network" info.networkTagLabel
+          , toolKeyValue "Network tag" (networkTagValue info.networkTag)
+          , toolKeyValue "Stake reference" info.stakeReference
+          , toolMaybeRow "Spending key hash" info.spendingKeyHash
+          , toolMaybeRow "Spending script hash" info.spendingScriptHash
+          , toolMaybeRow "Stake key hash" info.stakeKeyHash
+          , toolMaybeRow "Stake script hash" info.stakeScriptHash
+          ]
+            <> map (\detail -> toolKeyValue detail.label detail.value) info.extraDetails
+        )
+
+  renderScripts state =
+    HH.div
+      [ classNames [ "app-shell", "tool-page", "scripts-page" ] ]
+      [ toolIntro "Native scripts" "Inspect CBOR preimages, author canonical native-script JSON, or validate a ScriptTemplate locally."
+      , HH.div
+          [ classNames [ "tool-layout" ] ]
+          [ toolCard "tool-input-panel" "input"
+              [ toolHeading "Script input" "Results update as you type."
+              , HH.div
+                  [ classNames [ "tool-tabs" ]
+                  , HH.attr (HH.AttrName "role") "tablist"
+                  , HH.attr (HH.AttrName "aria-label") "Script input format"
+                  ]
+                  [ renderScriptModeTab state.scriptInputMode ScriptInputCbor "CBOR hex"
+                  , renderScriptModeTab state.scriptInputMode ScriptInputJson "JSON"
+                  , renderScriptModeTab state.scriptInputMode ScriptInputTemplate "Template JSON"
+                  ]
+              , HH.label
+                  [ classNames [ "field-stack" ] ]
+                  [ HH.span [ classNames [ "field-label" ] ] [ HH.text (scriptInputModeLabel state.scriptInputMode) ]
+                  , HH.textarea
+                      [ HP.rows 10
+                      , HP.value state.scriptInput
+                      , HH.attr (HH.AttrName "aria-label") (scriptInputModeLabel state.scriptInputMode)
+                      , HE.onValueInput SetScriptInput
+                      ]
+                  ]
+              ]
+          , HH.element (HH.ElemName "md-elevated-card")
+              [ classNames [ "panel", "tool-result-panel" ]
+              , mdSurface "result"
+              , HH.attr (HH.AttrName "role") "region"
+              , HH.attr (HH.AttrName "aria-label") "Script analysis result"
+              ]
+              [ HH.div [ classNames [ "panel-heading" ] ] [ HH.h2_ [ HH.text "Script analysis" ] ]
+              , case state.scriptInputMode of
+                  ScriptInputTemplate -> renderScriptTemplateResult state.scriptTemplateResult
+                  _ -> renderScriptResult state.scriptResult
+              ]
+          ]
+      ]
+
+  toolIntro title copy =
+    HH.section
+      [ classNames [ "intro-strip" ] ]
+      [ HH.div_ [ HH.h1_ [ HH.text title ], HH.p_ [ HH.text copy ] ] ]
+
+  toolCard panelClass surface children =
+    HH.element (HH.ElemName "md-elevated-card")
+      [ classNames [ "panel", panelClass ], mdSurface surface ]
+      children
+
+  toolHeading title copy =
+    HH.div [ classNames [ "panel-heading" ] ]
+      [ HH.div_ [ HH.h2_ [ HH.text title ], HH.p_ [ HH.text copy ] ] ]
+
+  renderScriptModeTab active target label =
+    HH.button
+      [ classNames (if active == target then [ "tool-tab", "is-selected" ] else [ "tool-tab" ])
+      , HH.attr (HH.AttrName "role") "tab"
+      , HH.attr (HH.AttrName "aria-selected") (if active == target then "true" else "false")
+      , HE.onClick (\_ -> SetScriptInputMode target)
+      ]
+      [ HH.text label ]
+
+  renderScriptResult = case _ of
+    Nothing -> toolEmpty "Paste native script CBOR or JSON to see its canonical form and ledger hash."
+    Just (Left err) -> toolError err
+    Just (Right result) ->
+      HH.div [ classNames [ "tool-result-grid" ] ]
+        ( [ toolKeyValue "Script type" result.scriptType
+          , toolKeyValue "Validation" result.validationStatus
+          , toolKeyValue "Hash hex" result.hashHex
+          , toolKeyValue "Hash bech32" result.hashBech32
+          , toolKeyValue "Canonical JSON" result.canonicalJson
+          , toolKeyValue "Script preimage (CBOR hex)" result.canonicalCborHex
+          ]
+            <> map renderScriptIssue result.issues
+        )
+
+  renderScriptTemplateResult = case _ of
+    Nothing -> toolEmpty "Paste ScriptTemplate JSON to validate cosigners and derive its native script."
+    Just (Left err) -> toolError err
+    Just (Right result) ->
+      HH.div [ classNames [ "tool-result-grid" ] ]
+        ( [ toolKeyValue "Template validation" result.templateValidationStatus
+          , toolKeyValue "Canonical template JSON" result.canonicalTemplateJson
+          ]
+            <> map renderScriptIssue result.templateIssues
+            <> if result.hasDerivedScript then
+                [ toolKeyValue "Derived script type" result.derivedScript.scriptType
+                , toolKeyValue "Derived validation" result.derivedScript.validationStatus
+                , toolKeyValue "Derived hash hex" result.derivedScript.hashHex
+                , toolKeyValue "Derived hash bech32" result.derivedScript.hashBech32
+                , toolKeyValue "Derived canonical JSON" result.derivedScript.canonicalJson
+                , toolKeyValue "Derived script preimage (CBOR hex)" result.derivedScript.canonicalCborHex
+                ]
+                  <> map renderScriptIssue result.derivedScript.issues
+              else
+                [ toolKeyValue "Derived script" "Unavailable until the template validates." ]
+        )
+
+  renderScriptIssue issue =
+    toolKeyValue ("Issue (" <> issue.level <> " / " <> issue.code <> ")") issue.message
+
+  toolKeyValue label value =
+    HH.div [ classNames [ "tool-kv-row" ] ]
+      [ HH.span [ classNames [ "tool-kv-label" ] ] [ HH.text label ]
+      , HH.code [ classNames [ "tool-kv-value" ] ] [ HH.text value ]
+      ]
+
+  toolMaybeRow label value = toolKeyValue label case value of
+    Just content -> content
+    Nothing -> "-"
+
+  toolEmpty copy = HH.div [ classNames [ "empty-state" ] ] [ HH.text copy ]
+
+  toolError err = HH.div [ classNames [ "tool-error" ] ] [ HH.text err ]
+
+  networkTagValue tag | tag < 0 = "-"
+  networkTagValue tag = show tag
+
+  scriptInputModeLabel = case _ of
+    ScriptInputCbor -> "Native script CBOR hex"
+    ScriptInputJson -> "Native script JSON"
+    ScriptInputTemplate -> "ScriptTemplate JSON"
+
+  scriptAnalysisStatus mode value =
+    let
+      trimmed = String.trim value
+      normalizedHex = String.trim (Regex.replace whitespaceRegex "" value)
+    in case mode of
+      ScriptInputCbor -> if normalizedHex == "" then Nothing else Just (Script.analyzeNativeScriptHex normalizedHex)
+      ScriptInputJson -> if trimmed == "" then Nothing else Just (Script.analyzeNativeScriptJson trimmed)
+      ScriptInputTemplate -> Nothing
+
+  whitespaceRegex = unsafeRegex "\\s+" (global <> unicode)
+
+  scriptTemplateStatus mode value =
+    let trimmed = String.trim value
+    in case mode of
+      ScriptInputTemplate -> if trimmed == "" then Nothing else Just (Script.analyzeScriptTemplateJson trimmed)
+      _ -> Nothing
 
   isDecodedResult result =
     result.exitOk && (Json.inspect result.stdout).valid
@@ -3715,6 +3994,33 @@ inspectorComponent initial =
 
   handleAction = case _ of
     Initialize -> pure unit
+    SetAddressInput value ->
+      H.modify_ _ { addressInput = value, addressResult = Nothing }
+    InspectAddress -> do
+      state <- H.get
+      if String.trim state.addressInput == "" then
+        H.modify_ _ { addressResult = Just (Left "Paste a Cardano address to inspect.") }
+      else do
+        outcome <- H.liftAff (attempt (inspectAddressWithSharedWasm state.addressInput))
+        H.modify_ _
+          { addressResult = Just case outcome of
+              Right result -> Right result
+              Left err -> Left (message err)
+          }
+    SetScriptInputMode mode -> do
+      state <- H.get
+      H.modify_ _
+        { scriptInputMode = mode
+        , scriptResult = scriptAnalysisStatus mode state.scriptInput
+        , scriptTemplateResult = scriptTemplateStatus mode state.scriptInput
+        }
+    SetScriptInput value ->
+      H.modify_ \state ->
+        state
+          { scriptInput = value
+          , scriptResult = scriptAnalysisStatus state.scriptInputMode value
+          , scriptTemplateResult = scriptTemplateStatus state.scriptInputMode value
+          }
     Navigate route event -> do
       routeBase <- H.gets _.routeBase
       liftEffect do
