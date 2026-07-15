@@ -15,6 +15,13 @@ This repository is the composed product shell:
 
 The current transaction signing flow is intentionally explicit: it signs the transaction body hash locally, keeps detached witness details visible, and asks the inspector WASM to attach or replace the generated vkey witness in transaction CBOR. Submission, bootstrap witness mutation, and hardware-wallet flows are still separate work.
 
+## Architecture
+
+`cardano-swiss-knife` (csk) is the browser product and workbench; [cardano-ledger-inspector](https://github.com/lambdasistemi/cardano-ledger-inspector) is its ledger engine.
+
+- The workbench consumes the engine through the flake inputs `tx-inspector` and `tx-inspector-rdf`.
+- It invokes `wasm-tx-inspector.wasm` through the versioned JSON control-envelope contract, keeping ledger operations in the engine rather than browser JavaScript.
+
 ## Development
 
 ```bash
