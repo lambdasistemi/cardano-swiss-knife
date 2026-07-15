@@ -39,6 +39,7 @@ import Routing (Route(..))
 import Routing as Routing
 import Shell as Shell
 import Theme as Theme
+import TxSigning as TxSigning
 import Vault as Vault
 import Halogen as H
 import Halogen.Aff as HA
@@ -191,6 +192,10 @@ type State =
   , identification :: Maybe Json.Identification
   , intent :: Maybe Json.IntentSummary
   , witnessPlan :: Maybe Json.WitnessPlan
+  , txSigningKeyInput :: String
+  , showTxSigningKey :: Boolean
+  , txSigningRunning :: Boolean
+  , txSigningResult :: Maybe (Either String TxSigning.WitnessMaterial)
   , validation :: Maybe Json.Validation
   , rdf :: Maybe Json.RdfGraph
   , sparqlLens :: Maybe SparqlLens
@@ -429,8 +434,13 @@ data Action
   | PopVaultEntryInRestore String
   | PeekVaultEntryInSigning String
   | PopVaultEntryInSigning String
+  | PeekVaultEntryInTxSigning String
+  | PopVaultEntryInTxSigning String
   | PeekVaultEntryInProvider String
   | PopVaultEntryInProvider String
+  | SetTxSigningKey String
+  | ToggleTxSigningKey
+  | RunTxSign
   | DeleteVaultEntry String
   | Navigate Route MouseEvent
   | ToggleTheme
@@ -459,6 +469,10 @@ inspectorComponent initial =
         , identification: Nothing
         , intent: Nothing
         , witnessPlan: Nothing
+        , txSigningKeyInput: ""
+        , showTxSigningKey: false
+        , txSigningRunning: false
+        , txSigningResult: Nothing
         , validation: Nothing
         , rdf: Nothing
         , sparqlLens: Nothing
@@ -595,7 +609,9 @@ inspectorComponent initial =
                 HH.text ""
             , HH.div
                 [ classNames [ "workspace-main" ] ]
-                [ renderResult state ]
+                [ renderResult state
+                , renderTxSigning state
+                ]
             ]
         ]
 
@@ -3127,6 +3143,93 @@ inspectorComponent initial =
             [ HH.text (if state.running then "Decoding..." else "Decode") ]
         ]
 
+  renderTxSigning state =
+    HH.section
+      [ classNames [ "panel", "tx-signing-panel" ]
+      , HH.attr (HH.AttrName "role") "region"
+      , HH.attr (HH.AttrName "aria-label") "Sign transaction body"
+      , mdSurface "result"
+      ]
+      [ HH.div
+          [ classNames [ "panel-heading" ] ]
+          [ HH.div_
+              [ HH.h2_ [ HH.text "Sign transaction body" ]
+              , HH.p_ [ HH.text "Create one local vkey witness, verify that it matches the current witness plan, then ask the ledger engine to attach it." ]
+              ]
+          ]
+      , case txSigningBodyHash state of
+          Just bodyHash | state.resultTab == WitnessTab ->
+            HH.div [ classNames [ "signing-context-card" ] ]
+              [ HH.span [ classNames [ "signing-context-label" ] ] [ HH.text "Body hash" ]
+              , HH.code [ classNames [ "signing-output-value" ] ] [ HH.text bodyHash ]
+              ]
+          _ -> HH.text ""
+      , renderVaultShelf "vault-shelf--tx-signing" signingAcceptedKinds state.vaultEntries PeekVaultEntryInTxSigning PopVaultEntryInTxSigning
+      , HH.div [ classNames [ "key-actions" ] ]
+          [ keyButton false (if state.showTxSigningKey then "Hide signing key" else "Show signing key") ToggleTxSigningKey ]
+      , HH.label [ classNames [ "key-field" ] ]
+          [ HH.span [ classNames [ "field-label" ] ] [ HH.text "Transaction signing key" ]
+          , HH.input
+              [ HP.type_ (if state.showTxSigningKey then HP.InputText else HP.InputPassword)
+              , HP.value state.txSigningKeyInput
+              , HH.attr (HH.AttrName "aria-label") "Transaction signing key"
+              , HE.onValueInput SetTxSigningKey
+              ]
+          ]
+      , HH.button
+          [ classNames [ "key-button", "key-button-primary", "tx-signing-submit" ]
+          , HP.disabled (state.running || state.txSigningRunning || not (txSigningReady state))
+          , HE.onClick (\_ -> RunTxSign)
+          ]
+          [ HH.text "Create signed transaction" ]
+      , renderTxSigningStatus state
+      ]
+
+  renderTxSigningStatus state
+    | state.running =
+        HH.div [ classNames [ "privacy-note", "tx-signing-status" ] ]
+          [ HH.text "Wait for transaction inspection to finish before signing." ]
+    | state.txSigningRunning =
+        HH.div [ classNames [ "privacy-note", "tx-signing-status" ] ]
+          [ HH.text "Signing locally and attaching the witness…" ]
+    | not (txSigningReady state) =
+        HH.div [ classNames [ "privacy-note", "tx-signing-status" ] ]
+          [ HH.text "Inspect a transaction first to load its CBOR and body hash." ]
+    | otherwise =
+        case state.txSigningResult of
+          Nothing ->
+            HH.div [ classNames [ "privacy-note", "tx-signing-status" ] ]
+              [ HH.text "The signing key remains only in this browser tab's memory." ]
+          Just (Left err) ->
+            HH.div
+              [ classNames [ "tool-error", "tx-signing-status" ]
+              , HH.attr (HH.AttrName "role") "alert"
+              ]
+              [ HH.text err ]
+          Just (Right result) ->
+            HH.div [ classNames [ "tx-signing-result" ] ]
+              [ HH.div [ classNames [ "signer-match-status" ] ]
+                  [ HH.text "Matches a missing required signer" ]
+              , HH.div [ classNames [ "signing-output-grid" ] ]
+                  [ renderSigningOutput "Body hash" result.bodyHashHex
+                  , renderSigningOutput "Verification key" result.verificationKeyBech32
+                  , renderSigningOutput "Signer hash" result.signerHashHex
+                  , renderSigningOutput "Signature" result.signatureHex
+                  , renderSigningOutput "Detached vkey witness CBOR" result.vkeyWitnessCborHex
+                  , renderSigningOutput "Attachment action" result.witnessPatchAction
+                  , renderSigningOutput "Patched signed transaction CBOR" result.signedTxCborHex
+                  ]
+              ]
+
+  renderSigningOutput label value =
+    HH.div [ classNames [ "signing-output-card" ] ]
+      [ HH.div
+          [ classNames [ "signing-output-content" ] ]
+          [ HH.h3_ [ HH.text label ]
+          , HH.code [ classNames [ "signing-output-value" ] ] [ HH.text value ]
+          ]
+      ]
+
   renderResult state =
     case state.fetchError of
       Just err ->
@@ -4962,6 +5065,9 @@ inspectorComponent initial =
         , vaultUnlocked = false
         , vaultEntries = []
         , vaultDirty = false
+        , txSigningKeyInput = ""
+        , showTxSigningKey = false
+        , txSigningResult = Nothing
         , vaultErrorMessage = Nothing
         , vaultStatusMessage = Just "Vault locked. Decrypted entries were cleared from memory."
         }
@@ -5003,6 +5109,10 @@ inspectorComponent initial =
       H.modify_ _ { signingKeyInput = entry.value } *> refreshKeySigning
     PopVaultEntryInSigning entryId -> popVaultEntry signingAcceptedKinds entryId \entry ->
       H.modify_ _ { signingKeyInput = entry.value } *> refreshKeySigning
+    PeekVaultEntryInTxSigning entryId -> useVaultEntry signingAcceptedKinds entryId \entry ->
+      H.modify_ _ { txSigningKeyInput = entry.value, txSigningResult = Nothing }
+    PopVaultEntryInTxSigning entryId -> popVaultEntry signingAcceptedKinds entryId \entry ->
+      H.modify_ _ { txSigningKeyInput = entry.value, txSigningResult = Nothing }
     PeekVaultEntryInProvider entryId -> do
       state <- H.get
       useVaultEntry (providerAcceptedKinds state.provider) entryId setProviderEntry
@@ -5012,6 +5122,52 @@ inspectorComponent initial =
     DeleteVaultEntry entryId -> do
       state <- H.get
       persistVaultEntries (Array.filter (\entry -> entry.id /= entryId) state.vaultEntries) "Removed entry from the vault."
+    SetTxSigningKey value ->
+      H.modify_ _ { txSigningKeyInput = value, txSigningResult = Nothing }
+    ToggleTxSigningKey ->
+      H.modify_ \state -> state { showTxSigningKey = not state.showTxSigningKey }
+    RunTxSign -> do
+      state <- H.get
+      if state.running then
+        setTxSigningError "Wait for transaction inspection to finish before signing."
+      else if state.txSigningRunning then
+        pure unit
+      else case state.txCbor of
+        Nothing ->
+          setTxSigningError "Inspect a transaction first to load its CBOR and body hash."
+        Just txCbor ->
+          case txSigningBodyHash state of
+            Nothing ->
+              setTxSigningError "The inspected transaction did not provide a body hash."
+            Just bodyHash ->
+              case state.witnessPlan of
+                Nothing ->
+                  setTxSigningError "The inspected transaction did not provide a witness plan."
+                Just witnessPlan ->
+                  if String.trim state.txSigningKeyInput == "" then
+                    setTxSigningError "Enter an extended signing key before signing."
+                  else if StringCodeUnits.contains (String.Pattern " ") (String.trim state.txSigningKeyInput) then
+                    setTxSigningError "Unsupported signing key: expected an extended Bech32 signing key."
+                  else do
+                    H.modify_ _ { txSigningRunning = true, txSigningResult = Nothing }
+                    prepared <- H.liftAff (TxSigning.prepareWitness bodyHash (String.trim state.txSigningKeyInput))
+                    case prepared of
+                      Left err ->
+                        H.modify_ _ { txSigningRunning = false, txSigningResult = Just (Left err) }
+                      Right detached ->
+                        if witnessPlanHasSigner "Present vkey witnesses" detached.signerHashHex witnessPlan then
+                          H.modify_ _
+                            { txSigningRunning = false
+                            , txSigningResult = Just (Left "Signer already present in the witness set.")
+                            }
+                        else if witnessPlanHasSigner "Missing declared signers" detached.signerHashHex witnessPlan then do
+                          attached <- H.liftAff (TxSigning.attachWitness txCbor detached)
+                          H.modify_ _ { txSigningRunning = false, txSigningResult = Just attached }
+                        else
+                          H.modify_ _
+                            { txSigningRunning = false
+                            , txSigningResult = Just (Left "Signer is not required by the current witness plan.")
+                            }
     SetAddressInput value ->
       H.modify_ _ { addressInput = value, addressResult = Nothing }
     InspectAddress -> do
@@ -5336,6 +5492,8 @@ inspectorComponent initial =
           , identification = Nothing
           , intent = Nothing
           , witnessPlan = Nothing
+          , txSigningRunning = false
+          , txSigningResult = Nothing
           , validation = Nothing
           , rdf = Nothing
           , sparqlLens = Nothing
@@ -5550,7 +5708,10 @@ inspectorComponent initial =
     SelectResultTab tab ->
       H.modify_ _ { resultTab = tab }
     ChangeInput ->
-      H.modify_ _ { loadFormExpanded = true, copied = false, copiedPath = Nothing }
+      H.modify_ _ { loadFormExpanded = true, copied = false, copiedPath = Nothing, txSigningResult = Nothing }
+
+  setTxSigningError errorMessage =
+    H.modify_ _ { txSigningRunning = false, txSigningResult = Just (Left errorMessage) }
 
   vaultError errorMessage =
     H.modify_ _ { vaultErrorMessage = Just errorMessage, vaultStatusMessage = Nothing }
@@ -5619,6 +5780,33 @@ inspectorComponent initial =
       Koios -> H.modify_ _ { koiosBearer = entry.value }
 
   restoreAcceptedKinds = [ Vault.kindTag Vault.VaultMnemonic ]
+
+  txSigningBodyHash state =
+    case state.identification of
+      Just identification | identification.valid ->
+        case Array.find (\row -> row.path == "[\"identification\",\"body_hash\"]") identification.primary of
+          Just row | String.trim row.copyValue /= "" -> Just (String.trim row.copyValue)
+          _ -> Nothing
+      _ -> Nothing
+
+  txSigningReady state =
+    case state.txCbor of
+      Just txCbor | String.trim txCbor /= "" ->
+        case txSigningBodyHash state of
+          Just _ ->
+            case state.witnessPlan of
+              Just witnessPlan -> witnessPlan.valid
+              Nothing -> false
+          Nothing -> false
+      _ -> false
+
+  witnessPlanHasSigner sectionTitle signerHash witnessPlan =
+    case Array.find (\section -> section.title == sectionTitle) witnessPlan.sections of
+      Nothing -> false
+      Just section ->
+        Array.any
+          (\row -> String.trim row.copyValue == signerHash || String.trim row.value == signerHash)
+          section.rows
 
   signingAcceptedKinds =
     [ Vault.kindTag Vault.VaultSigningKey
