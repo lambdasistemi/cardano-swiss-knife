@@ -3829,6 +3829,72 @@ md-filled-tonal-button.example-valid {
   }
 }
 
+.tx-signing-panel {
+  min-width: 0;
+  margin-top: 18px;
+  padding: 20px;
+}
+
+.signing-context-card,
+.signing-output-card {
+  min-width: 0;
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-card);
+  background: var(--surface-container-low);
+  padding: 12px;
+}
+
+.signing-context-label,
+.signing-output-card h3 {
+  display: block;
+  margin: 0 0 8px;
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.signing-output-value {
+  display: block;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.tx-signing-submit {
+  margin-top: 4px;
+}
+
+.tx-signing-status {
+  margin-top: 12px;
+}
+
+.signer-match-status {
+  margin-top: 14px;
+  border-radius: var(--radius-field);
+  background: var(--success-container);
+  padding: 12px;
+  color: var(--on-success-container);
+  font-weight: 700;
+}
+
+.signing-output-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+@media (max-width: 760px) {
+  .signing-output-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .tx-signing-panel {
+    padding: 14px;
+  }
+}
+
 /* Dim empty (NULL) leaf fields so populated fields stand out; every CDDL field is still
    present and in order (the faithful-decode contract). (P1 tree_readability) */
 .decoded-tree-row.decoded-tree-empty-field {

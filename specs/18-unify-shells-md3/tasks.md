@@ -62,10 +62,10 @@
 
 **Independent proof**: A RED-first browser case derives and vaults a matching key, loads it into Workbench, attaches one new vkey witness, and shows the detached witness, signer match, attachment action, and patched CBOR.
 
-- [ ] T017-S5 [P] [US3] Add the RED-first end-to-end signing-loop and local-validation/error cases in `docs/inspector/tests/unified-signing-loop.spec.mjs` and register them in `docs/inspector/playwright.config.mjs`.
-- [ ] T018-S5 [US3] Port the local body-hash signing and detached-witness encoding boundary into `docs/inspector/src/TxSigning.purs` and `docs/inspector/src/TxSigning.js`, preserving `cardano-ledger-functional/v1` as the only attachment engine.
-- [ ] T019-S5 [US3] Connect Workbench witness-plan state, derived/vault key selection, signer matching, `tx.witness.attach`, patched-CBOR state, errors, and honest result rendering in `docs/inspector/src/Main.purs` and `docs/inspector/dist/styles.css`.
-- [ ] T020-S5 [US3] Prove the focused case adds exactly one vkey witness, then run `nix run .#ci-inspector-playwright` and `./gate.sh` with the legacy shell still present.
+- [X] T017-S5 [P] [US3] Add the RED-first end-to-end signing-loop and local-validation/error cases in `docs/inspector/tests/unified-signing-loop.spec.mjs` and register them in `docs/inspector/playwright.config.mjs`.
+- [X] T018-S5 [US3] Port the local body-hash signing and detached-witness encoding boundary into `docs/inspector/src/TxSigning.purs` and `docs/inspector/src/TxSigning.js`, preserving `cardano-ledger-functional/v1` as the only attachment engine.
+- [X] T019-S5 [US3] Connect Workbench witness-plan state, derived/vault key selection, signer matching, `tx.witness.attach`, patched-CBOR state, errors, and honest result rendering in `docs/inspector/src/Main.purs` and `docs/inspector/dist/styles.css`.
+- [X] T020-S5 [US3] Prove the focused case adds exactly one vkey witness, then run `nix run .#ci-inspector-playwright` and `./gate.sh` with the legacy shell still present.
 
 **Commit**: `feat: close workbench signing loop` with `Tasks: T017, T018, T019, T020`.
 
