@@ -3579,6 +3579,184 @@ md-filled-tonal-button.example-valid {
   }
 }
 
+.key-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 18px;
+  padding: 4px;
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-button);
+  background: var(--surface-container-low);
+  overflow-x: auto;
+}
+
+.key-tab,
+.key-button,
+.key-copy {
+  min-height: 40px;
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-button);
+  background: var(--surface-container);
+  padding: 8px 14px;
+  color: var(--on-surface);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.key-tab {
+  flex: 1 0 auto;
+}
+
+.key-tab.is-selected,
+.key-button.is-selected {
+  border-color: var(--primary);
+  background: var(--primary-container);
+  color: var(--on-primary-container);
+}
+
+.key-button-primary {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: var(--on-primary);
+}
+
+.key-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+  gap: 18px;
+}
+
+.key-signing-grid {
+  display: grid;
+  gap: 18px;
+}
+
+.key-card {
+  min-width: 0;
+  padding: 20px;
+}
+
+.key-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-block: 12px;
+}
+
+.key-controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.key-field {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  margin-block: 12px;
+}
+
+.key-field input,
+.key-field textarea {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--outline);
+  border-radius: var(--radius-field);
+  background: var(--surface-container-lowest);
+  padding: 12px;
+  color: var(--on-surface);
+}
+
+.mnemonic-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+.mnemonic-word,
+.key-output-card {
+  min-width: 0;
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-card);
+  background: var(--surface-container-low);
+  padding: 12px;
+}
+
+.mnemonic-index {
+  margin-right: 8px;
+  color: var(--on-surface-variant);
+}
+
+.key-results {
+  display: grid;
+  gap: 12px;
+}
+
+.key-output-card h3 {
+  margin: 0 0 8px;
+  font-size: 0.92rem;
+}
+
+.key-output-body {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.key-output-value {
+  display: block;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.key-copy {
+  justify-self: start;
+  min-height: 32px;
+  padding: 4px 12px;
+}
+
+.privacy-note {
+  border-radius: var(--radius-field);
+  background: var(--surface-container-high);
+  padding: 12px;
+  color: var(--on-surface-variant);
+}
+
+.key-verification.is-valid {
+  color: var(--success);
+}
+
+.key-verification.is-invalid {
+  color: var(--error);
+}
+
+@media (max-width: 760px) {
+  .key-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .key-tabs {
+    scrollbar-width: thin;
+  }
+
+  .key-tab,
+  .key-button {
+    padding-inline: 10px;
+    font-size: 0.8rem;
+  }
+
+  .key-controls {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .key-card {
+    padding: 14px;
+  }
+}
+
 /* Dim empty (NULL) leaf fields so populated fields stand out; every CDDL field is still
    present and in order (the faithful-decode contract). (P1 tree_readability) */
 .decoded-tree-row.decoded-tree-empty-field {

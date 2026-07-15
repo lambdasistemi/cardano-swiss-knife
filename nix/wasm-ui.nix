@@ -125,7 +125,9 @@ pkgs.mkSpagoDerivation {
       --minify
 
     # 2. PureScript → dist/index.js
-    spago bundle --offline --module Main
+    spago bundle --offline --module Main \
+      --bundler-args='--external:fs' \
+      --bundler-args='--external:path'
 
     # 3. Concatenate deps first, then app
     cat dist/deps.js dist/index.js > dist/bundle.js

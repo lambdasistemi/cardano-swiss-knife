@@ -13,6 +13,7 @@ import Effect (Effect)
 data Route
   = RouteInspect
   | RouteAddresses
+  | RouteKeys
   | RouteScripts
   | RouteSettings
   | RouteLibrary
@@ -23,6 +24,7 @@ routePath :: Route -> String
 routePath = case _ of
   RouteInspect -> "inspect"
   RouteAddresses -> "addresses"
+  RouteKeys -> "keys"
   RouteScripts -> "scripts"
   RouteSettings -> "settings"
   RouteLibrary -> "library"
@@ -34,7 +36,7 @@ currentRoute = do
     "settings" -> RouteSettings
     "library" -> RouteLibrary
     "addresses" -> RouteAddresses
-    "keys" -> RouteInspect
+    "keys" -> RouteKeys
     "scripts" -> RouteScripts
     "vault" -> RouteInspect
     _ -> RouteInspect

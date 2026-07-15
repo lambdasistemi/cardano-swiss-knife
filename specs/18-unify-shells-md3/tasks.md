@@ -36,10 +36,10 @@
 
 **Independent proof**: RED-first browser cases cover all four tabs, mnemonic-to-restore handoff, network/path behavior, hidden private output, and generic sign/verify.
 
-- [ ] T009-S3 [P] [US1] Add RED-first four-tab Keys parity cases in `docs/inspector/tests/unified-keys.spec.mjs` and register them in `docs/inspector/playwright.config.mjs`.
-- [ ] T010-S3 [US4] Port Mnemonic and family-first Restore state, actions, validation, network/path handling, handoff, visibility controls, and shared-library operations into `docs/inspector/src/Main.purs`.
-- [ ] T011-S3 [US4] Port Expert and Sign & verify, and complete Keys tab routing, navigation, and responsive presentation in `docs/inspector/src/Main.purs`, `docs/inspector/src/Routing.purs`, `docs/inspector/src/Routing.js`, `docs/inspector/src/Shell.purs`, and `docs/inspector/dist/styles.css`.
-- [ ] T012-S3 [US1] Prove the focused cases, `nix run .#ci-inspector-playwright`, and `./gate.sh` while confirming vault actions still remain on the legacy shell until slice 4.
+- [x] T009-S3 [P] [US1] Add RED-first four-tab Keys parity cases in `docs/inspector/tests/unified-keys.spec.mjs` and register them in `docs/inspector/playwright.config.mjs`.
+- [x] T010-S3 [US4] Port Mnemonic and family-first Restore state, actions, validation, network/path handling, handoff, visibility controls, and shared-library operations into `docs/inspector/src/Main.purs`.
+- [x] T011-S3 [US4] Port Expert and Sign & verify, and complete Keys tab routing, navigation, and responsive presentation in `docs/inspector/src/Main.purs`, `docs/inspector/src/Routing.purs`, `docs/inspector/src/Routing.js`, `docs/inspector/src/Shell.purs`, and `docs/inspector/dist/styles.css`.
+- [x] T012-S3 [US1] Prove the focused cases, `nix run .#ci-inspector-playwright`, and `./gate.sh` while confirming vault actions still remain on the legacy shell until slice 4.
 
 **Commit**: `feat: migrate key workflows to MD3` with `Tasks: T009, T010, T011, T012`.
 
