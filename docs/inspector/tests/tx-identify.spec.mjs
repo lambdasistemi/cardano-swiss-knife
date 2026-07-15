@@ -2506,6 +2506,46 @@ test("preview subpath fetches split wasm assets while decode and RDF still work"
   );
 });
 
+test("preview deep route loads address WASM from the bundle-derived URL", async ({
+  page,
+}) => {
+  const addressWasmResponses = [];
+  page.on("response", (response) => {
+    if (
+      path.basename(new URL(response.url()).pathname).startsWith("cardano-addresses.")
+    ) {
+      addressWasmResponses.push(response);
+    }
+  });
+
+  let expectedAssetBase;
+  await withPrefixedInspectorSite(async (baseUrl) => {
+    expectedAssetBase = new URL(baseUrl).pathname;
+    await page.goto(`${baseUrl}inspect/`);
+
+    const result = await page.evaluate(
+      async (address) => globalThis.inspectCardanoAddress(address),
+      "addr1vyeq0sedsphv9j4u0rlhakrfh5cf3d7mj0zrej92jw44n6c0fpycd",
+    );
+
+    expect(result).toMatchObject({
+      addressStyle: "Shelley",
+      addressTypeLabel: "Enterprise address (key)",
+      networkTag: 1,
+      networkTagLabel: "Mainnet",
+    });
+  });
+
+  await expect.poll(() => addressWasmResponses.length).toBe(1);
+  const response = addressWasmResponses[0];
+  const responseUrl = new URL(response.url());
+  expect(responseUrl.pathname).toMatch(
+    new RegExp(`^${expectedAssetBase}cardano-addresses\\.[A-Za-z0-9_-]+\\.wasm$`),
+  );
+  expect(response.status()).toBe(200);
+  expect(await response.headerValue("content-type")).toContain("application/wasm");
+});
+
 test("inspect result is tree-primary tabs after genuine decode", async ({ page }) => {
   await decodeFixtureAt(page, "/inspect", conwayMainnetFixturePath);
   await expectTabbedInspectResult(page);

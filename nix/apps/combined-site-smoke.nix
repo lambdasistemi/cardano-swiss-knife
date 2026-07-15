@@ -44,17 +44,19 @@ let
       grep -q '<title>Cardano transaction inspector</title>' "$site/inspector/index.html"
 
       shopt -s nullglob
+      address_wasm=("$site"/inspector/cardano-addresses.*.wasm)
       inspector_wasm=("$site"/inspector/inspector.*.wasm)
       rdf_wasm=("$site"/inspector/rdf_shapes_wasm_bg.*.wasm)
       all_wasm=("$site"/inspector/*.wasm)
       all_wasm_gz=("$site"/inspector/*.wasm.gz)
       all_wasm_br=("$site"/inspector/*.wasm.br)
 
+      [[ ''${#address_wasm[@]} -eq 1 ]]
       [[ ''${#inspector_wasm[@]} -eq 1 ]]
       [[ ''${#rdf_wasm[@]} -eq 1 ]]
-      [[ ''${#all_wasm[@]} -eq 2 ]]
-      [[ ''${#all_wasm_gz[@]} -eq 2 ]]
-      [[ ''${#all_wasm_br[@]} -eq 2 ]]
+      [[ ''${#all_wasm[@]} -eq 3 ]]
+      [[ ''${#all_wasm_gz[@]} -eq 3 ]]
+      [[ ''${#all_wasm_br[@]} -eq 3 ]]
       for wasm in "''${all_wasm[@]}"; do
         test -f "$wasm.gz"
         test -f "$wasm.br"
@@ -103,6 +105,10 @@ let
         "/inspector/inspect"
         "/inspector/settings"
         "/inspector/library"
+        "/inspector/addresses"
+        "/inspector/keys"
+        "/inspector/scripts"
+        "/inspector/vault"
       )
       expected_files=(
         "$site/index.html"
@@ -110,6 +116,10 @@ let
         "$site/inspector/inspect/index.html"
         "$site/inspector/settings/index.html"
         "$site/inspector/library/index.html"
+        "$site/inspector/addresses/index.html"
+        "$site/inspector/keys/index.html"
+        "$site/inspector/scripts/index.html"
+        "$site/inspector/vault/index.html"
       )
 
       for index in "''${!routes[@]}"; do

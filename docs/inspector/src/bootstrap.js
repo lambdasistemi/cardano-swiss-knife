@@ -6,7 +6,9 @@ import { WASI, File, OpenFile, ConsoleStdout }
   from "@bjorn3/browser_wasi_shim";
 import * as rdfShapes from "./assets/rdf_shapes_wasm.js";
 import inspectorWasmAssetUrl from "./assets/inspector.wasm";
+import cardanoAddressWasmAssetUrl from "./assets/cardano-addresses.wasm";
 import rdfShapesWasmAssetUrl from "./assets/rdf_shapes_wasm_bg.wasm";
+import { inspectAddressWasmImpl } from "../../lib/src/Cardano/Address/Inspect.js";
 import sundaeSwapV3Blueprint from "../protocols/sundaeswap-v3/plutus.json";
 import cardanoShaclShapes from "../protocols/cardano-rdf/shapes.ttl";
 import * as rdfEditor from "purescript-rdf-editor";
@@ -18,12 +20,20 @@ const scriptBaseUrl = new URL(
     "http://localhost/"
 );
 const inspectorWasmUrl = resolveAssetUrl(inspectorWasmAssetUrl);
+const cardanoAddressWasmUrl = resolveAssetUrl(cardanoAddressWasmAssetUrl);
 const rdfShapesWasmUrl = resolveAssetUrl(rdfShapesWasmAssetUrl);
 
 let compiledModulePromise = null;
 
 globalThis.rdfShapes = rdfShapes;
 globalThis.rdfShapesReady = rdfShapes.default(rdfShapesWasmUrl);
+globalThis.cardanoAddressWasmUrl = cardanoAddressWasmUrl;
+globalThis.inspectCardanoAddress = (address) =>
+  inspectAddressWasmImpl(
+    (error) => {
+      throw new Error(error);
+    }
+  )((result) => result)(address)();
 globalThis.rdfEditor = rdfEditor;
 globalThis.sundaeSwapV3BlueprintJson = JSON.stringify(sundaeSwapV3Blueprint, null, 2);
 globalThis.cardanoShaclShapes = cardanoShaclShapes;

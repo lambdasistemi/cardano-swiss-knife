@@ -1,6 +1,14 @@
 "use strict";
 
-const routeNames = new Set(["inspect", "settings", "library"]);
+const routeNames = new Set([
+  "inspect",
+  "settings",
+  "library",
+  "addresses",
+  "keys",
+  "scripts",
+  "vault",
+]);
 
 const cleanSegments = (pathname) => pathname.split("/").filter(Boolean);
 

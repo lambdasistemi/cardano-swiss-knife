@@ -20,8 +20,10 @@
 , mkSpagoDerivation
 , wasmArtifact        # derivation whose $out/<name>.wasm is the embedded binary
 , wasmArtifactName    # e.g. "wasm-ledger-smoke"  (used to pick <name>.wasm)
+, addressWasmArtifact # derivation whose $out/cardano-addresses.wasm is bundled
 , rdfShapesWasmPkg    # wasm-bindgen web bundle from lambdasistemi/rdf-shapes-wasm
 , protocolRegistry   # packaged inspector protocol registry
+, addressPackageSrc ? null
 , editorPackageSrc ? null
 , src                 # PS project tree (./docs/inspector relative to flake root)
 }:
@@ -52,6 +54,17 @@ let
                      '"path": "../packages/purescript-rdf-editor"'
   '';
 
+  addressPackageSetup = if addressPackageSrc == null then "" else ''
+    cp -R ${addressPackageSrc} ../lib
+    chmod -R u+w ../lib
+    substituteInPlace spago.yaml \
+      --replace-fail "path: ../../lib" \
+                     "path: ../lib"
+    substituteInPlace spago.lock \
+      --replace-fail '"path": "../../lib"' \
+                     '"path": "../lib"'
+  '';
+
   editorPackageEsbuildArgs =
     if editorPackageSrc == null then "" else
       "--alias:purescript-rdf-editor=../packages/purescript-rdf-editor/index.js";
@@ -75,6 +88,7 @@ pkgs.mkSpagoDerivation {
 
   buildPhase = ''
     ${editorPackageSetup}
+    ${addressPackageSetup}
 
     ln -s ${nodeModules}/node_modules node_modules
     ln -s ${nodeModules}/node_modules ../node_modules
@@ -90,6 +104,7 @@ pkgs.mkSpagoDerivation {
     # can emit hashed browser assets at bundle time.
     mkdir -p src/assets
     cp ${wasmArtifact}/${wasmArtifactName}.wasm src/assets/inspector.wasm
+    cp ${addressWasmArtifact}/cardano-addresses.wasm src/assets/cardano-addresses.wasm
     cp ${rdfShapesWasmPkg}/rdf_shapes_wasm.js src/assets/rdf_shapes_wasm.js
     cp ${rdfShapesWasmPkg}/rdf_shapes_wasm_bg.wasm src/assets/rdf_shapes_wasm_bg.wasm
     chmod -R u+w src/assets
@@ -100,6 +115,8 @@ pkgs.mkSpagoDerivation {
       --outfile=dist/deps.js \
       --format=iife \
       --platform=browser \
+      --external:fs \
+      --external:path \
       ${editorPackageEsbuildArgs} \
       --loader:.wasm=file \
       --loader:.ttl=text \
@@ -124,7 +141,7 @@ pkgs.mkSpagoDerivation {
     cp dist/material.js $out/
     cp dist/*.wasm $out/
 
-    for route in inspect settings library; do
+    for route in inspect settings library addresses keys scripts vault; do
       mkdir -p "$out/$route"
       sed \
         -e 's#href="./styles.css"#href="../styles.css"#' \

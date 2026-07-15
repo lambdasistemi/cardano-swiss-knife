@@ -7,6 +7,7 @@
           "dependencies": [
             "aff",
             "aff-promise",
+            "cardano-addresses",
             "console",
             "effect",
             "either",
@@ -618,6 +619,9 @@
       }
     },
     "extra_packages": {
+      "cardano-addresses": {
+        "path": "../../lib"
+      },
       "rdf-editor": {
         "path": "../../packages/purescript-rdf-editor"
       }
@@ -660,6 +664,12 @@
         "transformers"
       ]
     },
+    "arraybuffer-types": {
+      "type": "registry",
+      "version": "3.0.2",
+      "integrity": "sha256-p05cJnSkyeoB7VHzMyc2Eb1RwUaB7Nl0sQSqEGNEUD8=",
+      "dependencies": []
+    },
     "arrays": {
       "type": "registry",
       "version": "7.3.0",
@@ -691,6 +701,23 @@
         "newtype",
         "prelude",
         "tuples"
+      ]
+    },
+    "cardano-addresses": {
+      "type": "local",
+      "path": "../../lib",
+      "dependencies": [
+        "aff",
+        "aff-promise",
+        "arraybuffer-types",
+        "arrays",
+        "effect",
+        "either",
+        "integers",
+        "maybe",
+        "nullable",
+        "prelude",
+        "strings"
       ]
     },
     "catenable-lists": {

@@ -29,6 +29,10 @@ currentRoute = do
   pure case suffix of
     "settings" -> RouteSettings
     "library" -> RouteLibrary
+    "addresses" -> RouteInspect
+    "keys" -> RouteInspect
+    "scripts" -> RouteInspect
+    "vault" -> RouteInspect
     _ -> RouteInspect
 
 currentBasePath :: Effect String
