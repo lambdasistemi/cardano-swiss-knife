@@ -3459,6 +3459,126 @@ md-filled-tonal-button.example-valid {
   margin: 0;
 }
 
+/* Address and native-script tools share the inspector's compact MD3 shell. */
+.tool-page {
+  gap: 14px;
+}
+
+.tool-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+  align-items: start;
+  gap: 12px;
+  min-width: 0;
+}
+
+.tool-input-panel,
+.tool-result-panel {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.tool-input-panel textarea {
+  width: 100%;
+  min-width: 0;
+  resize: vertical;
+  font-family: var(--font-mono);
+  overflow-wrap: anywhere;
+}
+
+.tool-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tool-tab {
+  min-height: 38px;
+  border: 1px solid var(--divider);
+  border-radius: var(--radius-chip);
+  background: var(--surface-container-low);
+  padding: 7px 13px;
+  color: var(--on-surface);
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.tool-tab.is-selected {
+  border-color: var(--primary);
+  background: var(--primary-container);
+  color: var(--on-primary-container);
+}
+
+.tool-result-grid {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.tool-kv-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 0.36fr) minmax(0, 1fr);
+  align-items: start;
+  gap: 12px;
+  min-width: 0;
+  border-bottom: 1px solid var(--divider);
+  padding: 7px 0 10px;
+}
+
+.tool-kv-label {
+  color: var(--on-surface-variant);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.035em;
+}
+
+.tool-kv-value {
+  min-width: 0;
+  color: var(--on-surface);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.tool-error {
+  border: 1px solid color-mix(in srgb, var(--error) 45%, var(--divider));
+  border-radius: var(--radius-card);
+  background: var(--error-container);
+  padding: 12px;
+  color: var(--on-error-container);
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 760px) {
+  .tool-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .topbar-nav-link {
+    padding-inline: 0.58rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .topbar-nav {
+    width: 100%;
+  }
+
+  .topbar-nav-link {
+    flex: 1 1 auto;
+    padding-inline: 0.42rem;
+    font-size: 0.78rem;
+  }
+
+  .tool-kv-row {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+}
+
 /* Dim empty (NULL) leaf fields so populated fields stand out; every CDDL field is still
    present and in order (the faithful-decode contract). (P1 tree_readability) */
 .decoded-tree-row.decoded-tree-empty-field {

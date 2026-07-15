@@ -23,10 +23,10 @@
 
 **Independent proof**: Focused browser cases demonstrate address inspection and native-script author/analyze behavior through MD3 routes before the complete inspector suite and gate pass.
 
-- [ ] T005-S2 [P] [US4] Add RED-first address and native-script parity cases in `docs/inspector/tests/unified-address-scripts.spec.mjs` and register them in `docs/inspector/playwright.config.mjs`.
-- [ ] T006-S2 [US4] Port the address inputs, actions, results, errors, and shared-library calls into the Addresses destination in `docs/inspector/src/Main.purs`.
-- [ ] T007-S2 [US4] Port native-script authoring and analysis into Scripts, then complete its routing, shell navigation hook, and responsive MD3 presentation in `docs/inspector/src/Main.purs`, `docs/inspector/src/Routing.purs`, `docs/inspector/src/Routing.js`, `docs/inspector/src/Shell.purs`, and `docs/inspector/dist/styles.css`.
-- [ ] T008-S2 [US1] Prove the focused cases, `nix run .#ci-inspector-playwright`, and `./gate.sh` while confirming the legacy `app` tree remains present.
+- [X] T005-S2 [P] [US4] Add RED-first address and native-script parity cases in `docs/inspector/tests/unified-address-scripts.spec.mjs` and register them in `docs/inspector/playwright.config.mjs`.
+- [X] T006-S2 [US4] Port the address inputs, actions, results, errors, and shared-library calls into the Addresses destination in `docs/inspector/src/Main.purs`.
+- [X] T007-S2 [US4] Port native-script authoring and analysis into Scripts, then complete its routing, shell navigation hook, and responsive MD3 presentation in `docs/inspector/src/Main.purs`, `docs/inspector/src/Routing.purs`, `docs/inspector/src/Routing.js`, `docs/inspector/src/Shell.purs`, and `docs/inspector/dist/styles.css`.
+- [X] T008-S2 [US1] Prove the focused cases, `nix run .#ci-inspector-playwright`, and `./gate.sh` while confirming the legacy `app` tree remains present.
 
 **Commit**: `feat: migrate addresses and scripts to MD3` with `Tasks: T005, T006, T007, T008`.
 

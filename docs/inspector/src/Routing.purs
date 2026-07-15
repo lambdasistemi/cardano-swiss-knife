@@ -12,6 +12,8 @@ import Effect (Effect)
 
 data Route
   = RouteInspect
+  | RouteAddresses
+  | RouteScripts
   | RouteSettings
   | RouteLibrary
 
@@ -20,6 +22,8 @@ derive instance eqRoute :: Eq Route
 routePath :: Route -> String
 routePath = case _ of
   RouteInspect -> "inspect"
+  RouteAddresses -> "addresses"
+  RouteScripts -> "scripts"
   RouteSettings -> "settings"
   RouteLibrary -> "library"
 
@@ -29,9 +33,9 @@ currentRoute = do
   pure case suffix of
     "settings" -> RouteSettings
     "library" -> RouteLibrary
-    "addresses" -> RouteInspect
+    "addresses" -> RouteAddresses
     "keys" -> RouteInspect
-    "scripts" -> RouteInspect
+    "scripts" -> RouteScripts
     "vault" -> RouteInspect
     _ -> RouteInspect
 
