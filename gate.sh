@@ -1,7 +1,20 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+legacy_secret_storage_inventory() {
+  local source
+  while IFS= read -r source; do
+    [[ "$source" == "docs/inspector/src/Main.purs" ]] || {
+      echo "legacy cleartext credential-storage key escaped its known migration boundary: $source" >&2
+      return 1
+    }
+  done < <(
+    rg -l 'blockfrost_project_id|koios_bearer_token|persist_api_keys' docs/inspector/src || true
+  )
+}
+
 git diff --check
+legacy_secret_storage_inventory
 nix build .#checks.x86_64-linux.test --no-link
 nix run .#ci-check
 nix run .#ci-haskell-quality
