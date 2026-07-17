@@ -3721,6 +3721,7 @@ inspectorComponent initial =
               ]
           ]
       , renderValidationVerdictBanner state validation
+      , renderValidationContextNotice validation.contextErrors
       , renderValidationFilters state.validationFilter (validationSurfaceCounts validation state.shaclConformance)
       , renderValidationRowGroup state.validationFilter "Validation summary"
           (map (renderValidationMetricRow state) validation.metrics)
@@ -3733,14 +3734,20 @@ inspectorComponent initial =
   renderValidationVerdictBanner state validation =
     let
       counts = validationSurfaceCounts validation state.shaclConformance
-      conforms = validation.valid && shaclConformancePasses state.shaclConformance
-      tone = if conforms then ValidationPass else ValidationFail
+      ledgerPasses =
+        validation.status == "valid"
+          && validation.complete
+          && validation.validForSuppliedContext
+      conforms = ledgerPasses && shaclConformancePasses state.shaclConformance
+      tone =
+        if not validation.complete then ValidationWarn
+        else if conforms then ValidationPass
+        else ValidationFail
       title =
-        if conforms then "Validation passed"
+        if not validation.complete then "Validation incomplete"
+        else if conforms then "Validation passed"
         else "Validation needs attention"
-      detail =
-        if conforms then validationTallyText counts
-        else validationTallyText counts
+      detail = validationTallyText counts
     in
       HH.div
         [ classNames
@@ -3750,11 +3757,25 @@ inspectorComponent initial =
         ]
         [ HH.element (HH.ElemName "md-icon")
             [ classNames [ "validation-verdict-icon" ] ]
-            [ HH.text (if conforms then "verified" else "error") ]
+            [ HH.text (validationToneIcon tone) ]
         , HH.div_
             [ HH.strong_ [ HH.text title ]
             , HH.p_ [ HH.text detail ]
             ]
+        ]
+
+  renderValidationContextNotice contextErrors =
+    if Array.null contextErrors then
+      HH.text ""
+    else
+      HH.div
+        [ classNames
+            [ "validation-context-notice"
+            , "witness-warnings"
+            ]
+        ]
+        [ HH.strong_ [ HH.text "Validation context unavailable" ]
+        , HH.p_ [ HH.text (String.joinWith " / " contextErrors) ]
         ]
 
   shaclConformancePasses conformance =

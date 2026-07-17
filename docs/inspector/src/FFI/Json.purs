@@ -169,6 +169,10 @@ type Validation =
   { valid :: Boolean
   , title :: String
   , subtitle :: String
+  , status :: String
+  , complete :: Boolean
+  , validForSuppliedContext :: Boolean
+  , contextErrors :: Array String
   , metrics :: Array Metric
   , warnings :: Array String
   , sections :: Array WitnessPlanSection

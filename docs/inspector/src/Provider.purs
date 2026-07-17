@@ -47,6 +47,7 @@ resolveProducerTxContext provider network key canFetchProducerTxs inspectionResp
         inspectionResponse
         (\txId -> fetchTxCborEffect provider network key txId)
         (fetchValidationContextEffect provider network key)
+        (not (needsKey provider) || key /= "")
         canFetchProducerTxs
     )
 
@@ -58,9 +59,7 @@ fetchTxCborEffect = case _ of
 fetchValidationContextEffect :: Provider -> Network -> String -> Effect (Promise String)
 fetchValidationContextEffect provider network key =
   case provider of
-    Blockfrost ->
-      if key == "" then Koios.fetchValidationContextEffect network ""
-      else Blockfrost.fetchValidationContextEffect network key
+    Blockfrost -> Blockfrost.fetchValidationContextEffect network key
     Koios -> Koios.fetchValidationContextEffect network key
 
 resolutionProvider :: Provider -> String
@@ -79,5 +78,6 @@ foreign import resolveProducerTxContextImpl
   -> String -- tx.inspect response
   -> (String -> Effect (Promise String)) -- fetchTxCbor by tx id
   -> Effect (Promise String) -- fetch current validation context
+  -> Boolean -- validation-context credentials available
   -> Boolean -- fetch producer tx CBOR
   -> Effect (Promise String)

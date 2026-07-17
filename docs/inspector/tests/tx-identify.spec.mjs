@@ -984,6 +984,9 @@ async function decodeFixtureAt(page, route, txFixturePath = fixturePath) {
   const validationContext = await loadValidationContext();
 
   await installClipboardMock(page);
+  await page.addInitScript(() => {
+    window.localStorage.setItem("provider", "Koios");
+  });
   await mockKoiosValidationContext(page, validationContext);
 
   await decodeTxCbor(page, route, txCbor);
@@ -3948,6 +3951,51 @@ test("shows transaction-derived witness plan values", async ({ page }) => {
   expect(copied).toMatch(/^[0-9a-f]{64}$/);
 });
 
+test("keeps Blockfrost decode inside the selected provider and surfaces missing credentials", async ({
+  page,
+}) => {
+  const txCbor = (await readFile(conwayMainnetFixturePath, "utf8")).trim();
+  let koiosRequests = 0;
+
+  await installClipboardMock(page);
+  await page.route("https://api.koios.rest/api/v1/**", async (route) => {
+    koiosRequests += 1;
+    await route.abort();
+  });
+
+  await decodeTxCbor(page, "/", txCbor);
+  await selectResultTab(page, "Validation");
+
+  const validationPanel = page.locator(".validation-panel");
+  const validationSummary = validationPanel
+    .locator(".validation-section")
+    .filter({ hasText: "Validation summary" });
+  const verdict = validationPanel.locator(".validation-verdict-banner");
+  const contextNotice = validationPanel.locator(".validation-context-notice");
+
+  expect(koiosRequests).toBe(0);
+  await expect(contextNotice).toBeVisible();
+  await expect(contextNotice).toContainText("Validation context unavailable");
+  await expect(contextNotice).toContainText("Blockfrost credentials not supplied");
+  await expect(
+    validationSummary
+      .locator(".validation-check-row", { hasText: "Status" })
+      .locator(".validation-status-badge", { hasText: "incomplete" }),
+  ).toBeVisible();
+  await expect(
+    validationSummary
+      .locator(".validation-check-row", { hasText: "Complete" })
+      .locator(".validation-status-badge", { hasText: "no" }),
+  ).toBeVisible();
+  await expect(verdict).toHaveClass(/validation-verdict-banner--warning/);
+  await expect(verdict).toContainText("Validation incomplete");
+  await expect(
+    validationPanel.locator(".validation-verdict-banner", {
+      hasText: "Validation passed",
+    }),
+  ).toHaveCount(0);
+});
+
 test("surfaces ledger validation diagnostics", async ({ page }) => {
   await decodeFixture(page);
 
@@ -4120,6 +4168,9 @@ test("passes producer transaction CBOR into witness planning", async ({
       .locator(".validation-panel .validation-check-row", { hasText: "Status" })
       .locator(".validation-status-badge", { hasText: "valid" }),
   ).toBeVisible();
+  await expect(
+    page.locator(".validation-verdict-banner", { hasText: "Validation passed" }),
+  ).toBeVisible();
   expect(producerCborRequests).toBeGreaterThan(0);
   expect(latestBlockRequests).toBe(1);
   expect(protocolParameterRequests).toBe(1);
@@ -4134,6 +4185,54 @@ test("passes producer transaction CBOR into witness planning", async ({
 
   const copied = await page.evaluate(() => navigator.clipboard.readText());
   expect(copied).toMatch(/^[0-9a-f]{64}#[0-9]+$/);
+});
+
+test("surfaces configured Blockfrost browser-boundary failures without consulting Koios", async ({
+  page,
+}) => {
+  const txCbor = (await readFile(conwayMainnetFixturePath, "utf8")).trim();
+  const validationContext = await loadValidationContext();
+  let koiosRequests = 0;
+
+  await installClipboardMock(page);
+  await page.route("https://api.koios.rest/api/v1/**", async (route) => {
+    koiosRequests += 1;
+    await route.abort();
+  });
+  await page.route("https://cardano-mainnet.blockfrost.io/api/v0/blocks/latest", async (route) => {
+    await route.abort("failed");
+  });
+  await page.route(
+    "https://cardano-mainnet.blockfrost.io/api/v0/epochs/latest/parameters",
+    async (route) => {
+      await route.abort("failed");
+    },
+  );
+  await page.route("https://cardano-mainnet.blockfrost.io/api/v0/txs/*/cbor", async (route) => {
+    const txHash = route.request().url().match(/\/txs\/([0-9a-f]+)\/cbor/)?.[1];
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ cbor: producerCbor(validationContext, txHash, txCbor) }),
+    });
+  });
+
+  await configureChainData(page, {
+    provider: "Blockfrost",
+    network: "mainnet",
+    blockfrostKey: "mainnet-test-project",
+  });
+  await openInspectViaShell(page);
+  await submitTxCbor(page, txCbor);
+  await selectResultTab(page, "Validation");
+
+  expect(koiosRequests).toBe(0);
+  const contextNotice = page.locator(".validation-context-notice");
+  await expect(contextNotice).toBeVisible();
+  await expect(contextNotice).toContainText("Validation context unavailable");
+  await expect(contextNotice).toContainText(
+    /validation_context: (Failed to fetch|NetworkError when attempting to fetch resource\.?)/,
+  );
 });
 
 test("passes producer transaction CBOR into RDF resolved value flow", async ({
