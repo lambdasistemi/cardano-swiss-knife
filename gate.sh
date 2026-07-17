@@ -39,9 +39,53 @@ book_interchange_contract_inventory() {
   done
 }
 
+rendered_resolution_journey_inventory() {
+  local fixture="docs/inspector/tests/fixtures/treasury-reorganize-unsigned-tx.hex"
+  local journey="docs/inspector/tests/tx-identify.spec.mjs"
+  local expected_sha="11ba0b62566367e6dfd76eb6d06e4dc6474cf145d434b596d047377b69d1fb75"
+  local fixture_sha required
+
+  [[ -f "$fixture" ]] || {
+    echo "missing rendered-resolution treasury fixture: $fixture" >&2
+    return 1
+  }
+  fixture_sha="$(sha256sum "$fixture")"
+  fixture_sha="${fixture_sha%% *}"
+  [[ "$fixture_sha" == "$expected_sha" ]] || {
+    echo "rendered-resolution treasury fixture SHA mismatch: expected $expected_sha, got $fixture_sha" >&2
+    return 1
+  }
+
+  [[ -f "$journey" ]] || {
+    echo "missing rendered-resolution browser journey: $journey" >&2
+    return 1
+  }
+  for required in \
+    'renders exact Amaru book resolutions across Structure and Witness' \
+    'attx-book-bundle.json' \
+    '.decoded-resolution-disclosure' \
+    '.decoded-resolution-entry' \
+    'network_compliance scope owner' \
+    'operator fuel wallet' \
+    'Missing declared signers' \
+    'treasuryOutputAddressHex' \
+    'navigator.clipboard.readText()'; do
+    rg -Fq "$required" "$journey" || {
+      echo "rendered-resolution browser journey missing proof anchor: $required" >&2
+      return 1
+    }
+  done
+
+  if rg -q '(^|[^A-Za-z])(test|describe)\.only\(' "$journey"; then
+    echo "rendered-resolution browser journey must not remain focused-only" >&2
+    return 1
+  fi
+}
+
 git diff --check
 legacy_secret_storage_inventory
 book_interchange_contract_inventory
+rendered_resolution_journey_inventory
 nix build .#checks.x86_64-linux.test --no-link
 nix run .#ci-check
 nix run .#ci-haskell-quality
