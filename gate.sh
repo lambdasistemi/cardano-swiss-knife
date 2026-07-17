@@ -63,6 +63,11 @@ rendered_resolution_journey_inventory() {
   for required in \
     'renders exact Amaru book resolutions across Structure and Witness' \
     'attx-book-bundle.json' \
+    'treasuryReorganizeFixturePath' \
+    'treasuryOwnerHash' \
+    '"required_signers"' \
+    '"ttl"' \
+    '"withdrawals"' \
     '.decoded-resolution-disclosure' \
     '.decoded-resolution-entry' \
     'network_compliance scope owner' \
