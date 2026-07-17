@@ -31,8 +31,9 @@ Canonical Turtle uses these prefixes:
 @prefix overlay: <https://lambdasistemi.github.io/cardano-ledger-inspector/overlay/amaru-treasury#> .
 ```
 
-This contract uses the existing `overlay:Owner` and `overlay:Address` classes.
-It does not add or redesign overlay vocabulary.
+This contract uses the existing `overlay:Owner`, `overlay:Address`, and
+`overlay:CardanoScript` classes. It does not add or redesign overlay
+vocabulary.
 
 ### Owner key hash
 
@@ -56,6 +57,20 @@ resolution value:
   a overlay:Address ;
   rdfs:label "operator fuel wallet" ;
   cardano:bech32 "addr1qx9aqvsf6gne2640jec828s25gzhk5wp2day8u24kf8mrs2v0zyuvk80fay35dx008p45ts0u6cdrv9g2maetq8jm8psznjcrz" .
+```
+
+### Script hash
+
+A 28-byte script hash is normalized to lowercase. Its subject IRI is
+`urn:cardano:id:script:<script-hash>`, it has type `overlay:CardanoScript`,
+and its `rdfs:label` is the emitting book's ordinary human-readable script
+label. The bundled Amaru journal, for example, labels a treasury script with
+the treasury title and its script role:
+
+```turtle
+<urn:cardano:id:script:5fbb3e5295c211c7595ddd23db2e0a0833131e0681cc7ea800f85d34>
+  a overlay:CardanoScript ;
+  rdfs:label "Amaru Core Development treasury script" .
 ```
 
 ## `amaru.book.bundle.v1`

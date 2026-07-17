@@ -25,6 +25,10 @@ const cardanoShaclShapesPath = path.join(
   repoRoot,
   "docs/inspector/protocols/cardano-rdf/shapes.ttl",
 );
+const attxBookBundlePath = path.join(
+  repoRoot,
+  "docs/inspector/tests/fixtures/attx-book-bundle.json",
+);
 const packagedSiteDir = path.resolve(
   process.cwd(),
   process.env.TX_INSPECTOR_SITE_DIR || "result",
@@ -1374,6 +1378,9 @@ test("library page manages local books with persisted CRUD", async ({ page }) =>
   await library.getByLabel("Book Turtle").fill(pastedTurtleBook);
   await library.getByRole("button", { name: "Add book" }).click();
   await expect(
+    library.getByText("Imported Pasted overlay Turtle (1 part).", { exact: true }),
+  ).toBeVisible();
+  await expect(
     library.getByRole("heading", { name: "Pasted overlay Turtle" }),
   ).toBeVisible();
 
@@ -1568,6 +1575,9 @@ test("library page exchanges local books through URL, file, and store JSON", asy
   await library.getByLabel("Book URL").fill("https://books.example.test/local-shapes.ttl");
   await library.getByRole("button", { name: "Import book from URL" }).click();
   await expect(
+    library.getByText("Imported Pasted SHACL shapes (1 part).", { exact: true }),
+  ).toBeVisible();
+  await expect(
     library.getByRole("heading", { name: "Pasted SHACL shapes" }),
   ).toBeVisible();
 
@@ -1576,6 +1586,9 @@ test("library page exchanges local books through URL, file, and store JSON", asy
     mimeType: "text/turtle",
     buffer: Buffer.from(pastedTurtleBook),
   });
+  await expect(
+    library.getByText("Imported Pasted overlay Turtle (1 part).", { exact: true }),
+  ).toBeVisible();
   await expect(
     library.getByRole("heading", { name: "Pasted overlay Turtle" }),
   ).toBeVisible();
@@ -1650,6 +1663,9 @@ test("library page exchanges local books through URL, file, and store JSON", asy
       mimeType: "application/json",
       buffer: Buffer.from(selectedJson),
     });
+    await expect(
+      cleanLibrary.getByText("Imported 1 book (1 part).", { exact: true }),
+    ).toBeVisible();
 
     const importedBook = cleanLibrary.locator(".library-book", {
       hasText: "Round-trip local treasury label",
@@ -1679,6 +1695,171 @@ test("library page exchanges local books through URL, file, and store JSON", asy
   } finally {
     await cleanContext.close();
   }
+});
+
+test("canonical wallets bundle imports selected resolution parts and reports ignored keys", async ({
+  page,
+}) => {
+  await page.goto("/library");
+  const library = page.locator(".library-page");
+  const bundle = {
+    kind: "amaru.book.bundle.v1",
+    books: {
+      wallets: [
+        {
+          name: "Canonical owner",
+          address: "ABCDEF09D227956AAF9670751E0AA2057B51C1537A43F155B24FB1C1",
+        },
+      ],
+      future_notes: ["retained by a future contract"],
+    },
+  };
+
+  await library.getByLabel("Book file").setInputFiles({
+    name: "canonical-wallets.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(JSON.stringify(bundle)),
+  });
+
+  await expect(
+    library.getByText(
+      "Imported Amaru book bundle (1 part). Ignored book keys: future_notes.",
+      { exact: true },
+    ),
+  ).toBeVisible();
+  const importedBook = library.locator(".library-book", {
+    hasText: "Amaru book bundle",
+  });
+  await expect(importedBook).toBeVisible();
+  await expect(
+    importedBook.getByRole("checkbox", { name: "Select Amaru book bundle" }),
+  ).toBeChecked();
+
+  const store = await storedBooks(page);
+  const imported = store.books.find((book) => book.name === "Amaru book bundle");
+  expect(imported).toMatchObject({
+    source: "amaru.book.bundle.v1",
+    selected: true,
+    seed: false,
+  });
+  expect(imported.parts).toHaveLength(1);
+  expect(imported.turtle).toContain(
+    "<urn:cardano:id:key:abcdef09d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1>",
+  );
+  expect(imported.turtle).toContain("a overlay:Owner");
+  expect(imported.turtle).toContain('rdfs:label "Canonical owner"');
+
+  await library.getByLabel("Book URL").fill("https://books.example.test/next.json");
+  await expect(library.getByText(/Imported Amaru book bundle/)).toHaveCount(0);
+});
+
+test("malformed and ambiguous bundles fail visibly without mutating the store", async ({
+  page,
+}) => {
+  await page.goto("/library");
+  const library = page.locator(".library-page");
+  const before = await page.evaluate(
+    (key) => window.localStorage.getItem(key),
+    localBookStoreKey,
+  );
+  const malformed = {
+    kind: "amaru.book.bundle.v1",
+    books: {
+      wallets: [{ name: "Broken wallet", address: "not-a-cardano-address" }],
+    },
+  };
+
+  await library.getByLabel("Book file").setInputFiles({
+    name: "malformed-wallets.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(JSON.stringify(malformed)),
+  });
+  await expect(
+    library.getByText(
+      "Book import failed: bundle wallets[0].address is neither a 28-byte key hash nor a Cardano Bech32 address.",
+      { exact: true },
+    ),
+  ).toBeVisible();
+  expect(
+    await page.evaluate((key) => window.localStorage.getItem(key), localBookStoreKey),
+  ).toBe(before);
+
+  const ambiguous = {
+    kind: "amaru.book.bundle.v1",
+    books: {
+      wallets: [],
+      "named:wallets": [],
+    },
+  };
+  await library.getByLabel("Book file").setInputFiles({
+    name: "ambiguous-wallets.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(JSON.stringify(ambiguous)),
+  });
+  await expect(
+    library.getByText(
+      "Book import failed: bundle books has both wallets and named:wallets; aliases are ambiguous.",
+      { exact: true },
+    ),
+  ).toBeVisible();
+  await expect(library.getByText(/neither a 28-byte key hash/)).toHaveCount(0);
+  expect(
+    await page.evaluate((key) => window.localStorage.getItem(key), localBookStoreKey),
+  ).toBe(before);
+});
+
+test("the exact 2026-07-17 named wallets bundle imports and persists contract Turtle", async ({
+  page,
+}) => {
+  await page.goto("/library");
+  const library = page.locator(".library-page");
+  const exactFixture = await readFile(attxBookBundlePath);
+
+  await library.getByLabel("Book file").setInputFiles({
+    name: "attx-book-bundle.json",
+    mimeType: "application/json",
+    buffer: exactFixture,
+  });
+
+  await expect(
+    library.getByText("Imported Amaru book bundle (2 parts).", { exact: true }),
+  ).toBeVisible();
+  const importedBook = library.locator(".library-book", {
+    hasText: "Amaru book bundle",
+  });
+  await expect(importedBook).toBeVisible();
+  await expect(
+    importedBook.getByRole("checkbox", { name: "Select Amaru book bundle" }),
+  ).toBeChecked();
+
+  const store = await storedBooks(page);
+  const imported = store.books.find((book) => book.name === "Amaru book bundle");
+  expect(imported).toMatchObject({
+    source: "amaru.book.bundle.v1",
+    raw: exactFixture.toString().trim(),
+    selected: true,
+    seed: false,
+  });
+  expect(imported.parts).toHaveLength(2);
+  expect(imported.parts.map((part) => part.label)).toEqual([
+    "network_compliance scope owner",
+    "operator fuel wallet",
+  ]);
+  expect(imported.turtle).toContain(
+    "<urn:cardano:id:key:8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1>",
+  );
+  expect(imported.turtle).toContain("a overlay:Owner");
+  expect(imported.turtle).toContain(
+    'rdfs:label "network_compliance scope owner"',
+  );
+  expect(imported.turtle).toContain(
+    "<urn:cardano:id:address:addr1qx9aqvsf6gne2640jec828s25gzhk5wp2day8u24kf8mrs2v0zyuvk80fay35dx008p45ts0u6cdrv9g2maetq8jm8psznjcrz>",
+  );
+  expect(imported.turtle).toContain("a overlay:Address");
+  expect(imported.turtle).toContain('rdfs:label "operator fuel wallet"');
+  expect(imported.turtle).toContain(
+    'cardano:bech32 "addr1qx9aqvsf6gne2640jec828s25gzhk5wp2day8u24kf8mrs2v0zyuvk80fay35dx008p45ts0u6cdrv9g2maetq8jm8psznjcrz"',
+  );
 });
 
 test("MD3 shell routes topbar nav and theme toggle", async ({ page }) => {

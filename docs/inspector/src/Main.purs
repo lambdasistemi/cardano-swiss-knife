@@ -209,6 +209,7 @@ type State =
   , libraryInput :: String
   , libraryUrl :: String
   , libraryError :: Maybe String
+  , libraryStatus :: Maybe String
   , browserNodes :: Array BrowserNode
   , expandedPaths :: Array String
   , decodedTreeExpanded :: Array String
@@ -486,6 +487,7 @@ inspectorComponent initial =
         , libraryInput: ""
         , libraryUrl: ""
         , libraryError: Nothing
+        , libraryStatus: Nothing
         , browserNodes: []
         , expandedPaths: []
         , decodedTreeExpanded: []
@@ -1693,12 +1695,20 @@ inspectorComponent initial =
                   ]
               ]
           ]
-      , case state.libraryError of
-          Just err ->
+      , case state.libraryError, state.libraryStatus of
+          Just err, _ ->
             HH.div
-              [ classNames [ "sparql-lens-error" ] ]
+              [ classNames [ "sparql-lens-error" ]
+              , HH.attr (HH.AttrName "role") "alert"
+              ]
               [ HH.text (libraryErrorPrefix err <> err) ]
-          Nothing -> HH.text ""
+          Nothing, Just status ->
+            HH.div
+              [ classNames [ "privacy-note", "library-import-success" ]
+              , HH.attr (HH.AttrName "role") "status"
+              ]
+              [ HH.text status ]
+          Nothing, Nothing -> HH.text ""
       ]
 
   libraryErrorPrefix err =
@@ -5226,28 +5236,40 @@ inspectorComponent initial =
     LoadExample hex -> do
       H.modify_ _ { mode = ByHex, txHex = hex, copied = false, copiedPath = Nothing, fetchError = Nothing }
       handleAction Decode
-    SetLibraryInput s -> H.modify_ _ { libraryInput = s, libraryError = Nothing }
-    SetLibraryUrl s -> H.modify_ _ { libraryUrl = s, libraryError = Nothing }
+    SetLibraryInput s ->
+      H.modify_ _ { libraryInput = s, libraryError = Nothing, libraryStatus = Nothing }
+    SetLibraryUrl s ->
+      H.modify_ _ { libraryUrl = s, libraryError = Nothing, libraryStatus = Nothing }
     AddLibraryBook -> do
       st <- H.get
       importLibraryBookText st.libraryInput
     ImportLibraryBookFile -> do
+      H.modify_ _ { libraryError = Nothing, libraryStatus = Nothing }
       fileText <- H.liftAff (attempt (Storage.readFileInputText "library-book-file"))
       case fileText of
         Left err ->
-          H.modify_ _ { libraryError = Just ("File import failed: " <> message err) }
+          H.modify_
+            _
+              { libraryError = Just ("File import failed: " <> message err)
+              , libraryStatus = Nothing
+              }
         Right input ->
           importLibraryBookText input
     ImportLibraryBookFromUrl -> do
       st <- H.get
       let url = String.trim st.libraryUrl
+      H.modify_ _ { libraryError = Nothing, libraryStatus = Nothing }
       if url == "" then
-        H.modify_ _ { libraryError = Just "Book URL is empty." }
+        H.modify_ _ { libraryError = Just "Book URL is empty.", libraryStatus = Nothing }
       else do
         fetched <- H.liftAff (attempt (Storage.fetchText url))
         case fetched of
           Left err ->
-            H.modify_ _ { libraryError = Just ("URL import failed: " <> message err) }
+            H.modify_
+              _
+                { libraryError = Just ("URL import failed: " <> message err)
+                , libraryStatus = Nothing
+                }
           Right input ->
             importLibraryBookText input
     ExportSelectedLibraryBooks -> do
@@ -5275,14 +5297,23 @@ inspectorComponent initial =
         )
       H.modify_ _ { libraryError = Nothing }
     ImportLibraryStoreFile -> do
+      H.modify_ _ { libraryError = Nothing, libraryStatus = Nothing }
       fileText <- H.liftAff (attempt (Storage.readFileInputText "library-store-file"))
       case fileText of
         Left err ->
-          H.modify_ _ { libraryError = Just ("Store import failed: " <> message err) }
+          H.modify_
+            _
+              { libraryError = Just ("Store import failed: " <> message err)
+              , libraryStatus = Nothing
+              }
         Right input ->
           case BookStore.parseStore input of
             Left err ->
-              H.modify_ _ { libraryError = Just ("Store import failed: " <> err) }
+              H.modify_
+                _
+                  { libraryError = Just ("Store import failed: " <> err)
+                  , libraryStatus = Nothing
+                  }
             Right imported -> do
               st <- H.get
               let
@@ -5294,6 +5325,7 @@ inspectorComponent initial =
                   { books = books
                   , bookNameEdits = edits
                   , libraryError = Nothing
+                  , libraryStatus = Just (libraryStoreImportSuccess imported)
                   }
     ToggleLibraryBook bookId selected -> do
       st <- H.get
@@ -5955,12 +5987,16 @@ inspectorComponent initial =
   importLibraryBookText raw = do
     let input = String.trim raw
     if input == "" then
-      H.modify_ _ { libraryError = Just "Book input is empty." }
+      H.modify_
+        _
+          { libraryError = Just "Book input is empty."
+          , libraryStatus = Nothing
+          }
     else do
       parsed <- liftEffect (OverlayBook.parse input)
       case parsed of
         Left err ->
-          H.modify_ _ { libraryError = Just err }
+          H.modify_ _ { libraryError = Just err, libraryStatus = Nothing }
         Right book ->
           appendLibraryBook input book
 
@@ -5987,6 +6023,7 @@ inspectorComponent initial =
         , libraryInput = ""
         , libraryUrl = ""
         , libraryError = Nothing
+        , libraryStatus = Just (libraryBookImportSuccess book)
         }
 
   saveBooks books =
@@ -6065,6 +6102,22 @@ inspectorComponent initial =
       partCount = Array.length book.parts
     in
       show partCount <> if partCount == 1 then " part" else " parts"
+
+  libraryBookImportSuccess book =
+    let
+      partCount = Array.length book.parts
+      partsLabel = show partCount <> if partCount == 1 then " part" else " parts"
+    in
+      "Imported " <> book.title <> " (" <> partsLabel <> ")."
+        <> if book.notice == "" then "" else " " <> book.notice
+
+  libraryStoreImportSuccess store =
+    let
+      inspection = BookStore.inspect store
+      booksLabel = show inspection.count <> if inspection.count == 1 then " book" else " books"
+      partsLabel = show inspection.partCount <> if inspection.partCount == 1 then " part" else " parts"
+    in
+      "Imported " <> booksLabel <> " (" <> partsLabel <> ")."
 
   libraryBookSourceText book =
     if String.trim book.raw == "" then book.source else book.raw

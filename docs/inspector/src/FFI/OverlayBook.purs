@@ -24,6 +24,7 @@ type OverlayBook =
   , source :: String
   , parts :: Array OverlayPart
   , turtle :: String
+  , notice :: String
   }
 
 foreign import bundledAmaruJournal :: String
