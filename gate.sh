@@ -47,6 +47,7 @@ nix run .#ci-check
 nix run .#ci-haskell-quality
 nix run .#ci-check-vectors
 nix run .#ci-build
+nix build .#tx-inspector-wasm --no-link
 nix build .#tx-inspector-ui --no-link
 nix run .#ci-inspector-playwright
 nix run .#ci-ux-capture
