@@ -258,12 +258,30 @@ const invalidValidation = (title, subtitle) => ({
   sections: [],
 });
 
-const witnessRow = (label, value, path, copyValue = value, detail = "") => ({
+const uniqueIdentifierCandidates = (values) =>
+  Array.from(new Set(values.map(text).filter((value) => value !== "")));
+
+const keyIdentifierCandidates = (value) => {
+  const hash = text(value).toLowerCase();
+  return hash === ""
+    ? []
+    : uniqueIdentifierCandidates([hash, `urn:cardano:id:key:${hash}`]);
+};
+
+const witnessRow = (
+  label,
+  value,
+  path,
+  copyValue = value,
+  detail = "",
+  identifierCandidates = []
+) => ({
   label,
   value: text(value),
   copyValue: text(copyValue),
   path,
   detail: text(detail),
+  identifierCandidates: uniqueIdentifierCandidates(identifierCandidates),
 });
 
 const sourceDetail = (item) => text(item && item.source ? item.source : "");
@@ -276,7 +294,8 @@ const signerRows = (items, pathRoot) =>
       item?.hash,
       witnessPlanPath(pathRoot, `#${index}`, "hash"),
       item?.hash,
-      sourceDetail(item)
+      sourceDetail(item),
+      keyIdentifierCandidates(item?.hash)
     )
   );
 
@@ -398,7 +417,8 @@ const normalizeWitnessPlan = (plan) => {
             item?.hash,
             witnessPlanPath("missing_vkey_witnesses", `#${index}`, "hash"),
             item?.hash,
-            item?.reason
+            item?.reason,
+            keyIdentifierCandidates(item?.hash)
           )
         ),
       },

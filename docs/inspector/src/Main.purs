@@ -214,6 +214,7 @@ type State =
   , expandedPaths :: Array String
   , decodedTreeExpanded :: Array String
   , decodedEmptyExpanded :: Array String
+  , decodedResolutionsExpanded :: Boolean
   , decodedRowStyle :: String
   , decodedBytesExpanded :: Boolean
   , validationFilter :: ValidationFilter
@@ -291,6 +292,12 @@ type SparqlLens =
 type ResolvedLabelsLens =
   { rows :: Array RdfShapes.ResolvedLabelRow
   , error :: Maybe String
+  }
+
+type ResolutionEntry =
+  { label :: String
+  , identifier :: String
+  , candidates :: Array String
   }
 
 type TypedFieldsLens =
@@ -372,6 +379,7 @@ data Action
   | BrowseJson String
   | ToggleDecodedEmpty String
   | ToggleDecodedTree String
+  | ToggleDecodedResolutions
   | SetDecodedRowStyle String
   | ExpandDecodedTree
   | CollapseDecodedTree
@@ -492,6 +500,7 @@ inspectorComponent initial =
         , expandedPaths: []
         , decodedTreeExpanded: []
         , decodedEmptyExpanded: []
+        , decodedResolutionsExpanded: false
         , decodedRowStyle: "quiet"
         , decodedBytesExpanded: true
         , validationFilter: ValidationAll
@@ -2187,14 +2196,10 @@ inspectorComponent initial =
             , renderDecodedBytesPanel state
             ]
 
-  renderDecodedToolbar state rows =
+  renderDecodedToolbar state _rows =
     HH.div
       [ classNames [ "decoded-toolbar" ] ]
-      [ HH.div
-          [ classNames [ "decoded-resolved-readout" ] ]
-          [ HH.element (HH.ElemName "md-icon") [] [ HH.text "auto_awesome" ]
-          , HH.span_ [ HH.text (show (decodedResolvedCount rows) <> " identifiers resolved to names") ]
-          ]
+      [ renderDecodedResolutionDisclosure state
       , HH.div
           [ classNames [ "decoded-row-style" ]
           , HH.attr (HH.AttrName "aria-label") "Row style"
@@ -2227,6 +2232,41 @@ inspectorComponent initial =
               , HH.text "Collapse"
               ]
           ]
+      ]
+
+  renderDecodedResolutionDisclosure state =
+    let
+      entries = resolutionInventory state
+      countLabel = show (Array.length entries) <> " identifiers resolved to names"
+    in
+      HH.div
+        [ classNames [ "decoded-resolution-disclosure" ] ]
+        [ HH.button
+            [ classNames [ "decoded-resolved-readout" ]
+            , HH.attr (HH.AttrName "type") "button"
+            , HH.attr (HH.AttrName "aria-expanded") (if state.decodedResolutionsExpanded then "true" else "false")
+            , HE.onClick (\_ -> ToggleDecodedResolutions)
+            ]
+            [ HH.element (HH.ElemName "md-icon") [] [ HH.text "auto_awesome" ]
+            , HH.span_ [ HH.text countLabel ]
+            ]
+        , if state.decodedResolutionsExpanded then
+            HH.div
+              [ classNames [ "decoded-resolution-list" ] ]
+              (map renderDecodedResolutionEntry entries)
+          else
+            HH.text ""
+        ]
+
+  renderDecodedResolutionEntry entry =
+    HH.div
+      [ classNames [ "decoded-resolution-entry" ] ]
+      [ HH.strong
+          [ classNames [ "decoded-resolution-label" ] ]
+          [ HH.text entry.label ]
+      , HH.code
+          [ classNames [ "decoded-resolution-identifier" ] ]
+          [ HH.text entry.identifier ]
       ]
 
   renderDecodedRowStyleButton state style label =
@@ -2323,7 +2363,8 @@ inspectorComponent initial =
       hasChildren = decodedTreeHasChildren rows row
       expanded = row.parentId == "" || Array.elem row.id state.decodedTreeExpanded
       isNull = row.kind == "null" && not hasChildren
-      isResolved = row.resolvedLabel /= ""
+      resolvedName = decodedRowResolvedName state row
+      isResolved = resolvedName /= ""
       rowClasses =
         [ "decoded-tree-row", "decoded-tree-depth-" <> show row.depth ]
           <> (if hasChildren then [ "decoded-tree-row--group" ] else [])
@@ -2395,7 +2436,7 @@ inspectorComponent initial =
                                 [ HH.element (HH.ElemName "md-icon")
                                     [ classNames [ "decoded-tree-kind-icon" ] ]
                                     [ HH.text (decodedTreeKindIcon row) ]
-                                , HH.text row.resolvedLabel
+                                , HH.text resolvedName
                                 ]
                             , HH.span
                                 [ classNames [ "li-chip", "decoded-tree-book-chip" ] ]
@@ -2572,8 +2613,61 @@ inspectorComponent initial =
       [ book ] -> book.name
       books -> show (Array.length books) <> " books"
 
-  decodedResolvedCount rows =
-    Array.length (Array.filter (\row -> row.resolvedLabel /= "") rows)
+  uniqueStrings values =
+    Array.foldl
+      ( \result value ->
+          if value == "" || Array.elem value result then result
+          else Array.snoc result value
+      )
+      []
+      values
+
+  resolutionInventory state =
+    let
+      rows = case state.resolvedLabelsLens of
+        Just lens -> lens.rows
+        Nothing -> []
+      addEntry entries row =
+        let
+          identifier = if row.matched == "" then row.entity else row.matched
+          entry =
+            { label: row.label
+            , identifier
+            , candidates: uniqueStrings [ row.entity, row.matched ]
+            }
+          exists = Array.any (\candidate -> candidate.label == entry.label && candidate.identifier == entry.identifier) entries
+        in
+          if row.label == "" || identifier == "" || exists then entries
+          else Array.snoc entries entry
+    in
+      Array.foldl addEntry [] rows
+
+  resolutionNameForCandidates state candidates =
+    let
+      exactCandidates = uniqueStrings candidates
+      matches entry =
+        Array.any (\candidate -> Array.elem candidate entry.candidates) exactCandidates
+    in
+      case Array.find matches (resolutionInventory state) of
+        Just entry -> entry.label
+        Nothing -> ""
+
+  decodedRowIdentifierCandidates row =
+    uniqueStrings
+      ( [ row.entityIri, row.value, row.raw, row.annotationValue ]
+          <> if row.kind == "key" || row.kind == "key-witness" then
+            [ "urn:cardano:id:key:" <> row.raw ]
+          else if row.kind == "script" || row.kind == "script_hash" then
+            [ "urn:cardano:id:script:" <> row.raw ]
+          else
+            []
+      )
+
+  decodedRowResolvedName state row =
+    let
+      indexed = resolutionNameForCandidates state (decodedRowIdentifierCandidates row)
+    in
+      if indexed == "" then row.resolvedLabel else indexed
 
   decodedEmptyGroupIds rows =
     rows
@@ -3565,7 +3659,10 @@ inspectorComponent initial =
         else
           HH.div
             [ classNames [ "witness-row-list" ] ]
-            (map (renderWitnessRowWithCopy state false) section.rows)
+            ( map
+                (\row -> renderWitnessRowWithCopy state (not (Array.null row.identifierCandidates)) row)
+                section.rows
+            )
       ]
 
   renderIdentification state identification =
@@ -4541,38 +4638,47 @@ inspectorComponent initial =
     renderWitnessRowWithCopy state true row
 
   renderWitnessRowWithCopy state showCopy row =
-    HH.div
-      [ classNames [ "identity-row", "witness-row" ] ]
-      [ HH.div
-          [ classNames [ "identity-copy" ] ]
-          [ HH.span
-              [ classNames [ "identity-label" ] ]
-              [ HH.text row.label ]
-          , if showCopy then
-              HH.element (HH.ElemName "md-outlined-button")
-                [ HE.onClick (\_ -> CopyValue row.path row.copyValue)
-                , classNames [ "inline-action" ]
-                , HH.attr (HH.AttrName "role") "button"
-                , mdControl "inline"
-                ]
-                [ HH.text
-                    ( if state.copiedPath == Just row.path then
-                        "Copied"
-                      else
-                        "Copy"
-                    )
-                ]
-            else
-              HH.text ""
-          ]
-      , HH.code_ [ HH.text row.value ]
-      , if row.detail == "" then
-          HH.text ""
-        else
-          HH.span
-            [ classNames [ "witness-detail" ] ]
-            [ HH.text row.detail ]
-      ]
+    let
+      resolvedName = resolutionNameForCandidates state row.identifierCandidates
+    in
+      HH.div
+        [ classNames [ "identity-row", "witness-row" ] ]
+        [ HH.div
+            [ classNames [ "identity-copy" ] ]
+            [ HH.span
+                [ classNames [ "identity-label" ] ]
+                [ HH.text row.label ]
+            , if showCopy then
+                HH.element (HH.ElemName "md-outlined-button")
+                  [ HE.onClick (\_ -> CopyValue row.path row.copyValue)
+                  , classNames [ "inline-action" ]
+                  , HH.attr (HH.AttrName "role") "button"
+                  , mdControl "inline"
+                  ]
+                  [ HH.text
+                      ( if state.copiedPath == Just row.path then
+                          "Copied"
+                        else
+                          "Copy"
+                      )
+                  ]
+              else
+                HH.text ""
+            ]
+        , HH.code_ [ HH.text row.value ]
+        , if resolvedName == "" then
+            HH.text ""
+          else
+            HH.strong
+              [ classNames [ "witness-resolved-name" ] ]
+              [ HH.text resolvedName ]
+        , if row.detail == "" then
+            HH.text ""
+          else
+            HH.span
+              [ classNames [ "witness-detail" ] ]
+              [ HH.text row.detail ]
+        ]
 
   renderIdentityRow state row =
     let
@@ -5715,6 +5821,8 @@ inspectorComponent initial =
                 else
                   Array.cons groupId st.decodedEmptyExpanded
             }
+    ToggleDecodedResolutions ->
+      H.modify_ \st -> st { decodedResolutionsExpanded = not st.decodedResolutionsExpanded }
     SetDecodedRowStyle style ->
       H.modify_ _ { decodedRowStyle = style }
     ExpandDecodedTree ->

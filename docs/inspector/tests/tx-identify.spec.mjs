@@ -29,6 +29,15 @@ const attxBookBundlePath = path.join(
   repoRoot,
   "docs/inspector/tests/fixtures/attx-book-bundle.json",
 );
+const treasuryReorganizeFixturePath = path.join(
+  repoRoot,
+  "docs/inspector/tests/fixtures/treasury-reorganize-unsigned-tx.hex",
+);
+const treasuryOwnerHash =
+  "8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1";
+const treasuryOwnerName = "network_compliance scope owner";
+const treasuryOutputAddressHex =
+  "018bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c14c7889c658ef4f491a34cf79c35a2e0fe6b0d1b0a856fb9580f2d9c3";
 const packagedSiteDir = path.resolve(
   process.cwd(),
   process.env.TX_INSPECTOR_SITE_DIR || "result",
@@ -1860,6 +1869,110 @@ test("the exact 2026-07-17 named wallets bundle imports and persists contract Tu
   expect(imported.turtle).toContain(
     'cardano:bech32 "addr1qx9aqvsf6gne2640jec828s25gzhk5wp2day8u24kf8mrs2v0zyuvk80fay35dx008p45ts0u6cdrv9g2maetq8jm8psznjcrz"',
   );
+});
+
+test("renders exact Amaru book resolutions across Structure and Witness", async ({
+  page,
+}) => {
+  await page.goto("/library");
+  const library = page.locator(".library-page");
+  const seedBooks = library.locator(".library-book").filter({
+    has: page.locator(".library-book-meta", { hasText: "seed" }),
+  });
+  for (let index = 0; index < (await seedBooks.count()); index += 1) {
+    await seedBooks.nth(index).getByRole("checkbox").uncheck();
+  }
+
+  await library.getByLabel("Book file").setInputFiles({
+    name: "attx-book-bundle.json",
+    mimeType: "application/json",
+    buffer: await readFile(attxBookBundlePath),
+  });
+  await expect(
+    library.getByText("Imported Amaru book bundle (2 parts).", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    library
+      .locator(".library-book", { hasText: "Amaru book bundle" })
+      .getByRole("checkbox", { name: "Select Amaru book bundle" }),
+  ).toBeChecked();
+
+  await decodeFixtureAt(page, "/inspect", treasuryReorganizeFixturePath);
+  const structurePanel = await selectResultTab(page, "Structure");
+
+  for (const style of ["A - Quiet", "B - Labeled"]) {
+    await structurePanel.getByRole("button", { name: style, exact: true }).click();
+    await expect(
+      structurePanel.getByRole("button", { name: style, exact: true }),
+    ).toHaveAttribute("aria-pressed", "true");
+
+    const disclosure = structurePanel.locator(".decoded-resolution-disclosure");
+    const toggle = disclosure.getByRole("button", {
+      name: /\d+ identifiers resolved to names/,
+    });
+    await expect(toggle).toHaveAttribute("aria-expanded", "false");
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-expanded", "true");
+
+    const entries = disclosure.locator(".decoded-resolution-entry");
+    const count = Number((await toggle.innerText()).match(/\d+/)?.[0]);
+    const renderedEntries = await entries.evaluateAll((nodes) =>
+      nodes.map((node) => ({
+        text: node.textContent?.trim() || "",
+        label:
+          node.querySelector(".decoded-resolution-label")?.textContent?.trim() || "",
+        identifier:
+          node.querySelector(".decoded-resolution-identifier")?.textContent?.trim() || "",
+      })),
+    );
+    expect(count).toBe(renderedEntries.length);
+    expect(new Set(renderedEntries.map((entry) => entry.text)).size).toBe(count);
+    expect(renderedEntries.every((entry) => entry.label && entry.identifier)).toBe(true);
+    expect(
+      renderedEntries.some(
+        (entry) =>
+          entry.label === treasuryOwnerName && entry.identifier.includes(treasuryOwnerHash),
+      ),
+    ).toBe(true);
+    await expect(
+      disclosure.getByText(treasuryOwnerName, { exact: true }),
+    ).toBeVisible();
+
+    if (style === "B - Labeled") {
+      await expandDecodedStructure(decodedPanel(structurePanel));
+      const outputResolution = decodedPanel(structurePanel)
+        .locator(".decoded-tree-resolved-name")
+        .filter({ hasText: "operator fuel wallet" });
+      await expect(outputResolution).toHaveCount(1);
+      await expect(outputResolution).toContainText("operator fuel wallet");
+    }
+
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-expanded", "false");
+  }
+
+  const witnessPanel = await selectResultTab(page, "Witness");
+  for (const sectionName of ["Required signers", "Missing declared signers"]) {
+    const signerRow = witnessPanel
+      .locator(".witness-plan .witness-section", { hasText: sectionName })
+      .locator(".witness-row", { hasText: treasuryOwnerHash });
+    await expect(signerRow).toContainText(treasuryOwnerHash);
+    await expect(signerRow).toContainText(treasuryOwnerName);
+    await signerRow.getByRole("button", { name: "Copy" }).click();
+    await expect
+      .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+      .toBe(treasuryOwnerHash);
+  }
+
+  const outputRow = witnessPanel
+    .locator(".intent-panel .witness-section", { hasText: "Outputs" })
+    .locator(".witness-row", { hasText: treasuryOutputAddressHex });
+  await expect(outputRow).toContainText(treasuryOutputAddressHex);
+  await expect(outputRow).toContainText("operator fuel wallet");
+  await outputRow.getByRole("button", { name: "Copy" }).click();
+  await expect
+    .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+    .toBe(treasuryOutputAddressHex);
 });
 
 test("MD3 shell routes topbar nav and theme toggle", async ({ page }) => {

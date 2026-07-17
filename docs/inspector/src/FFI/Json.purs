@@ -31,7 +31,11 @@ module FFI.Json
 
 import Prelude
 
+import Cardano.Address.Bech32 as Bech32
+import Cardano.Address.Hex as Hex
+import Cardano.Bytes as Bytes
 import Control.Monad.Except (runExcept)
+import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), fromMaybe)
 import Foreign (Foreign, isNull, isUndefined, readArray, readString)
@@ -133,6 +137,7 @@ type WitnessPlanRow =
   , copyValue :: String
   , path :: String
   , detail :: String
+  , identifierCandidates :: Array String
   }
 
 type WitnessPlanSection =
@@ -234,14 +239,57 @@ operationResultValue root =
 
 readIntentSummary :: Foreign -> IntentSummary
 readIntentSummary intent =
-  { valid: true
-  , title: stringField "title" "Signing summary" intent
-  , subtitle: stringField "subtitle" "" intent
-  , metrics: map readMetric (arrayField "metrics" intent)
-  , claims: map readIntentClaim (arrayField "claims" intent)
-  , sections: map readWitnessSection (arrayField "sections" intent)
-  , warnings: map readStringDefault (arrayField "warnings" intent)
-  }
+  let
+    outputRows = Array.mapWithIndex readIntentOutputRow (intentOutputValues intent)
+    sections = map readWitnessSection (arrayField "sections" intent)
+    sectionsWithOutputs =
+      if Array.null outputRows then sections
+      else
+        Array.snoc sections
+          { title: "Outputs"
+          , empty: "No outputs."
+          , rows: outputRows
+          }
+  in
+    { valid: true
+    , title: stringField "title" "Signing summary" intent
+    , subtitle: stringField "subtitle" "" intent
+    , metrics: map readMetric (arrayField "metrics" intent)
+    , claims: map readIntentClaim (arrayField "claims" intent)
+    , sections: sectionsWithOutputs
+    , warnings: map readStringDefault (arrayField "warnings" intent)
+    }
+
+intentOutputValues :: Foreign -> Array Foreign
+intentOutputValues intent =
+  case field "value" intent of
+    Just value -> arrayField "outputs" value
+    Nothing -> []
+
+readIntentOutputRow :: Int -> Foreign -> WitnessPlanRow
+readIntentOutputRow index value =
+  let
+    addressHex = stringField "address_hex" "" value
+  in
+    { label: "Output #" <> show index
+    , value: addressHex
+    , copyValue: addressHex
+    , path: "[\"intent\",\"value\",\"outputs\",\"#" <> show index <> "\",\"address_hex\"]"
+    , detail: stringField "bucket" "" value
+    , identifierCandidates: addressIdentifierCandidates addressHex
+    }
+
+addressIdentifierCandidates :: String -> Array String
+addressIdentifierCandidates addressHex =
+  case Hex.fromHex addressHex of
+    Right bytes | Bytes.byteLength bytes > 0 ->
+      let
+        networkTag = mod (Bytes.unsafeIndex bytes 0) 16
+        prefix = if networkTag == 1 then "addr" else "addr_test"
+      in
+        [ addressHex, Bech32.encode prefix bytes ]
+    _ ->
+      if addressHex == "" then [] else [ addressHex ]
 
 readMetric :: Foreign -> Metric
 readMetric value =
@@ -270,6 +318,7 @@ readWitnessRow value =
   , copyValue: stringField "copyValue" "" value
   , path: stringField "path" "" value
   , detail: stringField "detail" "" value
+  , identifierCandidates: map readStringDefault (arrayField "identifierCandidates" value)
   }
 
 stringField :: String -> String -> Foreign -> String
