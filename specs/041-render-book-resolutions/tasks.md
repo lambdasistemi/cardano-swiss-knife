@@ -16,19 +16,19 @@ one bisect-safe commit.
 **Goal**: Make one existing resolution inventory drive Structure and Witness
 without changing resolution semantics.
 
-- [ ] T002 Copy the exact reorganize CBOR to
+- [X] T002 Copy the exact reorganize CBOR to
   `docs/inspector/tests/fixtures/treasury-reorganize-unsigned-tx.hex` and verify
   SHA-256 `11ba0b62566367e6dfd76eb6d06e4dc6474cf145d434b596d047377b69d1fb75`.
-- [ ] T003 Add the RED Playwright journey that imports only the exact Amaru
+- [X] T003 Add the RED Playwright journey that imports only the exact Amaru
   bundle and proves the scope-owner name missing from Structure and Witness.
-- [ ] T004 Preserve generic identifier candidates on typed Witness/intent rows
+- [X] T004 Preserve generic identifier candidates on typed Witness/intent rows
   and expose full `intent.value.outputs[].address_hex` rows without engine or
   resolver changes.
-- [ ] T005 Add the shared exact-match presentation index, row-generic label
+- [X] T005 Add the shared exact-match presentation index, row-generic label
   affordance, and count-matched Structure disclosure; keep raw values copyable.
-- [ ] T006 Prove the scope owner in Structure disclosure and declared/missing
+- [X] T006 Prove the scope owner in Structure disclosure and declared/missing
   Witness rows, output-address resolution, and A-Quiet/B-Labeled behavior.
-- [ ] T007 Run `nix run .#ci-inspector-playwright` and `./gate.sh`, obtain
+- [X] T007 Run `nix run .#ci-inspector-playwright` and `./gate.sh`, obtain
   navigator approval, and commit with `Tasks: T002, T003, T004, T005, T006, T007`.
 
 ## Finalization (orchestrator-owned)
