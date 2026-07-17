@@ -2,7 +2,7 @@
 
 **Feature Branch**: `fix/42-truthful-absent-fields`
 **Created**: 2026-07-17
-**Status**: In progress
+**Status**: Complete
 **Input**: cardano-swiss-knife issue #42, parent epic #45, and issue #41
 
 ## P1 user story

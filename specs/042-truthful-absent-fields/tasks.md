@@ -31,7 +31,7 @@ preserving exact CDDL order and issue #41's generic resolution behavior.
 
 ## Finalization (orchestrator-owned)
 
-- [ ] T007 Independently verify the pair's diff and commit, mark T003-T006 in
+- [X] T007 Independently verify the pair's diff and commit, mark T003-T006 in
   the same commit, run the extended full gate at final HEAD, push, and update
   draft PR #50 without marking it ready.
 
