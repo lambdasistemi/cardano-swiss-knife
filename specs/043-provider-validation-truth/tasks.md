@@ -36,7 +36,7 @@ valid case.
 
 ## Finalization (orchestrator-owned)
 
-- [ ] T008 Independently verify the pair's diff and commit, mark T003-T007 in
+- [X] T008 Independently verify the pair's diff and commit, mark T003-T007 in
   the same commit, run the extended full gate at final HEAD, push, and update
   draft PR #51 without marking it ready.
 

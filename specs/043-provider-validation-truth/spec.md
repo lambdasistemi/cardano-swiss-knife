@@ -2,7 +2,7 @@
 
 **Feature Branch**: `fix/43-provider-validation-truth`
 **Created**: 2026-07-17
-**Status**: In progress
+**Status**: Complete
 **Input**: cardano-swiss-knife issues #43 and #30, parent epic #45
 
 ## P1 user story
