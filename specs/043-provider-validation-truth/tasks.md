@@ -20,17 +20,17 @@ commit.
 context failure, and an incomplete verdict while retaining a positive complete
 valid case.
 
-- [ ] T003 Add RED Playwright coverage proving selected Blockfrost sends zero
+- [X] T003 Add RED Playwright coverage proving selected Blockfrost sends zero
   Koios requests on the existing no-credentials fixture path.
-- [ ] T004 Assert the visible missing-credentials/network cause, incomplete
+- [X] T004 Assert the visible missing-credentials/network cause, incomplete
   warning banner, absence of `Validation passed`, and complete-valid positive
   case.
-- [ ] T005 Remove the Blockfrost-to-Koios fallback and record explicit missing
+- [X] T005 Remove the Blockfrost-to-Koios fallback and record explicit missing
   credentials without provider I/O.
-- [ ] T006 Preserve structured ledger verdict fields and provider resolution
+- [X] T006 Preserve structured ledger verdict fields and provider resolution
   errors through browser normalization, then render the dedicated context notice
   and truthful banner.
-- [ ] T007 Obtain navigator RED and GREEN approvals, run
+- [X] T007 Obtain navigator RED and GREEN approvals, run
   `nix run .#ci-inspector-playwright` and `./gate.sh`, and commit with
   `Tasks: T003, T004, T005, T006, T007`.
 

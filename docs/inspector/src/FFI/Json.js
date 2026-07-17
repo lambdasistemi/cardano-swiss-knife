@@ -253,6 +253,10 @@ const invalidValidation = (title, subtitle) => ({
   valid: false,
   title,
   subtitle,
+  status: "unknown",
+  complete: false,
+  validForSuppliedContext: false,
+  contextErrors: [],
   metrics: [],
   warnings: [],
   sections: [],
@@ -717,18 +721,25 @@ const normalizeValidation = (validation) => {
     validation.context && typeof validation.context === "object" ? validation.context : {};
   const resolution =
     context.resolution && typeof context.resolution === "object" ? context.resolution : {};
+  const contextErrors = Array.isArray(resolution.errors) ? resolution.errors.map(text) : [];
+  const complete = validation.complete === true;
+  const validForSuppliedContext = validation.valid_for_supplied_context === true;
 
   return {
     valid: true,
     title: "Ledger validation",
     subtitle: validationStatusSubtitle(status, failures, missingContext, errors),
+    status,
+    complete,
+    validForSuppliedContext,
+    contextErrors,
     metrics: [
       metric("Status", status),
       metric("Network", context.network ?? "n/a"),
       metric("Slot", context.slot ?? "n/a"),
       metric("Epoch", context.epoch ?? "n/a"),
-      metric("Complete", yesNo(validation.complete)),
-      metric("Valid for context", yesNo(validation.valid_for_supplied_context)),
+      metric("Complete", yesNo(complete)),
+      metric("Valid for context", yesNo(validForSuppliedContext)),
       metric("Checks", checks.length),
       metric("Failures", failures.length),
       metric("Missing context", missingContext.length),

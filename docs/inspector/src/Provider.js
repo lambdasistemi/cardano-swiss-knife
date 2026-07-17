@@ -39,7 +39,16 @@ const extractInspectionInputs = (inspectionResponse) => {
 
 const errorMessage = (err) => (err instanceof Error ? err.message : String(err));
 
-const providerValidationContext = async (fetchValidationContext, errors) => {
+const providerValidationContext = async (
+  provider,
+  canFetchValidationContext,
+  fetchValidationContext,
+  errors,
+) => {
+  if (provider === "blockfrost" && !canFetchValidationContext) {
+    errors.push("validation_context: Blockfrost credentials not supplied");
+    return { fields: {}, source: "" };
+  }
   try {
     const raw = await fetchValidationContext();
     const parsed = JSON.parse(raw);
@@ -56,7 +65,7 @@ const providerValidationContext = async (fetchValidationContext, errors) => {
 };
 
 export const resolveProducerTxContextImpl =
-  (provider) => (source) => (inspectionResponse) => (fetchTxCbor) => (fetchValidationContext) => (fetchProducerTxs) => async () => {
+  (provider) => (source) => (inspectionResponse) => (fetchTxCbor) => (fetchValidationContext) => (canFetchValidationContext) => (fetchProducerTxs) => async () => {
     const { inputs, referenceInputs } = extractInspectionInputs(inspectionResponse);
     const requestedTxIds = [
       ...new Set([...inputs, ...referenceInputs].map((input) => input.tx_id)),
@@ -64,7 +73,12 @@ export const resolveProducerTxContextImpl =
     const producerTxs = {};
     const missing = [];
     const errors = [];
-    const validationContext = await providerValidationContext(fetchValidationContext, errors);
+    const validationContext = await providerValidationContext(
+      provider,
+      canFetchValidationContext,
+      fetchValidationContext,
+      errors,
+    );
 
     if (!fetchProducerTxs && requestedTxIds.length > 0) {
       missing.push(...requestedTxIds);
