@@ -33,7 +33,7 @@ without changing resolution semantics.
 
 ## Finalization (orchestrator-owned)
 
-- [ ] T008 Independently review and verify the slice, stamp T002-T007 into its
+- [X] T008 Independently review and verify the slice, stamp T002-T007 into its
   commit, extend permanent `gate.sh` with fixture/test inventory, and record
   before/after DOM or screenshot evidence in the draft PR.
 

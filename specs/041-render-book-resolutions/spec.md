@@ -2,7 +2,7 @@
 
 **Feature Branch**: `feat/41-render-book-resolutions`
 **Created**: 2026-07-17
-**Status**: In progress
+**Status**: Complete
 **Input**: cardano-swiss-knife issue #41, parent epic #45, and A-001
 
 ## P1 user story
@@ -83,4 +83,3 @@ The tree-row assertion itself is deferred to #42.
 - Required-signers/ttl/withdrawals present-versus-absent repair (#42).
 - Blueprint/CIP-57 datum decoding, new book formats, import changes, new
   overlay vocabulary, or any resolution-semantic change.
-
