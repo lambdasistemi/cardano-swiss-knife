@@ -87,10 +87,39 @@ rendered_resolution_journey_inventory() {
   fi
 }
 
+provider_validation_truth_inventory() {
+  local journey="docs/inspector/tests/tx-identify.spec.mjs"
+  local required
+
+  [[ -f "$journey" ]] || {
+    echo "missing provider-validation truth journey: $journey" >&2
+    return 1
+  }
+
+  for required in \
+    'keeps Blockfrost decode inside the selected provider and surfaces missing credentials' \
+    'Validation context unavailable' \
+    'Blockfrost credentials not supplied' \
+    'Validation incomplete' \
+    'expect(koiosRequests).toBe(0)' \
+    'hasText: "Validation passed"'; do
+    rg -Fq "$required" "$journey" || {
+      echo "provider-validation truth journey missing proof anchor: $required" >&2
+      return 1
+    }
+  done
+
+  if rg -q '(^|[^A-Za-z])(test|describe)\.only\(' "$journey"; then
+    echo "provider-validation truth journey must not remain focused-only" >&2
+    return 1
+  fi
+}
+
 git diff --check
 legacy_secret_storage_inventory
 book_interchange_contract_inventory
 rendered_resolution_journey_inventory
+provider_validation_truth_inventory
 nix build .#checks.x86_64-linux.test --no-link
 nix run .#ci-check
 nix run .#ci-haskell-quality
