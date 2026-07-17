@@ -148,6 +148,12 @@ WHERE {
     BIND("Network id" AS ?label)
     BIND("network" AS ?kind)
     BIND("80" AS ?sort)
+  } UNION {
+    ?transaction cardano:hasValidityInterval ?interval .
+    ?interval cardano:intervalEnd ?value .
+    BIND("TTL" AS ?label)
+    BIND("slot" AS ?kind)
+    BIND("90" AS ?sort)
   }
   OPTIONAL {
     FILTER(BOUND(?resolveEntity))
@@ -159,6 +165,35 @@ WHERE {
   }
 }
 ORDER BY ?sort ?label ?value ?entity
+`;
+
+const decodedWithdrawalsQuery = `
+PREFIX cardano: <https://lambdasistemi.github.io/cardano-ledger-rdf/vocab/cardano#>
+SELECT ?withdrawal ?account ?accountRaw ?lovelace
+WHERE {
+  ?transaction a cardano:Transaction ;
+    cardano:hasWithdrawal ?withdrawal .
+  OPTIONAL {
+    ?withdrawal cardano:withdrawalAccount ?account .
+    OPTIONAL { ?account cardano:bytesHex ?accountRaw . }
+  }
+  OPTIONAL { ?withdrawal cardano:lovelace ?lovelace . }
+}
+ORDER BY ?accountRaw ?account ?withdrawal
+`;
+
+const decodedRequiredSignersQuery = `
+PREFIX cardano: <https://lambdasistemi.github.io/cardano-ledger-rdf/vocab/cardano#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+SELECT ?entity ?raw ?resolvedLabel ?resolvedType
+WHERE {
+  ?transaction a cardano:Transaction ;
+    cardano:hasRequiredSigner ?entity .
+  OPTIONAL { ?entity cardano:bytesHex ?raw . }
+  OPTIONAL { ?entity rdfs:label ?resolvedLabel . }
+  OPTIONAL { ?entity a ?resolvedType . }
+}
+ORDER BY ?raw ?entity
 `;
 
 const decodedInputsQuery = `
@@ -625,6 +660,8 @@ const normalizeDecodedTreeRows = (graphTtl) => {
   ];
 
   const bodyFields = queryBindings(graphTtl, decodedBodyFieldsQuery);
+  const withdrawals = queryBindings(graphTtl, decodedWithdrawalsQuery);
+  const requiredSigners = queryBindings(graphTtl, decodedRequiredSignersQuery);
   const inputs = queryBindings(graphTtl, decodedInputsQuery);
   const outputs = queryBindings(graphTtl, decodedOutputsQuery);
   const witnesses = queryBindings(graphTtl, decodedWitnessesQuery);
@@ -799,6 +836,111 @@ const normalizeDecodedTreeRows = (graphTtl) => {
       );
     });
   };
+  const addWithdrawals = () => {
+    if (withdrawals.length === 0) {
+      addNullField("decoded-body", 3, 60, "withdrawals");
+      return;
+    }
+    addContainerField(
+      "decoded-body",
+      3,
+      60,
+      "withdrawals",
+      countText(withdrawals.length, "withdrawal"),
+    );
+    withdrawals.forEach((withdrawal, index) => {
+      const withdrawalId = `decoded-withdrawal-${index}`;
+      addNode({
+        id: withdrawalId,
+        parentId: "decoded-body-withdrawals",
+        depth: 4,
+        order: index,
+        label: `Withdrawal ${index}`,
+        kind: "withdrawal",
+        value: bindingValue(withdrawal.withdrawal),
+        summary: compact(bindingValue(withdrawal.withdrawal)),
+        raw: bindingValue(withdrawal.withdrawal),
+      });
+      const account = bindingValue(withdrawal.account);
+      const accountRaw = bindingValue(withdrawal.accountRaw);
+      appendLeaf(
+        rows,
+        withdrawalId,
+        5,
+        10,
+        "Withdrawal account",
+        "identifier",
+        account,
+        {
+          raw: accountRaw || account,
+          entityIri: account,
+          annotationPredicate: accountRaw === "" ? "" : "cardano:bytesHex",
+          annotationValue: accountRaw,
+        },
+      );
+      appendLeaf(
+        rows,
+        withdrawalId,
+        5,
+        20,
+        "Lovelace",
+        "lovelace",
+        bindingValue(withdrawal.lovelace),
+      );
+    });
+  };
+  const addRequiredSigners = () => {
+    if (requiredSigners.length === 0) {
+      addNullField("decoded-body", 3, 130, "required_signers");
+      return;
+    }
+    if (requiredSigners.length > 1) {
+      addContainerField(
+        "decoded-body",
+        3,
+        130,
+        "required_signers",
+        countText(requiredSigners.length, "signer"),
+      );
+    }
+    requiredSigners.forEach((signer, index) => {
+      const entity = bindingValue(signer.entity);
+      const raw = bindingValue(signer.raw);
+      const value = raw || entity;
+      const resolved = resolvedFrom(
+        labelMatches,
+        bindingValue(signer.resolvedLabel),
+        bindingValue(signer.resolvedType),
+        raw,
+        entity,
+      );
+      addNode({
+        id:
+          requiredSigners.length === 1
+            ? "decoded-body-required-signers"
+            : `decoded-body-required-signers-${index}`,
+        parentId:
+          requiredSigners.length === 1
+            ? "decoded-body"
+            : "decoded-body-required-signers",
+        depth: requiredSigners.length === 1 ? 3 : 4,
+        order: requiredSigners.length === 1 ? 130 : index,
+        label:
+          requiredSigners.length === 1
+            ? "required_signers"
+            : `Required signer ${index}`,
+        kind: "hash",
+        value,
+        summary: compact(value),
+        raw: value,
+        entityIri: entity,
+        resolvedLabel: resolved.resolvedLabel,
+        resolvedType: resolved.resolvedType,
+        annotationPredicate: raw === "" ? "" : "cardano:bytesHex",
+        annotationValue: raw,
+      });
+    });
+  };
 
   addNode({
     id: "decoded-transaction-hash",
@@ -933,16 +1075,16 @@ const normalizeDecodedTreeRows = (graphTtl) => {
     });
     }],
     ["fee", 30, () => addBodyScalar("decoded-body", 3, 30, "fee", "Fee")],
-    ["ttl", 40, () => addNullField("decoded-body", 3, 40, "ttl")],
+    ["ttl", 40, () => addBodyScalar("decoded-body", 3, 40, "ttl", "TTL")],
     ["certs", 50, () => addNullField("decoded-body", 3, 50, "certs")],
-    ["withdrawals", 60, () => addNullField("decoded-body", 3, 60, "withdrawals")],
+    ["withdrawals", 60, addWithdrawals],
     ["update", 70, () => addNullField("decoded-body", 3, 70, "update")],
     ["auxiliary_data_hash", 80, () => addBodyScalar("decoded-body", 3, 80, "auxiliary_data_hash", "Auxiliary data hash")],
     ["validity_start_interval", 90, () => addNullField("decoded-body", 3, 90, "validity_start_interval")],
     ["mint", 100, () => addBodyScalar("decoded-body", 3, 100, "mint", "Mint")],
     ["script_data_hash", 110, () => addBodyScalar("decoded-body", 3, 110, "script_data_hash", "Script data hash")],
     ["collateral", 120, () => addInputGroup("collateral", 120, groupedInputs.collateral, "Collateral")],
-    ["required_signers", 130, () => addNullField("decoded-body", 3, 130, "required_signers")],
+    ["required_signers", 130, addRequiredSigners],
     ["network_id", 140, () => addBodyScalar("decoded-body", 3, 140, "network_id", "Network id")],
     ["collateral_return", 150, () => addBodyScalar("decoded-body", 3, 150, "collateral_return", "Collateral return")],
     ["total_collateral", 160, () => addBodyScalar("decoded-body", 3, 160, "total_collateral", "Total collateral")],

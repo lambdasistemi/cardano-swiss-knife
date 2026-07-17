@@ -36,6 +36,8 @@ const treasuryReorganizeFixturePath = path.join(
 const treasuryOwnerHash =
   "8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1";
 const treasuryOwnerName = "network_compliance scope owner";
+const treasuryWithdrawalAccount =
+  "urn:cardano:id:StakeScript:a64d1b9e1aeffe54056034d84977061b45a92691efc282fbee3fc094";
 const treasuryOutputAddressHex =
   "018bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c14c7889c658ef4f491a34cf79c35a2e0fe6b0d1b0a856fb9580f2d9c3";
 const packagedSiteDir = path.resolve(
@@ -1899,6 +1901,125 @@ test("renders exact Amaru book resolutions across Structure and Witness", async 
 
   await decodeFixtureAt(page, "/inspect", treasuryReorganizeFixturePath);
   const structurePanel = await selectResultTab(page, "Structure");
+  const structureTree = decodedPanel(structurePanel);
+  await expandDecodedStructure(structureTree);
+
+  const bodyPartition = await structureTree.locator("#decoded-body").evaluate((body) => {
+    const depthOf = (row) => {
+      const depthClass = Array.from(row.classList).find((className) =>
+        className.startsWith("decoded-tree-depth-"),
+      );
+      return depthClass ? Number(depthClass.replace("decoded-tree-depth-", "")) : 0;
+    };
+    const labelOf = (row) =>
+      row
+        .querySelector(":scope > .decoded-tree-main > .decoded-tree-line > .decoded-tree-key")
+        ?.textContent?.trim() || "";
+    const parentDepth = depthOf(body);
+    const present = [];
+    const absent = [];
+    const absentOutsideChip = [];
+    let insideAbsentChip = false;
+    let sibling = body.nextElementSibling;
+    while (sibling?.classList.contains("decoded-tree-row")) {
+      const depth = depthOf(sibling);
+      if (depth <= parentDepth) break;
+      if (depth === parentDepth + 1) {
+        if (sibling.classList.contains("decoded-tree-empty-group")) {
+          insideAbsentChip = true;
+        } else if (sibling.classList.contains("decoded-tree-empty-field")) {
+          absent.push(labelOf(sibling));
+          if (!insideAbsentChip) absentOutsideChip.push(labelOf(sibling));
+        } else {
+          present.push(labelOf(sibling));
+          insideAbsentChip = false;
+        }
+      }
+      sibling = sibling.nextElementSibling;
+    }
+    return { present, absent, absentOutsideChip };
+  });
+  const expectedPresentBodyFields = [
+    "inputs",
+    "outputs",
+    "fee",
+    "ttl",
+    "withdrawals",
+    "auxiliary_data_hash",
+    "script_data_hash",
+    "collateral",
+    "required_signers",
+    "collateral_return",
+    "total_collateral",
+    "reference_inputs",
+  ];
+  const expectedAbsentBodyFields = [
+    "certs",
+    "update",
+    "validity_start_interval",
+    "mint",
+    "network_id",
+    "voting_procedures",
+    "voting_proposals",
+    "donation",
+    "current_treasury_value",
+  ];
+  expect(bodyPartition.absentOutsideChip).toEqual([]);
+  expect(bodyPartition.present).toEqual(expectedPresentBodyFields);
+  expect(bodyPartition.absent).toEqual(expectedAbsentBodyFields);
+  const partitionedBodyFields = [
+    ...bodyPartition.present,
+    ...bodyPartition.absent,
+  ];
+  expect(new Set(partitionedBodyFields).size).toBe(conwayBodyFields.length);
+  expect([...partitionedBodyFields].sort()).toEqual(
+    conwayBodyFields.map(({ label }) => label).sort(),
+  );
+
+  const subtreeRows = (row) =>
+    row.evaluate((node) => {
+      const depthOf = (treeRow) => {
+        const depthClass = Array.from(treeRow.classList).find((className) =>
+          className.startsWith("decoded-tree-depth-"),
+        );
+        return depthClass ? Number(depthClass.replace("decoded-tree-depth-", "")) : 0;
+      };
+      const labelOf = (treeRow) =>
+        treeRow
+          .querySelector(":scope > .decoded-tree-main > .decoded-tree-line > .decoded-tree-key")
+          ?.textContent?.trim() || "";
+      const parentDepth = depthOf(node);
+      const renderedRow = (treeRow) => ({
+        label: labelOf(treeRow),
+        text: treeRow.textContent?.trim() || "",
+        subject:
+          treeRow.querySelector(".decoded-tree-subject")?.getAttribute("title") || "",
+        value:
+          treeRow.querySelector(".decoded-tree-value")?.textContent?.trim() || "",
+      });
+      const rows = [renderedRow(node)];
+      let sibling = node.nextElementSibling;
+      while (sibling?.classList.contains("decoded-tree-row")) {
+        if (depthOf(sibling) <= parentDepth) break;
+        rows.push(renderedRow(sibling));
+        sibling = sibling.nextElementSibling;
+      }
+      return rows;
+    });
+
+  await expect(structureTree.locator("#decoded-body-ttl")).toContainText(
+    "192815425",
+  );
+  const withdrawalRows = await subtreeRows(
+    structureTree.locator("#decoded-body-withdrawals"),
+  );
+  expect(
+    withdrawalRows.find(({ label }) => label === "Withdrawal account")?.subject,
+  ).toBe(treasuryWithdrawalAccount);
+  expect(withdrawalRows.find(({ label }) => label === "Lovelace")?.value).toBe("0");
+  await expect(
+    structureTree.locator("#decoded-body-required-signers"),
+  ).toContainText(treasuryOwnerHash);
 
   for (const style of ["A - Quiet", "B - Labeled"]) {
     await structurePanel.getByRole("button", { name: style, exact: true }).click();
@@ -1939,8 +2060,13 @@ test("renders exact Amaru book resolutions across Structure and Witness", async 
     ).toBeVisible();
 
     if (style === "B - Labeled") {
-      await expandDecodedStructure(decodedPanel(structurePanel));
-      const outputResolution = decodedPanel(structurePanel)
+      await expandDecodedStructure(structureTree);
+      const requiredSignerRow = structureTree.locator(
+        "#decoded-body-required-signers",
+      );
+      await expect(requiredSignerRow).toContainText(treasuryOwnerName);
+      await expect(requiredSignerRow).toContainText(treasuryOwnerHash);
+      const outputResolution = structureTree
         .locator(".decoded-tree-resolved-name")
         .filter({ hasText: "operator fuel wallet" });
       await expect(outputResolution).toHaveCount(1);
