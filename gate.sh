@@ -13,8 +13,33 @@ legacy_secret_storage_inventory() {
   )
 }
 
+book_interchange_contract_inventory() {
+  local contract="docs/book-interchange.md"
+  local required
+
+  [[ -f "$contract" ]] || {
+    echo "missing book interchange contract: $contract" >&2
+    return 1
+  }
+
+  for required in \
+    'amaru.book.bundle.v1' \
+    'urn:cardano:id:key:' \
+    'urn:cardano:id:address:' \
+    'overlay:Owner' \
+    'overlay:Address' \
+    'cardano:bech32' \
+    'named:wallets'; do
+    rg -Fq "$required" "$contract" || {
+      echo "book interchange contract missing required term: $required" >&2
+      return 1
+    }
+  done
+}
+
 git diff --check
 legacy_secret_storage_inventory
+book_interchange_contract_inventory
 nix build .#checks.x86_64-linux.test --no-link
 nix run .#ci-check
 nix run .#ci-haskell-quality
