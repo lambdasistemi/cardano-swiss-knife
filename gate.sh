@@ -26,8 +26,10 @@ book_interchange_contract_inventory() {
     'amaru.book.bundle.v1' \
     'urn:cardano:id:key:' \
     'urn:cardano:id:address:' \
+    'urn:cardano:id:script:' \
     'overlay:Owner' \
     'overlay:Address' \
+    'overlay:CardanoScript' \
     'cardano:bech32' \
     'named:wallets'; do
     rg -Fq "$required" "$contract" || {

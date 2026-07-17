@@ -29,12 +29,12 @@ RED before implementation. One slice equals one bisect-safe commit.
 two-part book; malformed input leaves storage unchanged with a visible reason;
 all four paths report successful name/part totals.
 
-- [ ] T003 [US1] Copy the exact 2026-07-17 reproducer unchanged into `docs/inspector/tests/fixtures/attx-book-bundle.json`
-- [ ] T004 [US1] Add RED browser cases for bundle selection/mapping, malformed atomic failure, and every import feedback path in `docs/inspector/tests/tx-identify.spec.mjs`
-- [ ] T005 [US1] Implement strict `amaru.book.bundle.v1` dispatch, typed ignored-key notice, and contract-pinned part/Turtle mapping in `docs/inspector/src/FFI/OverlayBook.js` and `docs/inspector/src/FFI/OverlayBook.purs`
-- [ ] T006 [US1] Add mutually exclusive visible Library success/failure feedback to every import action in `docs/inspector/src/Main.purs`
-- [ ] T007 [US1] Run `nix run .#ci-inspector-playwright` to GREEN and record exact counts in `WIP.md`
-- [ ] T008 [US1] Run `./gate.sh`, commit the reviewed slice with `Tasks: T003, T004, T005, T006, T007, T008`, and record evidence in `WIP.md`
+- [X] T003 [US1] Copy the exact 2026-07-17 reproducer unchanged into `docs/inspector/tests/fixtures/attx-book-bundle.json`
+- [X] T004 [US1] Add RED browser cases for bundle selection/mapping, malformed atomic failure, and every import feedback path in `docs/inspector/tests/tx-identify.spec.mjs`
+- [X] T005 [US1] Implement strict `amaru.book.bundle.v1` dispatch, typed ignored-key notice, and contract-pinned part/Turtle mapping in `docs/inspector/src/FFI/OverlayBook.js` and `docs/inspector/src/FFI/OverlayBook.purs`
+- [X] T006 [US1] Add mutually exclusive visible Library success/failure feedback to every import action in `docs/inspector/src/Main.purs`
+- [X] T007 [US1] Run `nix run .#ci-inspector-playwright` to GREEN and record exact counts in `WIP.md`
+- [X] T008 [US1] Run `./gate.sh`, commit the reviewed slice with `Tasks: T003, T004, T005, T006, T007, T008`, and record evidence in `WIP.md`
 
 **Checkpoint**: Driver commits only after navigator approves RED and GREEN;
 ticket orchestrator independently reviews, stamps all Slice 2 tasks, reruns the
