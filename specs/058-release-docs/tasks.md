@@ -33,7 +33,7 @@
 
 ## Slice E — bare-minimum README
 
-- [ ] T592-SE README-only facts verified present in (or folded into) the
+- [X] T592-SE README-only facts verified present in (or folded into) the
       manual's Architecture/Developer pages
-- [ ] T593-SE README.md reduced to a minimal pointer incl. the Docs tab link
-- [ ] T594-SE `./gate.sh` green; commit `docs: reduce the readme to a pointer`
+- [X] T593-SE README.md reduced to a minimal pointer incl. the Docs tab link
+- [X] T594-SE `./gate.sh` green; commit `fix(docs): fold the readme into the manual` (manual pages changed, per the convention)

@@ -10,6 +10,18 @@ The deployed site is a static bundle:
 
 No server-side application is required for the core product.
 
+## Product and engine
+
+`cardano-swiss-knife` (csk) is the browser product and workbench;
+[cardano-ledger-inspector](https://github.com/lambdasistemi/cardano-ledger-inspector)
+is its ledger engine.
+
+- The workbench consumes the engine through the flake inputs
+  `cardano-ledger-inspector` and `rdf-shapes-wasm`.
+- It invokes `wasm-tx-inspector.wasm` through a JSON control-envelope
+  protocol (`tx_cbor` + `op` + `args` over stdin), keeping ledger operations
+  in the engine rather than browser JavaScript.
+
 ## Core subsystems
 
 ### Browser shell
