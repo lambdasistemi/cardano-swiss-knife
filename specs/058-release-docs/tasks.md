@@ -10,9 +10,9 @@
 
 ## Slice B — user manual page
 
-- [ ] T584-SB `docs/user/versions.md` covers footer meaning, live==release
+- [X] T584-SB `docs/user/versions.md` covers footer meaning, live==release
       invariant, changelog reading, verification; nav entry added
-- [ ] T585-SB `./gate.sh` green; commit `fix(docs): add the versions and releases user manual`
+- [X] T585-SB `./gate.sh` green; commit `fix(docs): add the versions and releases user manual`
 
 ## Slice C — developer reference + architecture dataflow
 

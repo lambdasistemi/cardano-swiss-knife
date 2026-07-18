@@ -57,6 +57,7 @@ nav:
       - Storage and Secrets: architecture/storage.md
   - User Manual:
       - Usage: user/usage.md
+      - Versions and releases: user/versions.md
   - Developer:
       - Workflows: dev/workflows.md
       - Releasing: dev/releasing.md
