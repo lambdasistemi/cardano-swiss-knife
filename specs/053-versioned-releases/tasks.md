@@ -2,14 +2,14 @@
 
 ## Slice A — release-please pipeline
 
-- [ ] T531-SA `release-please-config.json` (node, bump-minor-pre-major,
+- [X] T531-SA `release-please-config.json` (node, bump-minor-pre-major,
       bump-patch-for-minor-pre-major, bootstrap-sha=13100d8) +
       `.release-please-manifest.json` `{".": "0.0.0"}` exist and are valid JSON
-- [ ] T532-SA `package.json` carries `"version": "0.0.0"`
-- [ ] T533-SA `.github/workflows/release.yml` runs release-please-action@v4 on
+- [X] T532-SA `package.json` carries `"version": "0.0.0"`
+- [X] T533-SA `.github/workflows/release.yml` runs release-please-action@v4 on
       `push: main` + `workflow_dispatch`, token minted from
       `vars.CI_APP_ID`/`secrets.CI_APP_PRIVATE_KEY`; actionlint + YAML parse green
-- [ ] T534-SA `./gate.sh` green; commit `feat: add release-please pipeline`
+- [X] T534-SA `./gate.sh` green; commit `feat: add release-please pipeline`
 
 ## Slice B — release-gated Pages deploy + docs
 
