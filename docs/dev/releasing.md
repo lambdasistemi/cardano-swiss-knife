@@ -25,6 +25,14 @@ The footer of the live site shows the released version. That version comes
 from the tag the current deployment was built from, so it always matches
 what's on GitHub Releases.
 
+## Repository settings
+
+The `github-pages` environment must allow deployments from `v*` tags
+(Settings → Environments → github-pages → deployment branch and tag rules).
+Without that rule the tag-triggered deploy job is rejected by environment
+protection before any step runs — the build job succeeds and the deploy job
+fails with no failed steps. The `v0.1.0` deploy hit exactly this.
+
 ## Emergency redeploy
 
 If Pages needs to be rebuilt without cutting a release (a hotfix to the
