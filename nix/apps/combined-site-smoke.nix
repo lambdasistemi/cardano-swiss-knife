@@ -113,6 +113,7 @@ let
         "/keys"
         "/scripts"
         "/vault"
+        "/manual"
         "/inspector/"
         "/inspector/inspect"
         "/inspector/settings"
@@ -121,6 +122,7 @@ let
         "/inspector/keys"
         "/inspector/scripts"
         "/inspector/vault"
+        "/inspector/manual"
       )
       expected_files=(
         "$site/index.html"
@@ -131,6 +133,7 @@ let
         "$site/keys/index.html"
         "$site/scripts/index.html"
         "$site/vault/index.html"
+        "$site/manual/index.html"
         "$site/inspector/index.html"
         "$site/inspector/inspect/index.html"
         "$site/inspector/settings/index.html"
@@ -139,6 +142,7 @@ let
         "$site/inspector/keys/index.html"
         "$site/inspector/scripts/index.html"
         "$site/inspector/vault/index.html"
+        "$site/inspector/manual/index.html"
       )
 
       for index in "''${!routes[@]}"; do

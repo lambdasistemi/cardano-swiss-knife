@@ -51,6 +51,7 @@ topbar active opts =
             , navLink opts.basePath RouteScripts active "Scripts" opts.onNavigate
             , navLink opts.basePath RouteVault active "Vault" opts.onNavigate
             , navLink opts.basePath RouteLibrary active "Library" opts.onNavigate
+            , navLink opts.basePath RouteManual active "Docs" opts.onNavigate
             , navLink opts.basePath RouteSettings active "Settings" opts.onNavigate
             ]
         , HH.element (HH.ElemName "md-icon-button")
@@ -110,7 +111,7 @@ siteFooter =
     [ classNames [ "page-frame", "site-footer" ] ]
     [ HH.div
         [ classNames [ "site-footer-links" ] ]
-        [ extLink "https://lambdasistemi.github.io/cardano-ledger-inspector/" "Docs"
+        [ extLink "https://lambdasistemi.github.io/cardano-swiss-knife/docs/" "Docs"
         , HH.text " "
         , extLink "https://github.com/lambdasistemi/cardano-swiss-knife" "Source"
         , HH.text " "

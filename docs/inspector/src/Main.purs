@@ -589,6 +589,7 @@ inspectorComponent initial =
               RouteVault -> renderVault state
               RouteSettings -> renderSettings state
               RouteLibrary -> renderLibrary state
+              RouteManual -> renderManual state
           ]
       , Shell.siteFooter
       ]
@@ -1593,6 +1594,13 @@ inspectorComponent initial =
             , renderLibraryBooks state
             ]
         ]
+
+  renderManual state =
+    HH.iframe
+      [ HP.src (state.routeBase <> "docs/")
+      , HP.title "Workbench manual"
+      , classNames [ "manual-frame" ]
+      ]
 
   renderLibraryImport state =
     HH.element (HH.ElemName "md-elevated-card")

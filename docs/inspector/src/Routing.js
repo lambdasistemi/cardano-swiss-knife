@@ -8,6 +8,7 @@ const routeNames = new Set([
   "keys",
   "scripts",
   "vault",
+  "manual",
 ]);
 
 const cleanSegments = (pathname) => pathname.split("/").filter(Boolean);

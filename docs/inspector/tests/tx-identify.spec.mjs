@@ -2124,13 +2124,17 @@ test("MD3 shell routes topbar nav and theme toggle", async ({ page }) => {
   await expect(navigation.getByRole("link", { name: "Workbench" })).toBeVisible();
   await expect(navigation.getByRole("link", { name: "Settings" })).toBeVisible();
   await expect(navigation.getByRole("link", { name: "Library" })).toBeVisible();
+  await expect(navigation.getByRole("link", { name: "Docs" })).toHaveAttribute(
+    "href",
+    /\/manual$/,
+  );
   await expect(page.getByRole("tab", { name: "Paste CBOR" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Decode" })).toBeVisible();
 
   const footer = page.getByRole("contentinfo");
   await expect(footer.getByRole("link", { name: "Docs" })).toHaveAttribute(
     "href",
-    "https://lambdasistemi.github.io/cardano-ledger-inspector/",
+    "https://lambdasistemi.github.io/cardano-swiss-knife/docs/",
   );
   await expect(footer.getByRole("link", { name: "Source" })).toHaveAttribute(
     "href",
@@ -2178,6 +2182,12 @@ test("MD3 shell routes topbar nav and theme toggle", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Library" })).toBeVisible();
   await expect(page.locator(".library-page")).toBeVisible();
   await expect(page.getByText("Library placeholder", { exact: true })).toHaveCount(0);
+
+  await navigation.getByRole("link", { name: "Docs" }).click();
+  await expect(page).toHaveURL(/\/manual$/);
+  const manualFrame = page.locator('iframe[title="Workbench manual"]');
+  await expect(manualFrame).toBeVisible();
+  await expect(manualFrame).toHaveAttribute("src", /docs\/$/);
 });
 
 test("MD3 shell keeps route navigation inside deployed subpaths", async ({

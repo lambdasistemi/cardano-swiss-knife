@@ -3984,3 +3984,9 @@ md-filled-tonal-button.example-valid {
   margin-left: 0.5rem;
   overflow-wrap: anywhere;
 }
+
+.manual-frame {
+  width: 100%;
+  min-height: 75vh;
+  border: 0;
+}

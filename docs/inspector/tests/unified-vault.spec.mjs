@@ -215,6 +215,7 @@ test("vault direct entry creates, opens, exports, locks, and reimports the legac
     "Scripts",
     "Vault",
     "Library",
+    "Docs",
     "Settings",
   ]);
 

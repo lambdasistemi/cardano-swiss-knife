@@ -70,6 +70,7 @@ test("unified publication exposes the exact primary navigation at canonical and 
     "Scripts",
     "Vault",
     "Library",
+    "Docs",
     "Settings",
   ];
   const entries = [
