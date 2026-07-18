@@ -43,9 +43,24 @@ explaining what the footer version means and how to verify what is live.
   release default, flake ignoring untracked files).
 - FR4: `docs/architecture/release-flow.md` with a mermaid dataflow:
   commit → release PR → tag → Pages deploy → footer version.
-- FR5: The SPA footer "Docs" link targets the workbench manual
-  (https://lambdasistemi.github.io/cardano-swiss-knife/docs/); the UX suite
-  asserts the new href.
+- FR5: The workbench topbar gains a "Docs" tab — SPA route `/manual`
+  rendering the same-origin manual (`basePath <> "docs/"`) in the content
+  area via an iframe, keeping the app shell visible. The route cannot be
+  `/docs`: that path is where the mkdocs artifact lives on Pages. The footer
+  "Docs" link also retargets from the engine docs to the manual. The UX
+  suite asserts the tab, the iframe src, and the footer href. The iframe
+  target only resolves on the assembled Pages site (the UI derivation does
+  not contain the mkdocs output), so tests assert presence and src, not
+  loaded content.
+
+- FR6: README reduced to a bare-minimum pointer: project name, one-sentence
+  description, live app link, Docs tab link
+  (https://lambdasistemi.github.io/cardano-swiss-knife/manual), engine repo
+  link. Before cutting, any README-only fact (engine coupling via flake
+  inputs, signing-flow stance, local dev commands) is verified present in —
+  or folded into — the manual's Architecture/Developer pages.
+- FR7 (verified already satisfied): the webapp footer "Source" link targets
+  the repository and stays asserted (tx-identify.spec.mjs:2135).
 
 ## Success criteria
 
