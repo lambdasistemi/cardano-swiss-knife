@@ -34,10 +34,28 @@ the versions and releases user manual`.
 `docs/dev/releasing.md` full expansion per FR3; `docs/architecture/release-flow.md`
 mermaid dataflow + nav. Commit: `fix(docs): expand the releasing reference`.
 
-### Slice D — footer Docs link + UX assertion
+### Slice D — Docs tab in the UI
 
-Shell.purs href → workbench manual; tx-identify.spec.mjs assertion updated.
-Commit: `fix: point the footer docs link at the workbench manual`.
+`Routing.purs`: `RouteManual` (path `manual`, currentRoute case).
+`Shell.purs`: topbar navLink "Docs" (between Library and Settings) + footer
+Docs extLink retargeted to the manual. `Main.purs`: `RouteManual ->
+renderManual state` — an iframe (`HP.src (state.routeBase <> "docs/")`,
+class `manual-frame`, title "Workbench manual"); `dist/styles.css` gains a
+full-height borderless rule for `.manual-frame`. `nix/wasm-ui.nix`: add
+`manual` to the route fallback loop; extend any other route enumerations
+(combined-site smoke, route-count smoke) found by grepping `for route in` /
+route lists. Playwright: MD3-shell test asserts the Docs tab, navigates,
+asserts the iframe src suffix `docs/`, and the updated footer href; update
+any nav-link count/enumeration assertions. Commit: `feat: add a docs tab to
+the workbench`.
+
+### Slice E — bare-minimum README
+
+Diff README content against the manual pages; fold missing facts into
+`docs/architecture/system.md` / `docs/dev/workflows.md`; rewrite README.md
+to ~12 lines (name, one-liner, live app, Docs tab `/manual`, engine repo).
+README is repo-internal → commit `docs: reduce the readme to a pointer`
+(rides along with the release the feat/fix commits cut).
 
 ## Post-merge operational step (part of acceptance)
 
