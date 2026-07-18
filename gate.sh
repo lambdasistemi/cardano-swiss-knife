@@ -115,11 +115,38 @@ provider_validation_truth_inventory() {
   fi
 }
 
+product_branding_inventory() {
+  local shell="docs/inspector/src/Shell.purs"
+  local journey="docs/inspector/tests/tx-identify.spec.mjs"
+  local required
+
+  for required in \
+    'Cardano Swiss Knife' \
+    'https://github.com/lambdasistemi/cardano-swiss-knife' \
+    'https://github.com/lambdasistemi/cardano-ledger-inspector'; do
+    rg -Fq "$required" "$shell" || {
+      echo "product branding is missing required text or link: $required" >&2
+      return 1
+    }
+  done
+
+  if rg -Fq 'Ledger Inspector' "$shell"; then
+    echo "legacy product brand remains in the site shell" >&2
+    return 1
+  fi
+
+  rg -Fq 'Cardano Swiss Knife' "$journey" || {
+    echo "Playwright branding assertion is missing" >&2
+    return 1
+  }
+}
+
 git diff --check
 legacy_secret_storage_inventory
 book_interchange_contract_inventory
 rendered_resolution_journey_inventory
 provider_validation_truth_inventory
+product_branding_inventory
 nix build .#checks.x86_64-linux.test --no-link
 nix run .#ci-check
 nix run .#ci-haskell-quality

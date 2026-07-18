@@ -615,6 +615,7 @@ md-icon-button {
 
 .topbar-theme {
   width: 32px;
+  overflow: hidden;
   border-color: var(--border);
   background: var(--surface);
   padding: 0;

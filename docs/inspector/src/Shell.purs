@@ -37,7 +37,7 @@ topbar active opts =
         [ classNames [ "page-frame", "topbar" ] ]
         [ HH.div
             [ classNames [ "brand" ] ]
-            [ HH.strong_ [ HH.text "Ledger Inspector" ]
+            [ HH.strong_ [ HH.text "Cardano Swiss Knife" ]
             , HH.span_ [ HH.text "Cardano transaction inspector" ]
             ]
         , HH.nav
@@ -110,7 +110,10 @@ siteFooter =
     [ HH.div
         [ classNames [ "site-footer-links" ] ]
         [ extLink "https://lambdasistemi.github.io/cardano-ledger-inspector/" "Docs"
-        , extLink "https://github.com/lambdasistemi/cardano-ledger-inspector" "Source"
+        , HH.text " "
+        , extLink "https://github.com/lambdasistemi/cardano-swiss-knife" "Source"
+        , HH.text " "
+        , extLink "https://github.com/lambdasistemi/cardano-ledger-inspector" "Engine"
         ]
     , HH.div_
         [ HH.text "Browser-based Cardano transaction inspection with explicit chain-data context." ]
