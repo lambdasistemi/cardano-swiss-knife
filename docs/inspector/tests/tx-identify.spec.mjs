@@ -1090,7 +1090,7 @@ async function expectCQuisitorInspectSurface(page, route, testInfo, captureEvide
     await decodeFixtureAt(page, route, conwayMainnetFixturePath);
 
     const topbar = page.getByRole("banner");
-    await expect(topbar.getByText("Ledger Inspector", { exact: true })).toBeVisible();
+    await expect(topbar.getByText("Cardano Swiss Knife", { exact: true })).toBeVisible();
     await expect(topbar.getByRole("navigation").getByRole("link", { name: "Workbench" })).toHaveAttribute(
       "aria-current",
       "page",
@@ -2118,13 +2118,27 @@ test("MD3 shell routes topbar nav and theme toggle", async ({ page }) => {
   expect(indexHtml).toContain("Roboto+Mono");
 
   await expect(
-    topbar.getByText("Ledger Inspector", { exact: true }),
+    topbar.getByText("Cardano Swiss Knife", { exact: true }),
   ).toBeVisible();
   await expect(navigation.getByRole("link", { name: "Workbench" })).toBeVisible();
   await expect(navigation.getByRole("link", { name: "Settings" })).toBeVisible();
   await expect(navigation.getByRole("link", { name: "Library" })).toBeVisible();
   await expect(page.getByRole("tab", { name: "Paste CBOR" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Decode" })).toBeVisible();
+
+  const footer = page.getByRole("contentinfo");
+  await expect(footer.getByRole("link", { name: "Docs" })).toHaveAttribute(
+    "href",
+    "https://lambdasistemi.github.io/cardano-ledger-inspector/",
+  );
+  await expect(footer.getByRole("link", { name: "Source" })).toHaveAttribute(
+    "href",
+    "https://github.com/lambdasistemi/cardano-swiss-knife",
+  );
+  await expect(footer.getByRole("link", { name: "Engine" })).toHaveAttribute(
+    "href",
+    "https://github.com/lambdasistemi/cardano-ledger-inspector",
+  );
 
   const initialTheme = await page.evaluate(
     () => document.documentElement.dataset.theme,
