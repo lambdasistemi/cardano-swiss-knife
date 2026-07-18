@@ -22,9 +22,9 @@
 
 ## Slice C — footer version + title rebrand + UX check
 
-- [ ] T538-SC footer renders the embedded version; dev builds show a dev label;
+- [X] T538-SC footer renders the embedded version; dev builds show a dev label;
       nix build substitutes the real `package.json` version
-- [ ] T539-SC `<title>` reads "Cardano Swiss Knife" in the served shell
-- [ ] T540-SC UX spec asserts footer version == `package.json` version and
+- [X] T539-SC `<title>` reads "Cardano Swiss Knife" in the served shell
+- [X] T540-SC UX spec asserts footer version == `package.json` version and
       `document.title` == "Cardano Swiss Knife"
-- [ ] T541-SC `./gate.sh` green; commit `feat: surface the released version in the footer`
+- [X] T541-SC `./gate.sh` green; commit `feat: surface the released version in the footer`

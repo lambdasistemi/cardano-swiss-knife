@@ -2106,6 +2106,7 @@ test("renders exact Amaru book resolutions across Structure and Witness", async 
 
 test("MD3 shell routes topbar nav and theme toggle", async ({ page }) => {
   await page.goto("/inspect");
+  await expect(page).toHaveTitle("Cardano Swiss Knife");
 
   const topbar = page.getByRole("banner");
   const navigation = topbar.getByRole("navigation");
@@ -2139,6 +2140,16 @@ test("MD3 shell routes topbar nav and theme toggle", async ({ page }) => {
     "href",
     "https://github.com/lambdasistemi/cardano-ledger-inspector",
   );
+
+  const pkg = JSON.parse(
+    await readFile(path.join(repoRoot, "package.json"), "utf8"),
+  );
+  const footerVersion = footer.locator(".site-footer-version");
+  if (process.env.TX_INSPECTOR_SITE_DIR) {
+    await expect(footerVersion).toHaveText(`Cardano Swiss Knife v${pkg.version}`);
+  } else {
+    await expect(footerVersion).toHaveText(/^Cardano Swiss Knife (v\d+\.\d+\.\d+|dev)$/);
+  }
 
   const initialTheme = await page.evaluate(
     () => document.documentElement.dataset.theme,

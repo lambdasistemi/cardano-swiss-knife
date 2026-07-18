@@ -29,6 +29,8 @@
 }:
 
 let
+  version = (builtins.fromJSON (builtins.readFile ../package.json)).version;
+
   pkgs = import nixpkgs {
     inherit system;
     overlays = [
@@ -133,6 +135,9 @@ pkgs.mkSpagoDerivation {
     cat dist/deps.js dist/index.js > dist/bundle.js
     mv dist/bundle.js dist/index.js
     rm dist/deps.js
+
+    # Stamp the release version into the bundle (dev builds keep the placeholder)
+    sed -i "s/__CSK_VERSION__/${version}/g" dist/index.js
   '';
 
   installPhase = ''
