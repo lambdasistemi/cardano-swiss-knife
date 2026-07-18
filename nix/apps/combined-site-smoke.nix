@@ -36,13 +36,13 @@ let
       test -f "$site/index.js"
       test -f "$site/material.js"
       test -f "$site/styles.css"
-      grep -q '<title>Cardano transaction inspector</title>' "$site/index.html"
+      grep -q '<title>Cardano Swiss Knife</title>' "$site/index.html"
 
       test -f "$site/inspector/index.html"
       test -f "$site/inspector/index.js"
       test -f "$site/inspector/material.js"
       test -f "$site/inspector/styles.css"
-      grep -q '<title>Cardano transaction inspector</title>' "$site/inspector/index.html"
+      grep -q '<title>Cardano Swiss Knife</title>' "$site/inspector/index.html"
 
       shopt -s nullglob
       address_wasm=("$site"/cardano-addresses.*.wasm)

@@ -20,6 +20,7 @@ import Web.UIEvent.MouseEvent (MouseEvent)
 
 import Routing (Route(..), routePath)
 import Theme as Theme
+import Version (versionLabel)
 
 topbar
   :: forall w i
@@ -117,6 +118,9 @@ siteFooter =
         ]
     , HH.div_
         [ HH.text "Browser-based Cardano transaction inspection with explicit chain-data context." ]
+    , HH.div
+        [ classNames [ "site-footer-version" ] ]
+        [ HH.text ("Cardano Swiss Knife " <> versionLabel) ]
     ]
   where
   extLink href label =

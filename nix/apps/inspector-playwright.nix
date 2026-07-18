@@ -19,6 +19,7 @@ let
 
       mkdir -p "$work_tree/docs"
       cp -R ${repoRoot}/docs/inspector "$work_tree/docs/inspector"
+      cp ${repoRoot}/package.json "$work_tree/package.json"
       chmod -R u+w "$work_tree"
 
       mkdir -p "$work_tree/specs/001-ledger-functional-layer"
