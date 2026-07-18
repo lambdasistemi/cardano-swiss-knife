@@ -55,6 +55,7 @@ nav:
   - Architecture:
       - System: architecture/system.md
       - Storage and Secrets: architecture/storage.md
+      - Release flow: architecture/release-flow.md
   - User Manual:
       - Usage: user/usage.md
       - Versions and releases: user/versions.md
