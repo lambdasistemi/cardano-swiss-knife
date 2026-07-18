@@ -16,10 +16,10 @@
 
 ## Slice C — developer reference + architecture dataflow
 
-- [ ] T586-SC `docs/dev/releasing.md` covers pipeline anatomy, stamping
+- [X] T586-SC `docs/dev/releasing.md` covers pipeline anatomy, stamping
       internals, operations runbook, troubleshooting signatures
-- [ ] T587-SC `docs/architecture/release-flow.md` mermaid dataflow + nav
-- [ ] T588-SC `./gate.sh` green; commit `fix(docs): expand the releasing reference`
+- [X] T587-SC `docs/architecture/release-flow.md` mermaid dataflow + nav
+- [X] T588-SC `./gate.sh` green; commit `fix(docs): expand the releasing reference`
 
 ## Slice D — Docs tab in the UI
 
