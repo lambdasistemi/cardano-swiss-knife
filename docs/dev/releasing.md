@@ -37,3 +37,9 @@ creating a release.
 Compare the version shown in the live footer against
 [the latest release](https://github.com/lambdasistemi/cardano-swiss-knife/releases/latest).
 They should always match.
+
+## Initial version
+
+The first release was pinned to `0.1.0` with a `Release-As: 0.1.0` commit
+footer — without it, release-please defaults an unreleased repository's first
+release to `1.0.0`.
