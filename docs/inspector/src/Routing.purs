@@ -18,6 +18,7 @@ data Route
   | RouteVault
   | RouteSettings
   | RouteLibrary
+  | RouteManual
 
 derive instance eqRoute :: Eq Route
 
@@ -30,6 +31,7 @@ routePath = case _ of
   RouteVault -> "vault"
   RouteSettings -> "settings"
   RouteLibrary -> "library"
+  RouteManual -> "manual"
 
 currentRoute :: Effect Route
 currentRoute = do
@@ -41,6 +43,7 @@ currentRoute = do
     "keys" -> RouteKeys
     "scripts" -> RouteScripts
     "vault" -> RouteVault
+    "manual" -> RouteManual
     _ -> RouteInspect
 
 currentBasePath :: Effect String

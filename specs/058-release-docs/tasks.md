@@ -23,13 +23,13 @@
 
 ## Slice D — Docs tab in the UI
 
-- [ ] T589-SD RouteManual exists (Routing.purs path `manual`); topbar shows a
+- [X] T589-SD RouteManual exists (Routing.purs path `manual`); topbar shows a
       "Docs" tab; `/manual` renders the manual iframe (`routeBase <> "docs/"`);
       footer Docs href = workbench manual; `manual` added to every route
       enumeration (wasm-ui fallback loop, smokes)
-- [ ] T590-SD Playwright asserts the Docs tab, the iframe src, the footer
+- [X] T590-SD Playwright asserts the Docs tab, the iframe src, the footer
       href; nav-count assertions updated
-- [ ] T591-SD `./gate.sh` green; commit `feat: add a docs tab to the workbench`
+- [X] T591-SD `./gate.sh` green; commit `feat: add a docs tab to the workbench`
 
 ## Slice E — bare-minimum README
 

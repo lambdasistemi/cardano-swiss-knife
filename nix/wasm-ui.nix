@@ -148,7 +148,7 @@ pkgs.mkSpagoDerivation {
     cp dist/material.js $out/
     cp dist/*.wasm $out/
 
-    for route in inspect settings library addresses keys scripts vault; do
+    for route in inspect settings library addresses keys scripts vault manual; do
       mkdir -p "$out/$route"
       sed \
         -e 's#href="./styles.css"#href="../styles.css"#' \

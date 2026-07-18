@@ -200,6 +200,7 @@ test("keys is reachable in the exact partial navigation without mobile overflow"
     "Scripts",
     "Vault",
     "Library",
+    "Docs",
     "Settings",
   ]);
   await navigation.getByRole("link", { name: "Keys", exact: true }).click();
