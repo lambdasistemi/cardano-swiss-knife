@@ -19,6 +19,29 @@ The tag push triggers the Pages workflow, which builds and deploys from the
 tagged tree. The live site is always exactly the latest release — never an
 untagged commit on `main`.
 
+## Docs releases
+
+Docs are part of the released site: nothing under `docs/` reaches the live
+site until it ships in a tagged release. A docs-only change that never bumps
+the version never goes live, no matter how correct it is.
+
+release-please has no configuration option that releases on `docs:`
+commits — checked against its config schema, not assumed. Its releasable
+types are fixed to `fix`/`feat`/`perf`/`revert` (plus breaking changes);
+`docs:` alone never triggers a version bump or release PR update, whatever
+`changelog-sections` says.
+
+So the convention: a docs change that affects the shipped site is committed
+as `fix(docs): …`, which release-please treats as a patch bump and pulls
+into the release PR. Repo-internal docs — README, `specs/`, `.worker`
+briefs, anything that never ships to the site — stay plain `docs:` and ride
+along with the next release that a `fix`/`feat` commit triggers.
+
+`docs:` commits (of either kind) now render in the changelog under their own
+"Documentation" section, so shipped-docs and repo-internal docs work are
+both visible in `CHANGELOG.md` — only the `fix(docs)` ones actually cut a
+release.
+
 ## Version on the live site
 
 The footer of the live site shows the released version. That version comes
