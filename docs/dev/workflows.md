@@ -1,5 +1,21 @@
 # Developer Workflows
 
+## Local development
+
+```bash
+nix develop
+npm install
+just build
+just bundle
+just build-docs
+just assemble-site
+just test
+```
+
+Local browser testing needs both WASM artifacts available under `dist/wasm/`. The Nix `web-dist` package assembles them automatically.
+
+`just assemble-site` produces a writable `site-root/` directory with the app at `/` and the MkDocs manual under `/docs/`.
+
 ## CI shape
 
 The main CI workflow validates:
