@@ -13,11 +13,11 @@
 
 ## Slice B — release-gated Pages deploy + docs
 
-- [ ] T535-SB `pages.yml` triggers are exactly `push: tags: ["v*"]` +
+- [X] T535-SB `pages.yml` triggers are exactly `push: tags: ["v*"]` +
       `workflow_dispatch`; no `push: branches` trigger remains; actionlint green
-- [ ] T536-SB mkdocs "Releasing" page documents: merge release PR → tag →
+- [X] T536-SB mkdocs "Releasing" page documents: merge release PR → tag →
       Pages deploy from tag; manual dispatch fallback; how to verify what is live
-- [ ] T537-SB `./gate.sh` green (incl. mkdocs build); commit
+- [X] T537-SB `./gate.sh` green (incl. mkdocs build); commit
       `feat: deploy pages from release tags`
 
 ## Slice C — footer version + title rebrand + UX check

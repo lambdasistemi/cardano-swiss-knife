@@ -59,3 +59,4 @@ nav:
       - Usage: user/usage.md
   - Developer:
       - Workflows: dev/workflows.md
+      - Releasing: dev/releasing.md
