@@ -141,39 +141,56 @@ product_branding_inventory() {
   }
 }
 
-address_label_view_foundation_inventory() {
+address_label_view_inventory() {
   local ui="docs/inspector/src/Main.purs"
   local journey="docs/inspector/tests/tx-identify.spec.mjs"
   local required
 
   for required in \
     'renderDecodedTreeAnnotationAction' \
+    'decodedRowHasAddressIdentity' \
+    'row.annotationPredicate == "cardano:bech32"' \
     'row.annotationValue' \
+    'decoded-tree-address-value' \
+    'Copy address' \
+    'decoded-tree-raw-value' \
+    'Copy raw value' \
+    'decoded-tree-annotation-target' \
+    'Address to label' \
     'Label this node'; do
     rg -Fq "$required" "$ui" || {
-      echo "decoded-tree address-label foundation missing UI anchor: $required" >&2
+      echo "decoded-tree address-label view missing UI anchor: $required" >&2
       return 1
     }
   done
 
   for required in \
     'resolves decoded-tree address rows from selected Turtle overlay books' \
+    'labels decoded-tree nodes into local books and resolves immediately' \
     'cardano:bech32' \
+    'cardano:bech32 "${addressBech32}"' \
+    'decodedRowRawText(addressRow)' \
+    'decoded-tree-address-value' \
+    'decoded-tree-annotation-target' \
+    'Address to label' \
+    'Copy address' \
+    'Copy raw value' \
     'Label this node'; do
     rg -Fq "$required" "$journey" || {
-      echo "decoded-tree address-label foundation missing browser anchor: $required" >&2
+      echo "decoded-tree address-label view missing browser anchor: $required" >&2
       return 1
     }
   done
 }
 
 git diff --check
+git diff --check origin/main...HEAD
 legacy_secret_storage_inventory
 book_interchange_contract_inventory
 rendered_resolution_journey_inventory
 provider_validation_truth_inventory
 product_branding_inventory
-address_label_view_foundation_inventory
+address_label_view_inventory
 nix build .#checks.x86_64-linux.test --no-link
 nix run .#ci-check
 nix run .#ci-haskell-quality
