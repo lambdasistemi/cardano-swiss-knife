@@ -2371,6 +2371,7 @@ inspectorComponent initial =
       hasChildren = decodedTreeHasChildren rows row
       expanded = row.parentId == "" || Array.elem row.id state.decodedTreeExpanded
       isNull = row.kind == "null" && not hasChildren
+      hasAddressIdentity = decodedRowHasAddressIdentity row
       resolvedName = decodedRowResolvedName state row
       isResolved = resolvedName /= ""
       rowClasses =
@@ -2394,10 +2395,14 @@ inspectorComponent initial =
             )
       valueText = decodedTreeValueText row
       rawText = decodedTreeRawText row
-      showScalarCopy = not hasChildren && not isResolved && not isNull && decodedTreeCanCopy row
+      showScalarCopy = not hasChildren && (not isResolved || hasAddressIdentity) && not isNull && decodedTreeCanCopy row
       trailingActions =
         ( if showScalarCopy then
-            [ renderDecodedCopyIcon row.id rawText "Copy value" ]
+            [ renderDecodedCopyIcon
+                row.id
+                (if hasAddressIdentity then row.annotationValue else rawText)
+                (if hasAddressIdentity then "Copy address" else "Copy value")
+            ]
           else
             []
         )
@@ -2438,6 +2443,30 @@ inspectorComponent initial =
                                 [ classNames [ "li-chip", "decoded-tree-count" ] ]
                                 [ HH.text (show (decodedTreeChildCount rows row.id)) ]
                             ]
+                          else if hasAddressIdentity then
+                            [ HH.span
+                                [ classNames [ "decoded-tree-value", "decoded-tree-address-value" ]
+                                , HP.title row.annotationValue
+                                ]
+                                [ HH.text row.annotationValue ]
+                            ]
+                              <> ( if isResolved then
+                                    [ HH.span
+                                        [ classNames [ "decoded-tree-resolved-name" ] ]
+                                        [ HH.element (HH.ElemName "md-icon")
+                                            [ classNames [ "decoded-tree-kind-icon" ] ]
+                                            [ HH.text (decodedTreeKindIcon row) ]
+                                        , HH.text resolvedName
+                                        ]
+                                    , HH.span
+                                        [ classNames [ "li-chip", "decoded-tree-book-chip" ] ]
+                                        [ HH.element (HH.ElemName "md-icon") [] [ HH.text "menu_book" ]
+                                        , HH.text (decodedResolutionSourceLabel state)
+                                        ]
+                                    ]
+                                  else
+                                    []
+                                 )
                           else if isResolved then
                             [ HH.span
                                 [ classNames [ "decoded-tree-resolved-name" ] ]
@@ -2469,7 +2498,7 @@ inspectorComponent initial =
                             [ HH.text row.kind ]
                          ]
                   )
-              , if isResolved then
+              , if isResolved || hasAddressIdentity then
                   HH.div
                     [ classNames [ "decoded-tree-raw-line" ] ]
                     [ HH.span
@@ -2603,6 +2632,11 @@ inspectorComponent initial =
       || row.kind == "key"
       || row.kind == "signature"
       || row.annotationValue /= ""
+
+  decodedRowHasAddressIdentity row =
+    row.kind == "address"
+      && row.annotationPredicate == "cardano:bech32"
+      && row.annotationValue /= ""
 
   decodedTreeKindIcon row =
     if row.kind == "address" then "account_balance"
@@ -2896,7 +2930,17 @@ inspectorComponent initial =
     in
       HH.div
         [ classNames [ "decoded-tree-annotation-form" ] ]
-        [ HH.label
+        [ if decodedRowHasAddressIdentity row then
+            HH.div
+              [ classNames [ "decoded-tree-annotation-target" ] ]
+              [ HH.span
+                  [ classNames [ "field-label" ] ]
+                  [ HH.text "Address to label" ]
+              , HH.code_ [ HH.text row.annotationValue ]
+              ]
+          else
+            HH.text ""
+        , HH.label
             [ classNames [ "field-stack" ] ]
             [ HH.span
                 [ classNames [ "field-label" ] ]

@@ -13,10 +13,10 @@ identity as secondary evidence.
 and verify address display/edit context, secondary identity, saved
 `cardano:bech32` Turtle, immediate resolution, export, and clean-context reload.
 
-- [ ] T611 [US1] Add failing address-first display/edit assertions to the known-address annotation journey in `docs/inspector/tests/tx-identify.spec.mjs`.
-- [ ] T612 [US1] Render the reusable address as primary identity and preserve the raw/credential identity in `docs/inspector/src/Main.purs`.
-- [ ] T613 [US1] Complete browser proof for address-bound save, immediate resolution, export, and reload in `docs/inspector/tests/tx-identify.spec.mjs`.
-- [ ] T614 [US1] Run `nix run .#ci-inspector-playwright` and `./gate.sh`, then commit the bisect-safe slice with the required task trailer.
+- [X] T611 [US1] Add failing address-first display/edit assertions to the known-address annotation journey in `docs/inspector/tests/tx-identify.spec.mjs`.
+- [X] T612 [US1] Render the reusable address as primary identity and preserve the raw/credential identity in `docs/inspector/src/Main.purs`.
+- [X] T613 [US1] Complete browser proof for address-bound save, immediate resolution, export, and reload in `docs/inspector/tests/tx-identify.spec.mjs`.
+- [X] T614 [US1] Run `nix run .#ci-inspector-playwright` and `./gate.sh`, then commit the bisect-safe slice with the required task trailer.
 
 ## Dependencies & Execution Order
 
