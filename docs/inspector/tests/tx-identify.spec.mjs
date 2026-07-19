@@ -3130,7 +3130,7 @@ test("resolves decoded-tree address rows from selected Turtle overlay books", as
     .first();
   await expect(addressRow).toBeVisible();
 
-  const rawAddress = await decodedRowText(addressRow);
+  const rawAddress = await decodedRowRawText(addressRow);
   expect(rawAddress).toMatch(/^[0-9a-f]+$/);
   expect(rawAddress.length).toBeGreaterThanOrEqual(24);
 
@@ -3279,22 +3279,29 @@ test("labels decoded-tree nodes into local books and resolves immediately", asyn
 
   await selectResultTab(page, "Graph / RDF");
   const graphTurtle = await page.locator(".rdf-panel .rdf-turtle").innerText();
-  const output0Subject = await page.evaluate((graph) => {
+  const { output0Subject, addressBech32 } = await page.evaluate((graph) => {
     const result = globalThis.rdfShapes.query(
       graph,
       `
         PREFIX cardano: <https://lambdasistemi.github.io/cardano-ledger-rdf/vocab/cardano#>
-        SELECT ?output WHERE {
+        SELECT ?output ?bech32 WHERE {
           ?transaction a cardano:Transaction ;
             cardano:hasOutput ?output .
-          ?output cardano:hasIndex 0 .
+          ?output cardano:hasIndex 0 ;
+            cardano:atAddress ?address .
+          ?address cardano:bech32 ?bech32 .
         }
         LIMIT 1
       `,
     );
-    return result.json.results.bindings[0].output.value;
+    const binding = result.json.results.bindings[0];
+    return {
+      output0Subject: binding.output.value,
+      addressBech32: binding.bech32.value,
+    };
   }, graphTurtle);
   expect(output0Subject).toMatch(/^urn:cardano:utxo:/);
+  expect(addressBech32).toMatch(/^addr1/);
 
   await selectResultTab(page, "Structure");
   const decodedTreePanel = decodedPanel(page);
@@ -3336,8 +3343,14 @@ test("labels decoded-tree nodes into local books and resolves immediately", asyn
   expect(await addressRows.count()).toBeGreaterThan(1);
 
   const firstAddressRow = addressRows.first();
-  const rawAddress = await decodedRowText(firstAddressRow);
+  await expect(firstAddressRow.locator(".decoded-tree-address-value")).toHaveText(
+    addressBech32,
+  );
+  await expect(firstAddressRow.getByRole("button", { name: "Copy address" })).toBeVisible();
+  const rawAddress = await firstAddressRow.locator(".decoded-tree-raw-value").innerText();
   expect(rawAddress).toMatch(/^[0-9a-f]+$/);
+  expect(rawAddress).not.toBe(addressBech32);
+  await expect(firstAddressRow.getByRole("button", { name: "Copy raw value" })).toBeVisible();
 
   const inlineLabel = "Inline annotated fixture address";
   await expect(firstAddressRow).not.toContainText(inlineLabel);
@@ -3346,6 +3359,12 @@ test("labels decoded-tree nodes into local books and resolves immediately", asyn
   await firstAddressRow
     .getByRole("button", { name: "Label this node" })
     .click();
+  await expect(firstAddressRow.locator(".decoded-tree-annotation-target")).toContainText(
+    "Address to label",
+  );
+  await expect(firstAddressRow.locator(".decoded-tree-annotation-target code")).toHaveText(
+    addressBech32,
+  );
   await expect(firstAddressRow.getByLabel("Label", { exact: true })).toBeVisible();
   await expect(firstAddressRow.getByLabel("Optional type")).toBeVisible();
   await firstAddressRow.getByLabel("Label", { exact: true }).fill(inlineLabel);
@@ -3356,7 +3375,21 @@ test("labels decoded-tree nodes into local books and resolves immediately", asyn
   });
   await firstAddressRow.getByRole("button", { name: "Save label" }).click();
 
-  await expect(firstAddressRow).toContainText(inlineLabel);
+  const annotatedAddressRow = decodedTreePanel
+    .locator(".decoded-tree-row")
+    .filter({ hasText: "Address" })
+    .filter({ hasText: inlineLabel })
+    .filter({ hasText: addressBech32 })
+    .first();
+  await expect(annotatedAddressRow).toContainText(inlineLabel);
+  await expect(annotatedAddressRow.locator(".decoded-tree-resolved-name")).toContainText(inlineLabel);
+  await expect(annotatedAddressRow.locator(".decoded-tree-address-value")).toHaveText(
+    addressBech32,
+  );
+  await expect(annotatedAddressRow.locator(".decoded-tree-raw-value")).toHaveText(/^[0-9a-f]+$/);
+  await expect(
+    annotatedAddressRow.getByRole("button", { name: "Copy raw value" }),
+  ).toBeVisible();
   await expandDecodedStructure(decodedTreePanel);
 
   const datumHashRow = decodedTreePanel
@@ -3416,6 +3449,7 @@ test("labels decoded-tree nodes into local books and resolves immediately", asyn
   expect(generatedBook.raw).toContain(`<${output0Subject}>`);
   expect(generatedBook.raw).not.toContain("local:annotation-");
   expect(generatedBook.raw).toContain("cardano:bech32");
+  expect(generatedBook.raw).toContain(`cardano:bech32 "${addressBech32}"`);
   expect(generatedBook.raw).toContain("cardano:TransactionOutput");
   expect(generatedBook.raw).toContain(outputLabel);
   expect(generatedBook.raw).toContain(inlineLabel);
@@ -3452,13 +3486,23 @@ test("labels decoded-tree nodes into local books and resolves immediately", asyn
     await decodeFixtureAt(cleanPage, "/inspect", conwayMainnetFixturePath);
     const cleanDecodedPanel = decodedPanel(cleanPage);
     await expandDecodedStructure(cleanDecodedPanel);
+    const importedAddressRow = cleanDecodedPanel
+      .locator(".decoded-tree-row")
+      .filter({ hasText: "Address" })
+      .filter({ hasText: inlineLabel })
+      .filter({ hasText: addressBech32 })
+      .first();
+    await expect(importedAddressRow).toContainText(inlineLabel);
+    await expect(importedAddressRow.locator(".decoded-tree-address-value")).toHaveText(
+      addressBech32,
+    );
+    await expect(importedAddressRow.locator(".decoded-tree-raw-value")).toHaveText(/^[0-9a-f]+$/);
     await expect(
-      cleanDecodedPanel
-        .locator(".decoded-tree-row")
-        .filter({ hasText: "Address" })
-        .filter({ hasText: inlineLabel })
-        .first(),
-    ).toContainText(inlineLabel);
+      importedAddressRow.getByRole("button", { name: "Copy address" }),
+    ).toBeVisible();
+    await expect(
+      importedAddressRow.getByRole("button", { name: "Copy raw value" }),
+    ).toBeVisible();
   } finally {
     await cleanContext.close();
   }
