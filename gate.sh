@@ -141,12 +141,39 @@ product_branding_inventory() {
   }
 }
 
+address_label_view_foundation_inventory() {
+  local ui="docs/inspector/src/Main.purs"
+  local journey="docs/inspector/tests/tx-identify.spec.mjs"
+  local required
+
+  for required in \
+    'renderDecodedTreeAnnotationAction' \
+    'row.annotationValue' \
+    'Label this node'; do
+    rg -Fq "$required" "$ui" || {
+      echo "decoded-tree address-label foundation missing UI anchor: $required" >&2
+      return 1
+    }
+  done
+
+  for required in \
+    'resolves decoded-tree address rows from selected Turtle overlay books' \
+    'cardano:bech32' \
+    'Label this node'; do
+    rg -Fq "$required" "$journey" || {
+      echo "decoded-tree address-label foundation missing browser anchor: $required" >&2
+      return 1
+    }
+  done
+}
+
 git diff --check
 legacy_secret_storage_inventory
 book_interchange_contract_inventory
 rendered_resolution_journey_inventory
 provider_validation_truth_inventory
 product_branding_inventory
+address_label_view_foundation_inventory
 nix build .#checks.x86_64-linux.test --no-link
 nix run .#ci-check
 nix run .#ci-haskell-quality
