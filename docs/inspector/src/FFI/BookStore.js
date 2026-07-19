@@ -19,6 +19,21 @@ const requireBoolean = (value, field) => {
   return value;
 };
 
+const canonicalizeTurtle = (turtle) => {
+  const seen = new Set();
+  return turtle
+    .split("\n")
+    .filter((line) => {
+      const match = line.match(/^\s*@prefix\s+([^\s:]+)\s*:\s*<([^>]*)>\s*\.\s*$/);
+      if (!match) return true;
+      const declaration = `${match[1]}\u0000${match[2]}`;
+      if (seen.has(declaration)) return false;
+      seen.add(declaration);
+      return true;
+    })
+    .join("\n");
+};
+
 const normalizePart = (part, index) => {
   if (!part || typeof part !== "object" || Array.isArray(part)) {
     invalid(`book store part ${index} is not an object`);
@@ -28,7 +43,7 @@ const normalizePart = (part, index) => {
     id: requireString(part.id, `parts[${index}].id`),
     label: requireString(part.label, `parts[${index}].label`),
     kind: requireString(part.kind, `parts[${index}].kind`),
-    turtle: requireString(part.turtle, `parts[${index}].turtle`),
+    turtle: canonicalizeTurtle(requireString(part.turtle, `parts[${index}].turtle`)),
     plutusJson: requireString(part.plutusJson, `parts[${index}].plutusJson`),
   };
 };
@@ -45,9 +60,9 @@ const normalizeBook = (book, index) => {
     id: requireString(book.id, `books[${index}].id`),
     name: requireString(book.name, `books[${index}].name`),
     source: requireString(book.source, `books[${index}].source`),
-    raw: requireString(book.raw, `books[${index}].raw`),
+    raw: canonicalizeTurtle(requireString(book.raw, `books[${index}].raw`)),
     parts: book.parts.map(normalizePart),
-    turtle: requireString(book.turtle, `books[${index}].turtle`),
+    turtle: canonicalizeTurtle(requireString(book.turtle, `books[${index}].turtle`)),
     selected: requireBoolean(book.selected, `books[${index}].selected`),
     seed: requireBoolean(book.seed, `books[${index}].seed`),
   };
