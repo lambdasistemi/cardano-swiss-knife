@@ -3,6 +3,7 @@ module Main (main) where
 import Prelude
 
 import Cardano.Address.Bootstrap as Bootstrap
+import Cardano.BookableIdentifier (isBookableIdentifierKind)
 import Cardano.Address.Derivation as Derivation
 import Cardano.Address.Shelley as Shelley
 import Cardano.Address.Signing as Signing
@@ -2905,7 +2906,7 @@ inspectorComponent initial =
       Just draft | draft.rowId == row.id ->
         HH.text ""
       _ ->
-        if row.resolvedLabel == "" && row.annotationPredicate /= "" && row.annotationValue /= "" then
+        if isBookableIdentifierKind row.kind && row.resolvedLabel == "" && row.annotationPredicate /= "" && row.annotationValue /= "" then
           HH.element (HH.ElemName "md-icon-button")
             [ classNames [ "inline-action", "decoded-tree-annotate" ]
             , HH.attr (HH.AttrName "role") "button"
