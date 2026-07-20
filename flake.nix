@@ -102,6 +102,11 @@
           inherit apps;
           devShells.default = pkgs.mkShell {
             inputsFrom = [ haskellProject.devShells.default ];
+            shellHook = ''
+              if [ ! -e node_modules ] && [ ! -L node_modules ]; then
+                ln -s ${purescript.nodeModules}/node_modules node_modules
+              fi
+            '';
             packages = [
               pkgs.cabal-install
               pkgs.fourmolu

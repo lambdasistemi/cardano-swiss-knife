@@ -54,3 +54,9 @@
 - [X] T029-S7 Preserve the GitHub Windows Node 22 RED where the repaired smoke reaches the foreign program but `--import` rejects the absolute drive path with `ERR_UNSUPPORTED_ESM_URL_SCHEME`.
 - [X] T030-S7 Convert the shared network-denial preload path to a canonical `file:` URL without changing its API/CLI coverage or denial semantics on any host.
 - [X] T031-S7 Run the package smoke and `./gate.sh`, then commit exactly `fix(ci): normalize Windows preload URL` with `Tasks: T029, T030, T031`; the pushed Linux/macOS/Windows matrix is the live-boundary GREEN.
+
+## Slice 8 — Clean dev-shell dependency closure
+
+- [X] T032-S8 Preserve the GitHub clean-runner RED where all earlier checks and the cross-OS package matrix pass, then `nix develop --quiet -c just ci` fails to resolve pinned `@bjorn3/browser_wasi_shim` from PureScript test output.
+- [X] T033-S8 Expose the flake-built runtime `node_modules` tree to clean default dev shells without network installation and without replacing an existing developer module tree.
+- [X] T034-S8 Prove dependency resolution and `just ci` from a clean detached worktree, run `./gate.sh`, then commit exactly `fix(nix): provide pinned modules in dev shell` with `Tasks: T032, T033, T034`; the pushed full `check-and-build` job is the live-boundary GREEN.

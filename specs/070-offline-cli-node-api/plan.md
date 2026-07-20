@@ -248,6 +248,22 @@ preserve the same preload, API/CLI program, and denial semantics on every host.
 **Focused proof**: `nix run .#ci-node-package` and local `./gate.sh`; the
 GitHub Node 22 Linux/macOS/Windows matrix is the required live-boundary GREEN.
 
+### Slice 8 — Clean dev-shell dependency closure
+
+The third pushed run passed the artifact, Linux/macOS/Windows package matrix,
+and every full-CI step before the mandatory clean `nix develop -c just ci`
+boundary. That final step built the PureScript workspace but could not resolve
+the pinned `@bjorn3/browser_wasi_shim` because a clean checkout has no ambient
+`node_modules`. Make the default dev shell expose the flake-built runtime module
+tree only when the checkout has no existing module tree, preserving developer
+installs and avoiding network installation.
+
+**Owned file**: `flake.nix`
+
+**Focused proof**: from a clean detached worktree, resolve the WASI shim and run
+`nix develop --quiet -c just ci`; then run local `./gate.sh`. The pushed full
+`check-and-build` job is the required clean-runner GREEN.
+
 ## Dependency and ordering constraints
 
 1. Slice 1 is independent and lands first.
