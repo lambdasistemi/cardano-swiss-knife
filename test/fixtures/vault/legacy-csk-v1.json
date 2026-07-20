@@ -1,0 +1,5 @@
+{
+  "version": 1,
+  "kdf": { "name": "PBKDF2", "hash": "SHA-256", "iterations": 250000, "saltBase64": "AAECAwQFBgcICQoLDA0ODw==" },
+  "cipher": { "name": "AES-GCM", "ivBase64": "EBESExQVFhcYGRob", "ciphertextBase64": "ujGJKR6pBPtVTvhDccvituYXzr0zogtPUYgdJ1XyppfJ8tMM2yim3O03xsJdoaKSrq5QFp4+aH52nZ55swzyEf1P7IcFk/4E8zThrFQI9jnAm1HDXhdk8AMD6ImIb6uLWYyhyf04CoamVMRNHXS/hSHV9/ydFA/LS+YRy7ytuN6z0h73dYiNvDbAsiN9P6VhGRCeJj8FAWO0fNym2b/KOS52xRRcZ79KhE3WbJy7wSrPXT+QxZIEFEBsuujLhEP3vvopAPcVLLhCKfNyZYGyyfldtZ/5ck25iOqKyiJzHI7l8XPCRLOm6e7t76AWthkVMbLe6EDrdPnfapaQiVPev6MOeUfrJ0DM913CGZD7SAfZH+Zxjvjz92AAZex8mQLFfwb+PXmXe+1eieWbODmXuQR47gy222Vb/TELYsTY/aCC" }
+}

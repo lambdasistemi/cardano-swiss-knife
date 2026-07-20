@@ -1,0 +1,14 @@
+{
+  "cardanoSwissKnifeVault": {
+    "version": 1,
+    "entries": [
+      {
+        "id": "canonical-mnemonic",
+        "kind": "mnemonic",
+        "label": "Canonical seed",
+        "value": "synthetic canonical mnemonic",
+        "createdAt": "2026-07-20T00:00:00.000Z"
+      }
+    ]
+  }
+}
