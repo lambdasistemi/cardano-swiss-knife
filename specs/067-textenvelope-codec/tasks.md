@@ -51,10 +51,10 @@ Tasks: T674, T675, T676, T677
 **Goal**: Pin the delivered shared API, exact strings, and direct proof into the
 existing cumulative gate, then finalize the issue-backed PR.
 
-- [ ] T678 Extend `gate.sh` additively with shared-module, exact-type-string,
+- [X] T678 Extend `gate.sh` additively with shared-module, exact-type-string,
   direct-test wiring, rejection, and round-trip proof anchors; run `./gate.sh`;
   commit the gate extension with the required task trailer.
-- [ ] T679 Audit all #67 requirements and task/commit linkage, update the draft
+- [X] T679 Audit all #67 requirements and task/commit linkage, update the draft
   PR body with exact verification evidence, push, and mark the PR ready.
 
 **Owned Files**:
