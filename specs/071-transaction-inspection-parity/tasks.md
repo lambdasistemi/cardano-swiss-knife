@@ -2,12 +2,12 @@
 
 ## Slice 1 — Offline transaction engine and Node API
 
-- [ ] T001-S1 Add failing installed-Node tests for raw CBOR and shared TextEnvelope equality across inspect, browse, identify, and intent.
-- [ ] T002-S1 Prove raw operations attempt no network access and missing, incompatible, execution, and protocol ledger-engine failures are typed.
-- [ ] T003-S1 Add the delegation-only transaction input facade and package-relative Node ledger-inspector WASI runner with no host CBOR/ledger fallback.
-- [ ] T004-S1 Export `inspectTransaction`, `browseTransaction`, `identifyTransaction`, and `transactionIntent` through the existing ESM result envelope.
-- [ ] T005-S1 Package the pinned ledger-inspector artifact beside the Node bundle and extend the flake-owned Node API check.
-- [ ] T006-S1 Run `nix run .#ci-node-api` and `./gate.sh`, then commit exactly `feat(node): expose offline transaction inspection` with `Tasks: T001, T002, T003, T004, T005, T006`.
+- [X] T001-S1 Add failing installed-Node tests for raw CBOR and shared TextEnvelope equality across inspect, browse, identify, and intent.
+- [X] T002-S1 Prove raw operations attempt no network access and missing, incompatible, execution, and protocol ledger-engine failures are typed.
+- [X] T003-S1 Add the delegation-only transaction input facade and package-relative Node ledger-inspector WASI runner with no host CBOR/ledger fallback.
+- [X] T004-S1 Export `inspectTransaction`, `browseTransaction`, `identifyTransaction`, and `transactionIntent` through the existing ESM result envelope.
+- [X] T005-S1 Package the pinned ledger-inspector artifact beside the Node bundle and extend the flake-owned Node API check.
+- [X] T006-S1 Run `nix run .#ci-node-api` and `./gate.sh`, then commit exactly `feat(node): expose offline transaction inspection` with `Tasks: T001, T002, T003, T004, T005, T006`.
 
 ## Slice 2 — Shared provider loading and context failures
 

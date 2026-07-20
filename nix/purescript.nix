@@ -1,4 +1,4 @@
-{ pkgs, repoRoot, txInspectorUi, wasmBinary }:
+{ pkgs, repoRoot, txInspectorUi, wasmBinary, txInspectorWasmBinary }:
 
 let
   nodejs = pkgs.nodejs_22;
@@ -133,6 +133,7 @@ in
       esbuild node/src/index.js --bundle --platform=node --format=esm --outfile=node/dist/index.js
       esbuild cli/csk.mjs --bundle --platform=node --format=esm --outfile=node/dist/csk.mjs
       cp ${wasmBinary}/cardano-addresses.wasm node/dist/cardano-addresses.wasm
+      cp ${txInspectorWasmBinary}/wasm-tx-inspector.wasm node/dist/wasm-tx-inspector.wasm
     '';
     installPhase = ''
       mkdir -p $out

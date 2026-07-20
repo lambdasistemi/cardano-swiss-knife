@@ -3,10 +3,12 @@ import * as Key from "../../output/Cardano.Offline.Key/index.js";
 import * as Mnemonic from "../../output/Cardano.Offline.Mnemonic/index.js";
 import * as Payload from "../../output/Cardano.Offline.Payload/index.js";
 import * as Script from "../../output/Cardano.Offline.Script/index.js";
+import * as Transaction from "../../output/Cardano.Transaction/index.js";
 import * as Aff from "../../output/Effect.Aff/index.js";
 import * as Either from "../../output/Data.Either/index.js";
 import * as Maybe from "../../output/Data.Maybe/index.js";
 import { CskError, toCskError } from "./error.js";
+import { runTransactionOperation } from "./transaction-engine.js";
 
 const ok = (value) => ({ ok: true, value: normalise(value) });
 const fail = (error) => ({ ok: false, error: { code: error.code, message: error.message } });
@@ -75,3 +77,35 @@ export const verifySignature = ({ payloadMode: mode, payloadInput, verificationK
 export const analyzeNativeScriptHex = (input) => operation(async () => fromEither(Script.analyzeNativeScriptHex(typeof input === "string" ? input : input.cborHex)));
 export const analyzeNativeScriptJson = (input) => operation(async () => fromEither(Script.analyzeNativeScriptJson(typeof input === "string" ? input : input.json)));
 export const analyzeScriptTemplateJson = (input) => operation(async () => fromEither(Script.analyzeScriptTemplateJson(typeof input === "string" ? input : input.json)));
+
+const transactionInput = (input) => {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    throw new CskError("DOMAIN_ERROR", "Transaction input must be an object with cborHex or textEnvelope.");
+  }
+
+  const hasCbor = Object.hasOwn(input, "cborHex");
+  const hasEnvelope = Object.hasOwn(input, "textEnvelope");
+  if (hasCbor === hasEnvelope) {
+    throw new CskError("DOMAIN_ERROR", "Transaction input must contain exactly one of cborHex or textEnvelope.");
+  }
+
+  const value = hasCbor
+    ? input.cborHex
+    : typeof input.textEnvelope === "string"
+      ? input.textEnvelope
+      : JSON.stringify(input.textEnvelope);
+  if (typeof value !== "string") {
+    throw new CskError("DOMAIN_ERROR", "Transaction input must be CBOR hex or a TextEnvelope value.");
+  }
+
+  return fromEither(Transaction.decodeTransactionInput(value));
+};
+
+const transactionOperation = (name, input, options = {}) => operation(async () =>
+  runTransactionOperation(name, transactionInput(input), options),
+);
+
+export const inspectTransaction = (input, options) => transactionOperation("tx.inspect", input, options);
+export const browseTransaction = (input, options = {}) => transactionOperation("tx.browse", input, options);
+export const identifyTransaction = (input, options) => transactionOperation("tx.identify", input, options);
+export const transactionIntent = (input, options) => transactionOperation("tx.intent", input, options);
