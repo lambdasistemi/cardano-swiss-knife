@@ -37,6 +37,6 @@
 
 ## Orchestrator-owned finalization
 
-- [ ] T024 Append the focused Node API/package transaction checks to the inherited `gate.sh` without replacing any existing check or function.
+- [X] T024 Append the focused Node API/package transaction checks to the inherited `gate.sh` without replacing any existing check or function.
 - [ ] T025 Audit all issue acceptance criteria, public exports/commands, provider fixtures, raw identifier truth, engine ownership, secret handling, and task/commit correspondence.
 - [ ] T026 Run the final gate and commit-message audit, update PR #89 with exact proof and residual risks, drop `gate.sh` only under the finalization rule, mark ready, report `COMPLETE`, and do not merge.

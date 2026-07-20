@@ -382,4 +382,5 @@ nix run .#ci-test
 nix run .#ci-vault
 nix run .#ci-vault-cli
 nix run .#ci-playwright
-
+nix run .#ci-node-api
+nix run .#ci-node-package
