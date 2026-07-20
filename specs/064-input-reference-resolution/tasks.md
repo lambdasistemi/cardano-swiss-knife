@@ -41,8 +41,8 @@ Tasks: T641, T642, T643, T644, T645, T646
 **Goal**: Pin the delivered behavior into the accumulated gate and complete
 issue/PR accounting without editing behavior files.
 
-- [ ] T647 Extend the existing `gate.sh` with input-resolution model, rendering, drill-in, provider-accounting, and regression anchors; run `./gate.sh`; commit the gate extension.
-- [ ] T648 Audit issue #64 requirements and task accounting, update the draft PR body with exact local proof, and run the final commit/task audit.
+- [X] T647 Extend the existing `gate.sh` with input-resolution model, rendering, drill-in, provider-accounting, and regression anchors; run `./gate.sh`; commit the gate extension.
+- [X] T648 Audit issue #64 requirements and task accounting, update the draft PR body with exact local proof, and run the final commit/task audit.
 
 **Owned Files**:
 
