@@ -1907,6 +1907,18 @@ test("renders exact Amaru book resolutions across Structure and Witness", async 
   const structureTree = decodedPanel(structurePanel);
   await expandDecodedStructure(structureTree);
 
+  for (const label of ["auxiliary_data_hash", "script_data_hash"]) {
+    const row = structureTree
+      .locator(".decoded-tree-row")
+      .filter({ hasText: label })
+      .first();
+    await expect(row).toBeVisible();
+    await expect(decodedTreeAnnotationActionLayout(row)).resolves.toEqual({
+      headerButtonCount: 0,
+      standaloneButtonCount: 0,
+    });
+  }
+
   const bodyPartition = await structureTree.locator("#decoded-body").evaluate((body) => {
     const depthOf = (row) => {
       const depthClass = Array.from(row.classList).find((className) =>
@@ -3279,12 +3291,12 @@ test("labels decoded-tree nodes into local books and resolves immediately", asyn
 
   await selectResultTab(page, "Graph / RDF");
   const graphTurtle = await page.locator(".rdf-panel .rdf-turtle").innerText();
-  const { output0Subject, addressBech32 } = await page.evaluate((graph) => {
+  const { addressBech32 } = await page.evaluate((graph) => {
     const result = globalThis.rdfShapes.query(
       graph,
       `
         PREFIX cardano: <https://lambdasistemi.github.io/cardano-ledger-rdf/vocab/cardano#>
-        SELECT ?output ?bech32 WHERE {
+        SELECT ?bech32 WHERE {
           ?transaction a cardano:Transaction ;
             cardano:hasOutput ?output .
           ?output cardano:hasIndex 0 ;
@@ -3296,45 +3308,33 @@ test("labels decoded-tree nodes into local books and resolves immediately", asyn
     );
     const binding = result.json.results.bindings[0];
     return {
-      output0Subject: binding.output.value,
       addressBech32: binding.bech32.value,
     };
   }, graphTurtle);
-  expect(output0Subject).toMatch(/^urn:cardano:utxo:/);
   expect(addressBech32).toMatch(/^addr1/);
 
   await selectResultTab(page, "Structure");
   const decodedTreePanel = decodedPanel(page);
   await expandDecodedStructure(decodedTreePanel);
 
-  const output0Row = decodedTreePanel
-    .locator(".decoded-tree-row")
-    .filter({ hasText: "Output 0" })
-    .first();
-  await expect(output0Row).toBeVisible();
-
-  const outputLabel = "Inline annotated fixture output";
-  await expect(output0Row).not.toContainText(outputLabel);
-  await expect(decodedTreeAnnotationActionLayout(output0Row)).resolves.toEqual({
-    headerButtonCount: 1,
-    standaloneButtonCount: 0,
-  });
-  await output0Row
-    .getByRole("button", { name: "Label this node" })
-    .click();
-  await expect(
-    output0Row.locator(":scope > .decoded-tree-main > .decoded-tree-annotation-form"),
-  ).toBeVisible();
-  await expect(output0Row.getByLabel("Label", { exact: true })).toBeVisible();
-  await output0Row.getByLabel("Label", { exact: true }).fill(outputLabel);
-  await output0Row.getByLabel("Optional type").fill("cardano:TransactionOutput");
-  await output0Row.getByRole("radio", { name: "Create new local book" }).check();
-  await output0Row.getByLabel("New book name").fill("Inline fixture annotations");
-  await output0Row.getByRole("button", { name: "Save label" }).click();
-
-  await expect(output0Row).toHaveClass(/decoded-tree-row--resolved/);
-  await expect(output0Row.locator(".decoded-tree-raw-value")).toContainText(output0Subject);
-  await expandDecodedStructure(decodedTreePanel);
+  const nonBookableRows = [
+    "transaction_hash",
+    "Input 0",
+    "Output 0",
+    "Datum hash",
+    "Datum raw bytes",
+  ];
+  for (const label of nonBookableRows) {
+    const row = decodedTreePanel
+      .locator(".decoded-tree-row")
+      .filter({ hasText: label })
+      .first();
+    await expect(row).toBeVisible();
+    await expect(decodedTreeAnnotationActionLayout(row)).resolves.toEqual({
+      headerButtonCount: 0,
+      standaloneButtonCount: 0,
+    });
+  }
 
   const addressRows = decodedTreePanel
     .locator(".decoded-tree-row")
@@ -3356,9 +3356,11 @@ test("labels decoded-tree nodes into local books and resolves immediately", asyn
   await expect(firstAddressRow).not.toContainText(inlineLabel);
   await expect(firstAddressRow.getByLabel("Label", { exact: true })).toHaveCount(0);
   await expect(firstAddressRow.getByLabel("Optional type")).toHaveCount(0);
-  await firstAddressRow
-    .getByRole("button", { name: "Label this node" })
-    .click();
+  await expect(decodedTreeAnnotationActionLayout(firstAddressRow)).resolves.toEqual({
+    headerButtonCount: 1,
+    standaloneButtonCount: 0,
+  });
+  await firstAddressRow.getByRole("button", { name: "Label this node" }).click();
   await expect(firstAddressRow.locator(".decoded-tree-annotation-target")).toContainText(
     "Address to label",
   );
@@ -3369,10 +3371,8 @@ test("labels decoded-tree nodes into local books and resolves immediately", asyn
   await expect(firstAddressRow.getByLabel("Optional type")).toBeVisible();
   await firstAddressRow.getByLabel("Label", { exact: true }).fill(inlineLabel);
   await firstAddressRow.getByLabel("Optional type").fill("FixtureAddress");
-  await firstAddressRow.getByRole("radio", { name: "Append to existing book" }).check();
-  await firstAddressRow.getByLabel("Target book").selectOption({
-    label: "Inline fixture annotations",
-  });
+  await firstAddressRow.getByRole("radio", { name: "Create new local book" }).check();
+  await firstAddressRow.getByLabel("New book name").fill("Inline fixture annotations");
   await firstAddressRow.getByRole("button", { name: "Save label" }).click();
 
   const annotatedAddressRow = decodedTreePanel
@@ -3390,26 +3390,11 @@ test("labels decoded-tree nodes into local books and resolves immediately", asyn
   await expect(
     annotatedAddressRow.getByRole("button", { name: "Copy raw value" }),
   ).toBeVisible();
-  await expandDecodedStructure(decodedTreePanel);
-
-  const datumHashRow = decodedTreePanel
-    .locator(".decoded-tree-row")
-    .filter({ hasText: "Datum hash" })
-    .first();
-  const appendedLabel = "Existing-book annotated fixture datum hash";
-  await expect(datumHashRow.getByLabel("Label", { exact: true })).toHaveCount(0);
-  await datumHashRow
-    .getByRole("button", { name: "Label this node" })
-    .click();
-  await expect(datumHashRow.getByLabel("Label", { exact: true })).toBeVisible();
-  await datumHashRow.getByLabel("Label", { exact: true }).fill(appendedLabel);
-  await datumHashRow.getByRole("radio", { name: "Append to existing book" }).check();
-  await datumHashRow.getByLabel("Target book").selectOption({
-    label: "Inline fixture annotations",
+  await expect(decodedTreeAnnotationActionLayout(annotatedAddressRow)).resolves.toEqual({
+    headerButtonCount: 0,
+    standaloneButtonCount: 0,
   });
-  await datumHashRow.getByRole("button", { name: "Save label" }).click();
-
-  await expect(datumHashRow).toContainText(appendedLabel);
+  await expandDecodedStructure(decodedTreePanel);
 
   await expandDecodedStructure(decodedTreePanel);
   const verificationKeyRow = decodedTreePanel
@@ -3419,6 +3404,10 @@ test("labels decoded-tree nodes into local books and resolves immediately", asyn
   const verificationKeyLabel = "Existing-book annotated verification key";
   await expect(verificationKeyRow).toBeVisible();
   await expect(verificationKeyRow.getByLabel("Label", { exact: true })).toHaveCount(0);
+  await expect(decodedTreeAnnotationActionLayout(verificationKeyRow)).resolves.toEqual({
+    headerButtonCount: 1,
+    standaloneButtonCount: 0,
+  });
   await verificationKeyRow
     .getByRole("button", { name: "Label this node" })
     .click();
@@ -3446,14 +3435,10 @@ test("labels decoded-tree nodes into local books and resolves immediately", asyn
   expect(generatedBook.raw).toContain("@prefix cardano:");
   expect(generatedBook.raw).toContain("@prefix rdfs:");
   expect(generatedBook.raw).toContain("@prefix local:");
-  expect(generatedBook.raw).toContain(`<${output0Subject}>`);
   expect(generatedBook.raw).not.toContain("local:annotation-");
   expect(generatedBook.raw).toContain("cardano:bech32");
   expect(generatedBook.raw).toContain(`cardano:bech32 "${addressBech32}"`);
-  expect(generatedBook.raw).toContain("cardano:TransactionOutput");
-  expect(generatedBook.raw).toContain(outputLabel);
   expect(generatedBook.raw).toContain(inlineLabel);
-  expect(generatedBook.raw).toContain(appendedLabel);
   expect(generatedBook.raw).toContain(verificationKeyLabel);
 
   await page.getByRole("banner").getByRole("link", { name: "Library" }).click();

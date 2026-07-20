@@ -43,9 +43,9 @@ transaction hash, transaction output/reference, auxiliary-data hash,
 script-data hash, or datum hash rows; an address can create a local book and a
 verification key can append to it.
 
-- [ ] T634 [US1] Rewrite the existing annotation journey in `docs/inspector/tests/tx-identify.spec.mjs` to establish RED with absent-action assertions and address-first book creation.
-- [ ] T635 [US1] Import and apply the shared bookability predicate in `docs/inspector/src/Main.purs` while preserving the existing unresolved/non-empty guards.
-- [ ] T636 [US1] Run `nix run .#ci-inspector-playwright` and `./gate.sh`, then commit the reviewed slice with the required task trailer.
+- [X] T634 [US1] Rewrite the existing annotation journey in `docs/inspector/tests/tx-identify.spec.mjs` to establish RED with absent-action assertions and address-first book creation.
+- [X] T635 [US1] Import and apply the shared bookability predicate in `docs/inspector/src/Main.purs` while preserving the existing unresolved/non-empty guards.
+- [X] T636 [US1] Run `nix run .#ci-inspector-playwright` and `./gate.sh`, then commit the reviewed slice with the required task trailer.
 
 **Owned Files**:
 
