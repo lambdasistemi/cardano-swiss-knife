@@ -5,6 +5,9 @@ import Prelude
 import Cardano.Provider as Provider
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
+import Data.String as String
+import Data.String.CodeUnits as StringCodeUnits
+import Data.Traversable (traverse_)
 import Effect.Aff (Aff)
 import Effect.Class (liftEffect)
 import Effect.Exception (throw)
@@ -26,6 +29,60 @@ runProviderContractTests = do
   assertBlankBlockfrostCredential
   assertFailures Provider.Blockfrost Provider.Mainnet "blockfrost-key"
   assertFailures Provider.Koios Provider.Mainnet ""
+  assertProducerContextOutcomes
+
+assertProducerContextOutcomes :: Aff Unit
+assertProducerContextOutcomes = do
+  assertContextOutcome "complete" completeContextTransport
+    [ "\"resolved_count\":2", "\"missing\":[]", "\"errors\":[]", "\"error_codes\":[]" ]
+  assertContextOutcome "partial" partialContextTransport
+    [ "\"resolved_count\":1", "\"missing\":[\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"]", "\"errors\":[\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb: Blockfrost tx cbor 503: unavailable [redacted]\"]", "\"error_codes\":[{\"tx_id\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"code\":\"PROVIDER_SERVER\",\"message\":\"Blockfrost tx cbor 503: unavailable [redacted]\"}]" ]
+  assertContextOutcome "total" totalContextTransport
+    [ "\"resolved_count\":0", "\"missing\":[\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"]", "\"errors\":[\"validation_context: Blockfrost validation context 503: unavailable [redacted]\",\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa: Blockfrost tx cbor 503: unavailable [redacted]\",\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb: Blockfrost tx cbor 503: unavailable [redacted]\"]", "\"error_codes\":[{\"code\":\"PROVIDER_SERVER\",\"message\":\"Blockfrost validation context 503: unavailable [redacted]\"},{\"tx_id\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"code\":\"PROVIDER_SERVER\",\"message\":\"Blockfrost tx cbor 503: unavailable [redacted]\"},{\"tx_id\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"code\":\"PROVIDER_SERVER\",\"message\":\"Blockfrost tx cbor 503: unavailable [redacted]\"}]" ]
+  assertContextDoesNotContain "partial" partialContextTransport "blockfrost-key"
+  assertContextDoesNotContain "total" totalContextTransport "blockfrost-key"
+
+assertContextOutcome :: String -> Provider.Transport -> Array String -> Aff Unit
+assertContextOutcome label transport expectedFragments = do
+  resolved <- Provider.resolveProducerTxContextWith transport Provider.Blockfrost Provider.Mainnet "blockfrost-key" true inspectionWithTwoInputs
+  traverse_ (assertContains label resolved) expectedFragments
+
+assertContains :: String -> String -> String -> Aff Unit
+assertContains label value expected =
+  if StringCodeUnits.contains (String.Pattern expected) value then pure unit
+  else fail (label <> " context did not retain " <> expected)
+
+assertContextDoesNotContain :: String -> Provider.Transport -> String -> Aff Unit
+assertContextDoesNotContain label transport forbidden = do
+  resolved <- Provider.resolveProducerTxContextWith transport Provider.Blockfrost Provider.Mainnet "blockfrost-key" true inspectionWithTwoInputs
+  if StringCodeUnits.contains (String.Pattern forbidden) resolved then fail (label <> " context leaked credential") else pure unit
+
+inspectionWithTwoInputs :: String
+inspectionWithTwoInputs = "{\"inspection\":{\"inputs\":[{\"tx_id\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"index\":0},{\"tx_id\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"index\":1}]}}"
+
+completeContextTransport :: Provider.Transport
+completeContextTransport = contextTransport (success "{\"cbor\":\"deadbeef\"}") (success "{\"cbor\":\"cafebabe\"}")
+
+partialContextTransport :: Provider.Transport
+partialContextTransport = contextTransport (success "{\"cbor\":\"deadbeef\"}") (status 503 "unavailable blockfrost-key")
+
+totalContextTransport :: Provider.Transport
+totalContextTransport = totalContextTransportImpl
+
+contextTransport :: Either String Provider.HttpResponse -> Either String Provider.HttpResponse -> Provider.Transport
+contextTransport firstProducer secondProducer request
+  | request.url == "https://cardano-mainnet.blockfrost.io/api/v0/blocks/latest" = pure (success "{\"slot\":42,\"epoch\":9}")
+  | request.url == "https://cardano-mainnet.blockfrost.io/api/v0/epochs/latest/parameters" = pure (success "{\"min_fee_a\":44,\"protocol_major_ver\":9,\"protocol_minor_ver\":0}")
+  | request.url == "https://cardano-mainnet.blockfrost.io/api/v0/txs/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/cbor" = pure firstProducer
+  | request.url == "https://cardano-mainnet.blockfrost.io/api/v0/txs/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb/cbor" = pure secondProducer
+  | otherwise = pure (Left "unexpected provider request")
+
+totalContextTransportImpl :: Provider.Transport
+totalContextTransportImpl request
+  | request.url == "https://cardano-mainnet.blockfrost.io/api/v0/blocks/latest" = pure (status 503 "unavailable blockfrost-key")
+  | request.url == "https://cardano-mainnet.blockfrost.io/api/v0/txs/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/cbor" = pure (status 503 "unavailable blockfrost-key")
+  | request.url == "https://cardano-mainnet.blockfrost.io/api/v0/txs/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb/cbor" = pure (status 503 "unavailable blockfrost-key")
+  | otherwise = pure (Left "unexpected provider request")
 
 assertTxSuccess
   :: Provider.Provider

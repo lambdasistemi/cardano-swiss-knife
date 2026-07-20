@@ -1,0 +1,7 @@
+{
+  "authentication": { "status": 401, "body": "credential rejected: {{credential}}" },
+  "rate-limit": { "status": 429, "body": "slow down: {{credential}}" },
+  "server": { "status": 503, "body": "service unavailable: {{credential}}" },
+  "transport": { "error": "network rejected" },
+  "decode": { "status": 200, "body": "{\"not_cbor\":\"{{credential}}\"}" }
+}
