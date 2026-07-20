@@ -40,15 +40,15 @@ once to browser and Node hosts.
 **Goal**: Emit canonical `.age` files from the browser and keep current vault
 shelves working while migration is explicit and future entries survive.
 
-- [ ] T011 Add RED browser cases for `.age` create/open/export, wrong-passphrase
+- [X] T011 Add RED browser cases for `.age` create/open/export, wrong-passphrase
   redaction, explicit legacy CSK migration, and cross-save opaque-entry retention.
-- [ ] T012 Convert browser picker/download/persist behavior to a thin host over
+- [X] T012 Convert browser picker/download/persist behavior to a thin host over
   `Cardano.Vault`, including binary MIME/extensions and in-memory bytes only.
-- [ ] T013 Preserve all eight current shelf kinds and retain unknown future
+- [X] T013 Preserve all eight current shelf kinds and retain unknown future
   entries/fields when known entries are added, popped, or deleted.
-- [ ] T014 Keep errors and browser storage free of passphrases/decrypted entry
+- [X] T014 Keep errors and browser storage free of passphrases/decrypted entry
   values; fail malformed/unsupported/duplicate imports without state mutation.
-- [ ] T015 Obtain navigator RED/GREEN approval, run both Playwright surfaces and
+- [X] T015 Obtain navigator RED/GREEN approval, run both Playwright surfaces and
   `./gate.sh`, and commit once with `Tasks: T011, T012, T013, T014, T015`.
 
 ## Slice 3 — Offline csk vault CLI and cross-host proof (driver+navigator)

@@ -6,6 +6,7 @@ module Vault
   , createVaultFile
   , exportVaultFile
   , importVaultFile
+  , migrateLegacyVaultFile
   , kindTag
   , labelForKind
   , persistVaultFile
@@ -51,6 +52,8 @@ foreign import exportVaultFileImpl :: String -> String -> Array VaultEntry -> Ef
 
 foreign import importVaultFileImpl :: String -> Effect (Promise VaultImportResult)
 
+foreign import migrateLegacyVaultFileImpl :: String -> Effect (Promise VaultImportResult)
+
 foreign import persistVaultFileImpl :: String -> String -> Array VaultEntry -> Effect (Promise String)
 
 createVaultEntry :: VaultKind -> String -> String -> Effect VaultEntry
@@ -64,6 +67,9 @@ exportVaultFile fileName passphrase entries = toAffE (exportVaultFileImpl fileNa
 
 importVaultFile :: String -> Aff VaultImportResult
 importVaultFile passphrase = toAffE (importVaultFileImpl passphrase)
+
+migrateLegacyVaultFile :: String -> Aff VaultImportResult
+migrateLegacyVaultFile passphrase = toAffE (migrateLegacyVaultFileImpl passphrase)
 
 persistVaultFile :: String -> String -> Array VaultEntry -> Aff String
 persistVaultFile fileName passphrase entries = toAffE (persistVaultFileImpl fileName passphrase entries)
