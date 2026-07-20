@@ -4146,24 +4146,32 @@ test("keeps copy controls off non-value missing context rows", async ({ page }) 
   await expect(sourceOutputRow.getByRole("button", { name: "Copy" })).toBeVisible();
 });
 
-test("passes producer transaction CBOR into witness planning", async ({
+test("resolves input and reference input context in Structure and Witness", async ({
   page,
 }) => {
-  const txCbor = (await readFile(fixturePath, "utf8")).trim();
+  const producerHash =
+    "42ceabd168faa7e7bbe10d8e72e6ba0e71886bf3537ea88bd098782e1df1c1e9";
+  const outputReference = `${producerHash}#2`;
+  const outputAddress = "613c12f6735ef87655c5b27bced3f828d857d0a27fd20f2cda18ebf2fb";
+  const outputLovelace = "7015148761";
   const validationContext = await loadValidationContext();
-  let producerCborRequests = 0;
+  const producerCborRequests = new Set();
+  const producerCborRequestHashes = [];
+  const producerCborRequestUrls = [];
   let utxoRequests = 0;
   let latestBlockRequests = 0;
   let protocolParameterRequests = 0;
 
   await installClipboardMock(page);
   await page.route("https://cardano-mainnet.blockfrost.io/api/v0/txs/*/cbor", async (route) => {
-    producerCborRequests += 1;
     const txHash = route.request().url().match(/\/txs\/([0-9a-f]+)\/cbor/)?.[1];
+    producerCborRequestUrls.push(route.request().url());
+    producerCborRequests.add(txHash);
+    producerCborRequestHashes.push(txHash);
     await route.fulfill({
       status: 200,
       contentType: "application/json",
-      body: JSON.stringify({ cbor: producerCbor(validationContext, txHash, txCbor) }),
+      body: JSON.stringify({ cbor: producerCbor(validationContext, txHash) }),
     });
   });
   await page.route("https://cardano-mainnet.blockfrost.io/api/v0/blocks/latest", async (route) => {
@@ -4201,54 +4209,49 @@ test("passes producer transaction CBOR into witness planning", async ({
     blockfrostKey: "mainnet-test-project",
   });
   await openInspectViaShell(page);
-  await page.getByRole("tab", { name: "Paste CBOR" }).click();
-  await page.getByPlaceholder("Paste Conway transaction CBOR hex").fill(txCbor);
-  await page.getByRole("button", { name: "Decode" }).click();
+  await page
+    .getByRole("button", { name: "Reference input overlaps a spent input" })
+    .click();
 
-  await selectResultTab(page, "Witness");
+  const witnessPanel = await selectResultTab(page, "Witness");
   await expect(
     page.getByText("Producer transaction CBOR resolved every visible transaction input"),
   ).toBeVisible();
-  await selectResultTab(page, "Validation");
-  await expect(
-    page
-      .locator(".validation-panel .validation-section", { hasText: "Validation summary" })
-      .locator(".validation-check-row", { hasText: "Resolved inputs" }),
-  ).toBeVisible();
-  await selectResultTab(page, "Witness");
-  await expect(
-    page.locator(".witness-plan .identity-section-title", {
-      hasText: "Resolved inputs",
-    }),
-  ).toBeVisible();
-  await selectResultTab(page, "Validation");
-  await expect(
-    page
-      .locator(".validation-panel .validation-section-title", { hasText: "Resolved inputs" })
-      .first(),
-  ).toBeVisible();
-  await expect(
-    page
-      .locator(".validation-panel .validation-check-row", { hasText: "Status" })
-      .locator(".validation-status-badge", { hasText: "valid" }),
-  ).toBeVisible();
-  await expect(
-    page.locator(".validation-verdict-banner", { hasText: "Validation passed" }),
-  ).toBeVisible();
-  expect(producerCborRequests).toBeGreaterThan(0);
+  await expect(witnessPanel).toContainText("Regular input");
+  await expect(witnessPanel).toContainText("Reference input");
+  await expect(witnessPanel).toContainText(outputReference);
+  await expect(witnessPanel).toContainText(outputAddress);
+  await expect(witnessPanel).toContainText(outputLovelace);
+  await expect(witnessPanel).toContainText("No native assets");
+
+  const structurePanel = await selectResultTab(page, "Structure");
+  await expect(structurePanel).toContainText(outputReference);
+  await expect(structurePanel).toContainText("Regular input");
+  await expect(structurePanel).toContainText("Reference input");
+  await expect(structurePanel).toContainText(outputAddress);
+  await expect(structurePanel).toContainText(outputLovelace);
+  await expect(structurePanel).toContainText("No native assets");
+  await expect(structurePanel.getByRole("button", { name: "Inspect producer transaction" })).toBeVisible();
+
+  expect(producerCborRequests.size).toBe(1);
   expect(latestBlockRequests).toBe(1);
   expect(protocolParameterRequests).toBe(1);
   expect(utxoRequests).toBe(0);
 
-  await selectResultTab(page, "Witness");
-  const resolvedRow = page
-    .locator(".witness-plan .witness-row")
-    .filter({ hasText: "resolved" })
-    .first();
-  await resolvedRow.getByRole("button", { name: "Copy" }).click();
-
-  const copied = await page.evaluate(() => navigator.clipboard.readText());
-  expect(copied).toMatch(/^[0-9a-f]{64}#[0-9]+$/);
+  await structurePanel.getByRole("button", { name: "Inspect producer transaction" }).click();
+  await expect(page.getByRole("tab", { name: "Fetch by hash" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  await expect(page.getByPlaceholder("Transaction hash (64 hex chars)")).toHaveValue(producerHash);
+  await expect.poll(
+    () => producerCborRequestHashes.filter((txHash) => txHash === producerHash).length,
+  ).toBe(2);
+  expect(
+    producerCborRequestUrls.filter(
+      (url) => url === `https://cardano-mainnet.blockfrost.io/api/v0/txs/${producerHash}/cbor`,
+    ),
+  ).toHaveLength(2);
 });
 
 test("surfaces configured Blockfrost browser-boundary failures without consulting Koios", async ({

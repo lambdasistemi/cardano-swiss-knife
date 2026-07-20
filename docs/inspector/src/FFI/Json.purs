@@ -15,6 +15,7 @@ module FFI.Json
   , WitnessPlan
   , WitnessPlanRow
   , WitnessPlanSection
+  , ResolvedInput
   , inspect
   , operationBrowser
   , operationIdentification
@@ -163,6 +164,20 @@ type WitnessPlan =
   , metrics :: Array Metric
   , warnings :: Array String
   , sections :: Array WitnessPlanSection
+  , resolvedInputs :: Array ResolvedInput
+  }
+
+type ResolvedInput =
+  { kind :: String
+  , key :: String
+  , txId :: String
+  , outputIndex :: String
+  , resolved :: Boolean
+  , source :: String
+  , reason :: String
+  , addressHex :: String
+  , coinLovelace :: String
+  , assets :: Array { policyId :: String, assetName :: String, quantity :: String }
   }
 
 type Validation =

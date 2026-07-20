@@ -247,6 +247,7 @@ const invalidWitnessPlan = (title, subtitle) => ({
   metrics: [],
   warnings: [],
   sections: [],
+  resolvedInputs: [],
 });
 
 const invalidValidation = (title, subtitle) => ({
@@ -304,6 +305,13 @@ const signerRows = (items, pathRoot) =>
   );
 
 const resolvedTxInLabel = (item) => item?.key || `${item?.tx_id || ""}#${text(item?.index)}`;
+const resolvedInput = (item, kind) => {
+  const txOut = item?.tx_out && typeof item.tx_out === "object" ? item.tx_out : {};
+  const assets = Object.entries(txOut.assets || {}).flatMap(([policyId, names]) =>
+    Object.entries(names || {}).map(([assetName, quantity]) => ({ policyId: text(policyId), assetName: text(assetName), quantity: text(quantity) }))
+  ).sort((a, b) => `${a.policyId}:${a.assetName}`.localeCompare(`${b.policyId}:${b.assetName}`));
+  return { kind, key: resolvedTxInLabel(item), txId: text(item?.tx_id), outputIndex: text(item?.index), resolved: item?.resolved === true, source: text(item?.source), reason: text(item?.reason), addressHex: text(txOut.address_hex), coinLovelace: text(txOut.coin_lovelace), assets };
+};
 
 const resolvedTxInRows = (items, pathRoot) =>
   (Array.isArray(items) ? items : []).map((item, index) => {
@@ -406,6 +414,10 @@ const normalizeWitnessPlan = (plan) => {
       metric("Missing inputs", context.missing_input_count ?? 0),
     ],
     warnings,
+    resolvedInputs: [
+      ...resolvedInputs.map((item) => resolvedInput(item, "Regular input")),
+      ...resolvedReferenceInputs.map((item) => resolvedInput(item, "Reference input")),
+    ],
     sections: [
       {
         title: "Required signers",
@@ -435,16 +447,6 @@ const normalizeWitnessPlan = (plan) => {
         title: "Present bootstrap witnesses",
         empty: "None present.",
         rows: signerRows(bootstrapWitnesses, "present_bootstrap_witnesses"),
-      },
-      {
-        title: "Resolved inputs",
-        empty: "No input UTxO context supplied.",
-        rows: resolvedTxInRows(resolvedInputs, "resolved_inputs"),
-      },
-      {
-        title: "Resolved reference inputs",
-        empty: "No reference input UTxO context supplied.",
-        rows: resolvedTxInRows(resolvedReferenceInputs, "resolved_reference_inputs"),
       },
       {
         title: "Script witnesses",
