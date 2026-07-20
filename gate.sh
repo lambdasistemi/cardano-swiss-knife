@@ -285,6 +285,76 @@ portable_age_vault_contract_inventory() {
   done
 }
 
+auxiliary_metadata_rendering_inventory() {
+  local lock="flake.lock"
+  local model="docs/inspector/src/FFI/Json.purs"
+  local renderer="docs/inspector/src/Main.purs"
+  local fixture="docs/inspector/tests/fixtures/tx-intent-metadata-all-types.hex"
+  local journey="docs/inspector/tests/tx-identify.spec.mjs"
+  local expected_sha="112463f5e7065fe6ce78a60be9efee50fb174dd4a918d6b9366d0f14356afaac"
+  local fixture_sha required
+
+  rg -Fq 'a4cf31f4abd7ab0b9872d70dd8f0afe3dbccf5d7' "$lock" || {
+    echo "ledger-inspector pin lacks typed auxiliary metadata support" >&2
+    return 1
+  }
+
+  for required in \
+    'MetadataInt String' \
+    'MetadataBytes String' \
+    'MetadataText String' \
+    'MetadataList (Array MetadataValue)' \
+    'MetadataMap (Array MetadataMapEntry)' \
+    'field "auxiliary_data" intent' \
+    'arrayField "metadata" auxiliaryData'; do
+    rg -Fq "$required" "$model" || {
+      echo "typed auxiliary metadata model missing proof anchor: $required" >&2
+      return 1
+    }
+  done
+
+  for required in \
+    'Self-declared transaction metadata' \
+    'Json.MetadataInt decimal' \
+    'Json.MetadataBytes hex' \
+    'Json.MetadataText text' \
+    'Json.MetadataList items' \
+    'Json.MetadataMap entries' \
+    'renderMetadataMapEntry'; do
+    rg -Fq "$required" "$renderer" || {
+      echo "recursive auxiliary metadata renderer missing proof anchor: $required" >&2
+      return 1
+    }
+  done
+
+  [[ -f "$fixture" ]] || {
+    echo "missing canonical all-types metadata fixture: $fixture" >&2
+    return 1
+  }
+  fixture_sha="$(sha256sum "$fixture")"
+  fixture_sha="${fixture_sha%% *}"
+  [[ "$fixture_sha" == "$expected_sha" ]] || {
+    echo "all-types metadata fixture SHA mismatch: expected $expected_sha, got $fixture_sha" >&2
+    return 1
+  }
+
+  for required in \
+    'renders decoded auxiliary metadata' \
+    'Self-declared transaction metadata' \
+    '9007199254740993' \
+    'toHaveCount(3)' \
+    'mapEntries.nth(0)' \
+    'mapEntries.nth(1)' \
+    'mapEntries.nth(2)' \
+    '00ff' \
+    'nested'; do
+    rg -Fq "$required" "$journey" || {
+      echo "auxiliary metadata browser proof missing anchor: $required" >&2
+      return 1
+    }
+  done
+}
+
 git diff --check
 git diff --check origin/main...HEAD
 legacy_secret_storage_inventory
@@ -295,6 +365,7 @@ product_branding_inventory
 address_label_view_inventory
 bookable_identifier_restriction_inventory
 portable_age_vault_contract_inventory
+auxiliary_metadata_rendering_inventory
 bash scripts/check-architecture-boundary.sh
 nix build .#checks.x86_64-linux.test --no-link
 nix run .#ci-check
