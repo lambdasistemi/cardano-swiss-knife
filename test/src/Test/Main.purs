@@ -22,11 +22,13 @@ import Effect.Exception (throw)
 import Partial.Unsafe (unsafeCrashWith)
 import Test.Vectors (BootstrapVector, DerivationVector, FamilyRestoreVector, InspectionVector, ScriptHashVector, ScriptTemplateVector, ShelleyRestoreVector, SigningVector, bootstrapVectors, derivationVectors, familyRestoreVectors, inspectionVectors, scriptHashVectors, scriptTemplateVectors, shelleyRestoreVectors, signingVectors)
 import Test.Provider (runProviderContractTests)
+import Test.TextEnvelope (runTextEnvelopeTests)
 
 main :: Effect Unit
 main = launchAff_ do
   runBookableIdentifierTests
   runProviderContractTests
+  runTextEnvelopeTests
   wasmAvailable <- tryWasm
   when wasmAvailable do
     traverse_ assertDerivationVector derivationVectors
