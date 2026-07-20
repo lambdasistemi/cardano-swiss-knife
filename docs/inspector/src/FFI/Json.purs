@@ -5,6 +5,9 @@ module FFI.Json
   , Identification
   , IdentificationRow
   , IntentClaim
+  , MetadataEntry
+  , MetadataMapEntry
+  , MetadataValue(..)
   , IntentSummary
   , Inspection
   , Metric
@@ -132,6 +135,24 @@ type IntentClaim =
   , detail :: String
   }
 
+type MetadataEntry =
+  { label :: String
+  , value :: MetadataValue
+  }
+
+type MetadataMapEntry =
+  { key :: MetadataValue
+  , value :: MetadataValue
+  }
+
+data MetadataValue
+  = MetadataInt String
+  | MetadataBytes String
+  | MetadataText String
+  | MetadataList (Array MetadataValue)
+  | MetadataMap (Array MetadataMapEntry)
+  | MetadataMalformed
+
 type WitnessPlanRow =
   { label :: String
   , value :: String
@@ -153,6 +174,7 @@ type IntentSummary =
   , subtitle :: String
   , metrics :: Array Metric
   , claims :: Array IntentClaim
+  , metadata :: Array MetadataEntry
   , sections :: Array WitnessPlanSection
   , warnings :: Array String
   }
@@ -241,6 +263,7 @@ invalidIntentSummary title subtitle =
   , subtitle
   , metrics: []
   , claims: []
+  , metadata: []
   , sections: []
   , warnings: []
   }
@@ -275,9 +298,38 @@ readIntentSummary intent =
     , subtitle: stringField "subtitle" "" intent
     , metrics: map readMetric (arrayField "metrics" intent)
     , claims: map readIntentClaim (arrayField "claims" intent)
+    , metadata: intentMetadataEntries intent
     , sections: sectionsWithOutputs
     , warnings: map readStringDefault (arrayField "warnings" intent)
     }
+
+intentMetadataEntries :: Foreign -> Array MetadataEntry
+intentMetadataEntries intent =
+  case field "auxiliary_data" intent of
+    Just auxiliaryData -> map readMetadataEntry (arrayField "metadata" auxiliaryData)
+    Nothing -> []
+
+readMetadataEntry :: Foreign -> MetadataEntry
+readMetadataEntry value =
+  { label: stringField "label" "" value
+  , value: fromMaybe MetadataMalformed (field "value" value <#> readMetadataValue)
+  }
+
+readMetadataValue :: Foreign -> MetadataValue
+readMetadataValue value =
+  case stringField "type" "" value of
+    "int" -> MetadataInt (stringField "value" "" value)
+    "bytes" -> MetadataBytes (stringField "hex" "" value)
+    "text" -> MetadataText (stringField "value" "" value)
+    "list" -> MetadataList (map readMetadataValue (arrayField "items" value))
+    "map" -> MetadataMap (map readMetadataMapEntry (arrayField "entries" value))
+    _ -> MetadataMalformed
+
+readMetadataMapEntry :: Foreign -> MetadataMapEntry
+readMetadataMapEntry value =
+  { key: fromMaybe MetadataMalformed (field "key" value <#> readMetadataValue)
+  , value: fromMaybe MetadataMalformed (field "value" value <#> readMetadataValue)
+  }
 
 intentOutputValues :: Foreign -> Array Foreign
 intentOutputValues intent =

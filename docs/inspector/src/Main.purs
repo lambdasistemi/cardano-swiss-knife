@@ -30,7 +30,7 @@ import FFI.Blockfrost (Network(..), networkName)
 import FFI.BookStore as BookStore
 import FFI.Clipboard (copy) as Clipboard
 import FFI.Inspector (InspectorResult, runLedgerOperation)
-import FFI.Json (Browser, Identification, IntentSummary, RdfGraph, Validation, WitnessPlan, inspect, operationArgsMerged, operationArgsWithPath, operationBrowser, operationIdentification, operationInspection, operationIntentSummary, operationRdfGraph, operationValidation, operationWitnessPlan, pretty, providerResolutionErrorArgs) as Json
+import FFI.Json (Browser, Identification, IntentSummary, MetadataValue(..), RdfGraph, Validation, WitnessPlan, inspect, operationArgsMerged, operationArgsWithPath, operationBrowser, operationIdentification, operationInspection, operationIntentSummary, operationRdfGraph, operationValidation, operationWitnessPlan, pretty, providerResolutionErrorArgs) as Json
 import FFI.OverlayBook as OverlayBook
 import FFI.RdfShapes as RdfShapes
 import FFI.Storage as Storage
@@ -2179,8 +2179,77 @@ inspectorComponent initial =
               , HH.div [ classNames [ "li-empty-title" ] ] [ HH.text "No decoded tree yet" ]
               , HH.p [ classNames [ "li-empty-copy" ] ] [ HH.text "Decode a transaction to populate the structured Conway tree." ]
               ]
-          ] <> renderResolvedInputs state)
+          ] <> renderDeclaredMetadata state <> renderResolvedInputs state)
     in HH.section [ classNames [ "decoded-screen" ] ] children
+
+  renderDeclaredMetadata state =
+    case state.intent of
+      Just intent | intent.valid && not (Array.null intent.metadata) ->
+        [ HH.section
+            [ classNames [ "declared-metadata-panel", "identity-panel" ]
+            , mdSurface "decoded"
+            ]
+            [ HH.div
+                [ classNames [ "identity-heading" ] ]
+                [ HH.div_
+                    [ HH.h3_ [ HH.text "Self-declared transaction metadata" ]
+                    , HH.p_ [ HH.text "This is transaction-supplied metadata, not independently verified information." ]
+                    ]
+                ]
+            , HH.div [ classNames [ "declared-metadata-entries" ] ] (map renderMetadataEntry intent.metadata)
+            ]
+        ]
+      _ -> []
+
+  renderMetadataEntry entry =
+    HH.div
+      [ classNames [ "declared-metadata-entry" ] ]
+      [ HH.div [ classNames [ "identity-section-title" ] ] [ HH.text ("Label " <> entry.label) ]
+      , renderMetadataValue entry.value
+      ]
+
+  renderMetadataValue value =
+    case value of
+      Json.MetadataInt decimal -> renderMetadataScalar "int" decimal
+      Json.MetadataBytes hex -> renderMetadataScalar "bytes" hex
+      Json.MetadataText text -> renderMetadataScalar "text" text
+      Json.MetadataList items ->
+        HH.div
+          [ classNames [ "declared-metadata-value", "declared-metadata-list" ] ]
+          [ HH.strong_ [ HH.text "list" ]
+          , HH.div_ (Array.mapWithIndex renderMetadataListItem items)
+          ]
+      Json.MetadataMap entries ->
+        HH.div
+          [ classNames [ "declared-metadata-value", "declared-metadata-map" ] ]
+          [ HH.strong_ [ HH.text "map" ]
+          , HH.div_ (map renderMetadataMapEntry entries)
+          ]
+      Json.MetadataMalformed ->
+        HH.div
+          [ classNames [ "declared-metadata-value", "declared-metadata-malformed" ] ]
+          [ HH.text "Malformed metadata value" ]
+
+  renderMetadataScalar tag value =
+    HH.div
+      [ classNames [ "declared-metadata-value", "declared-metadata-scalar" ] ]
+      [ HH.strong_ [ HH.text tag ]
+      , HH.code_ [ HH.text value ]
+      ]
+
+  renderMetadataListItem index value =
+    HH.div
+      [ classNames [ "declared-metadata-list-item" ] ]
+      [ HH.span_ [ HH.text ("Item " <> show index) ]
+      , renderMetadataValue value
+      ]
+
+  renderMetadataMapEntry entry =
+    HH.div
+      [ classNames [ "declared-metadata-map-entry" ] ]
+      [ HH.div_ [ HH.span_ [ HH.text "Key" ], renderMetadataValue entry.key ]
+      , HH.div_ [ HH.span_ [ HH.text "Value" ], renderMetadataValue entry.value ]
+      ]
 
   renderResolvedInputs state = case state.witnessPlan of
     Just plan | plan.valid ->

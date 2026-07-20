@@ -33,6 +33,10 @@ const treasuryReorganizeFixturePath = path.join(
   repoRoot,
   "docs/inspector/tests/fixtures/treasury-reorganize-unsigned-tx.hex",
 );
+const metadataAllTypesFixturePath = path.join(
+  repoRoot,
+  "docs/inspector/tests/fixtures/tx-intent-metadata-all-types.hex",
+);
 const treasuryOwnerHash =
   "8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1";
 const treasuryOwnerName = "network_compliance scope owner";
@@ -52,6 +56,12 @@ const amaruTreasuryTx2026Root = path.join(
 );
 const contingencyTxId =
   "18d57a4f104df4cc776104ce626958e2110122392e4c4c7671edc8861b48452e";
+const contingencyMetadataFixturePath = path.join(
+  amaruTreasuryTx2026Root,
+  "contingency",
+  contingencyTxId,
+  "signed-tx.hex",
+);
 const previewPrefix = "/lambdasistemi/cardano-ledger-inspector/pr-99/";
 const localBookStoreKey = "cardano-ledger-inspector.books.v1";
 const pastedTurtleBook = `
@@ -2827,6 +2837,39 @@ test("faithful CQuisitor parity renders Conway structure for the Amaru treasury 
     checkedContingencyGolden,
     `expected to cover contingency transaction ${contingencyTxId}`,
   ).toBe(true);
+});
+
+test("renders decoded auxiliary metadata", async ({ page }) => {
+  await decodeFixture(page, contingencyMetadataFixturePath);
+
+  const structurePanel = await selectResultTab(page, "Structure");
+  const declaredMetadata = structurePanel.locator(".declared-metadata-panel");
+  await expect(declaredMetadata).toContainText("Self-declared transaction metadata");
+  await expect(declaredMetadata).toContainText("1694");
+  await expect(declaredMetadata).toContainText(
+    "Funding Network Compliance to reach 425k USDM target",
+  );
+
+  await decodeFixture(page, metadataAllTypesFixturePath);
+  const allTypesMetadata = page.locator(".declared-metadata-panel");
+  await expect(allTypesMetadata).toContainText("int");
+  await expect(allTypesMetadata).toContainText("bytes");
+  await expect(allTypesMetadata).toContainText("text");
+  await expect(allTypesMetadata).toContainText("list");
+  await expect(allTypesMetadata).toContainText("map");
+  await expect(allTypesMetadata).toContainText("9007199254740993");
+  await expect(allTypesMetadata).toContainText("-1");
+  await expect(allTypesMetadata).toContainText("00ff");
+
+  const mapEntries = allTypesMetadata.locator(".declared-metadata-map-entry");
+  await expect(mapEntries).toHaveCount(3);
+  await expect(mapEntries.nth(0)).toContainText("aa");
+  await expect(mapEntries.nth(0)).toContainText("1");
+  await expect(mapEntries.nth(1)).toContainText("d");
+  await expect(mapEntries.nth(1)).toContainText("1");
+  await expect(mapEntries.nth(2)).toContainText("d");
+  await expect(mapEntries.nth(2)).toContainText("2");
+  await expect(allTypesMetadata).toContainText("nested");
 });
 
 test("decoded structure toggles collapse and expand direct children", async ({
