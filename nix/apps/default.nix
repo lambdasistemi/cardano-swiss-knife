@@ -9,6 +9,7 @@ in
   "ci-haskell-quality" = import ./haskell-quality.nix { inherit lib; };
   "ci-check-vectors" = import ./check-vectors.nix { inherit lib; };
   "ci-test" = import ./test.nix { inherit lib; };
+  "ci-vault" = import ./vault-test.nix { inherit pkgs repoRoot; };
   "ci-playwright" = import ./playwright.nix { inherit lib; };
   "ci-inspector-playwright" = import ./inspector-playwright.nix {
     inherit pkgs repoRoot playwrightBrowsers txInspectorUi inspectorSource protocolRegistry;

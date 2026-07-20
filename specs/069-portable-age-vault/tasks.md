@@ -20,18 +20,18 @@ recognized legacy vaults migrate without cleartext touching disk.
 **Goal**: Make canonical age and all recognized migration mappings available
 once to browser and Node hosts.
 
-- [ ] T005 Add RED tests for canonical v1 validation, all current kinds,
+- [X] T005 Add RED tests for canonical v1 validation, all current kinds,
   duplicate ids, unsupported versions, unknown-kind/extension retention, and
   secret-free diagnostics.
-- [ ] T006 Add the portable `age-encryption` dependency and implement binary
+- [X] T006 Add the portable `age-encryption` dependency and implement binary
   scrypt-passphrase encrypt/decrypt in `Cardano.Vault` without native addons.
-- [ ] T007 Implement legacy CSK AES-GCM, `cardanoTxSignVault`, and
+- [X] T007 Implement legacy CSK AES-GCM, `cardanoTxSignVault`, and
   `amaruTreasuryWitnessVault` adapters with exact type/label/metadata mapping.
-- [ ] T008 Reject duplicate migrated labels/key hashes and preserve every
+- [X] T008 Reject duplicate migrated labels/key hashes and preserve every
   unknown canonical entry object losslessly across re-encryption.
-- [ ] T009 Prove Node/browser-compatible round trips and bidirectional official
+- [X] T009 Prove Node/browser-compatible round trips and bidirectional official
   `age` CLI interoperability from checked-in synthetic fixtures.
-- [ ] T010 Obtain navigator RED/GREEN approval, run `nix run .#ci-vault`,
+- [X] T010 Obtain navigator RED/GREEN approval, run `nix run .#ci-vault`,
   `nix run .#ci-test`, and `./gate.sh`, and commit once with
   `Tasks: T005, T006, T007, T008, T009, T010`.
 
