@@ -41,7 +41,7 @@ const ptyCreate = async (out, mismatch = false) => {
     `spawn sh -c {stty -g > ${quote(before)}; node ${quote(cli.pathname)} vault create --out ${quote(out)} --force; status=$?; stty -g > ${quote(after)}; exit $status}`,
     'expect "Vault passphrase:"', `send -- "${passphrase}\\r"`,
     'expect "Confirm vault passphrase:"', `send -- "${mismatch ? "different confirmation" : passphrase}\\r"`,
-    "expect eof", "puts -nonewline $expect_out(buffer)",
+    "expect eof", "puts -nonewline $expect_out(buffer)", "exit [lindex [wait] 3]",
   ].join("\n");
   let result;
   try { result = { ...(await execFileAsync("expect", ["-c", script])), code: 0 }; }
@@ -50,7 +50,7 @@ const ptyCreate = async (out, mismatch = false) => {
 };
 const ptySignal = async (out) => {
   const before = `${out}.before`; const after = `${out}.after`;
-  const script = ["log_user 0", "set timeout 15", `spawn sh -c {stty -g > ${quote(before)}; node ${quote(cli.pathname)} vault create --out ${quote(out)}; status=$?; stty -g > ${quote(after)}; exit $status}`, 'expect "Vault passphrase:"', "send \\003", "expect eof", "puts -nonewline $expect_out(buffer)"].join("\n");
+  const script = ["log_user 0", "set timeout 15", `spawn sh -c {stty -g > ${quote(before)}; node ${quote(cli.pathname)} vault create --out ${quote(out)}; status=$?; stty -g > ${quote(after)}; exit $status}`, 'expect "Vault passphrase:"', "send \\003", "expect eof", "puts -nonewline $expect_out(buffer)", "exit [lindex [wait] 3]"].join("\n");
   let result; try { result = { ...(await execFileAsync("expect", ["-c", script])), code: 0 }; } catch (error) { result = { stdout: error.stdout ?? "", stderr: error.stderr ?? "", code: error.code ?? 1 }; }
   return { ...result, before: await readFile(before, "utf8"), after: await readFile(after, "utf8") };
 };
@@ -206,6 +206,21 @@ test("SIGINT during a no-echo TTY prompt restores terminal state without creatin
   const out = join(dir, "signal.age"); const result = await ptySignal(out);
   assert.notEqual(result.code, 0); assert.notEqual(result.before, ""); assert.equal(result.before, result.after);
   await assert.rejects(readFile(out)); assert.doesNotMatch(`${result.stdout}${result.stderr}`, new RegExp(passphrase));
+}));
+
+test("TTY create works with stdin redirected to null and never echoes its passphrase", async () => withVault(async (dir) => {
+  const out = join(dir, "redirected.age");
+  const before = `${out}.before`; const after = `${out}.after`;
+  const script = ["log_user 1", `log_file {${out}.transcript}`, "set timeout 15", `spawn sh -c {stty -g > ${quote(before)}; node ${quote(cli.pathname)} vault create --out ${quote(out)} </dev/null; status=$?; stty -g > ${quote(after)}; exit $status}`, 'expect "Vault passphrase:"', `send -- "${passphrase}\\r"`, 'expect "Confirm vault passphrase:"', `send -- "${passphrase}\\r"`, "expect eof", "exit [lindex [wait] 3]"].join("\n");
+  const result = await execFileAsync("expect", ["-c", script]); assert.match(await readFile(out, "utf8"), /^age-encryption\.org\/v1/); const beforeState = await readFile(before, "utf8"); const afterState = await readFile(after, "utf8"); assert.notEqual(beforeState, ""); assert.notEqual(afterState, ""); assert.equal(beforeState, afterState); assert.doesNotMatch(`${result.stdout}${result.stderr}${await readFile(`${out}.transcript`, "utf8")}`, new RegExp(passphrase));
+}));
+
+test("migrate supports one inherited passphrase FD and one shared controlling-terminal prompt", async () => withVault(async (dir) => {
+  const input = join(dir, "mixed.input"); const out = join(dir, "mixed.age"); const fifo = join(dir, "mixed.fd"); const before = `${out}.before`; const after = `${out}.after`;
+  await writeFile(input, await encryptedWrapper("tx-sign-v1.json"));
+  await execFileAsync("mkfifo", [fifo]); const writer = writeFile(fifo, passphrase);
+  const script = ["log_user 1", `log_file {${out}.transcript}`, "set timeout 15", `spawn sh -c {stty -g > ${quote(before)}; exec 3<${quote(fifo)}; node ${quote(cli.pathname)} vault migrate --input ${quote(input)} --out ${quote(out)} --input-passphrase-fd 3; status=$?; stty -g > ${quote(after)}; exit $status}`, 'expect "Vault passphrase:"', `send -- "${passphrase}\\r"`, "expect eof", "exit [lindex [wait] 3]"].join("\n");
+  const result = await execFileAsync("expect", ["-c", script]); await writer; assert.match(await readFile(out, "utf8"), /^age-encryption\.org\/v1/); const beforeState = await readFile(before, "utf8"); const afterState = await readFile(after, "utf8"); assert.notEqual(beforeState, ""); assert.notEqual(afterState, ""); assert.equal(beforeState, afterState); assert.doesNotMatch(`${result.stdout}${result.stderr}${await readFile(`${out}.transcript`, "utf8")}`, new RegExp(passphrase)); assert.equal((await run(["vault", "list", "--vault", out, ...fdArgs(0)], `${passphrase}\n`)).code, 0);
 }));
 
 test("migrate rejects a real encrypted wrapper with a wrong passphrase without changing input, target, or temp state", async () => withVault(async (dir) => {
