@@ -2,10 +2,10 @@
 
 ## Slice 1 — Shared offline services and checked parity
 
-- [ ] T001-S1 Add a failing PureScript test that maps every checked inventory ID to its shared service and proves representative invalid-input typing.
-- [ ] T002-S1 Add `Cardano.Offline.Address`, `.Mnemonic`, `.Key`, `.Script`, and `.Payload` as delegation-only facades over the existing authoritative modules.
-- [ ] T003-S1 Move the WebUI imports to the offline facades without visible behavior change and add the inventory correspondence check.
-- [ ] T004-S1 Run the focused PureScript proof and `./gate.sh`, then commit exactly `refactor(offline): share backend-independent services` with `Tasks: T001, T002, T003, T004`.
+- [x] T001-S1 Add a failing PureScript test that maps every checked inventory ID to its shared service and proves representative invalid-input typing.
+- [x] T002-S1 Add `Cardano.Offline.Address`, `.Mnemonic`, `.Key`, `.Script`, and `.Payload` as delegation-only facades over the existing authoritative modules.
+- [x] T003-S1 Move the WebUI imports to the offline facades without visible behavior change and add the inventory correspondence check.
+- [x] T004-S1 Run the focused PureScript proof and `./gate.sh`, then commit exactly `refactor(offline): share backend-independent services` with `Tasks: T001, T002, T003, T004`.
 
 ## Slice 2 — Importable ESM package and package-relative engine
 

@@ -2,13 +2,12 @@ module Test.Main where
 
 import Prelude
 
-import Cardano.Address.Bootstrap as Bootstrap
-import Cardano.Address.Derivation (Role(..), derivePipeline)
-import Cardano.Address.Inspect as Inspect
-import Cardano.Address.Inspect (eitherInspectAddress)
-import Cardano.Address.Shelley as Shelley
-import Cardano.Address.Signing as Signing
-import Cardano.Address.Script (analyzeNativeScriptHex, analyzeNativeScriptJson, analyzeScriptTemplateJson)
+import Cardano.Offline.Address as Inspect
+import Cardano.Offline.Key as Bootstrap
+import Cardano.Offline.Key as Shelley
+import Cardano.Offline.Key (Role(..), derivePipeline)
+import Cardano.Offline.Payload as Signing
+import Cardano.Offline.Script (analyzeNativeScriptHex, analyzeNativeScriptJson, analyzeScriptTemplateJson)
 import Test.BookableIdentifier (runBookableIdentifierTests)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
@@ -22,11 +21,13 @@ import Effect.Exception (throw)
 import Partial.Unsafe (unsafeCrashWith)
 import Test.Vectors (BootstrapVector, DerivationVector, FamilyRestoreVector, InspectionVector, ScriptHashVector, ScriptTemplateVector, ShelleyRestoreVector, SigningVector, bootstrapVectors, derivationVectors, familyRestoreVectors, inspectionVectors, scriptHashVectors, scriptTemplateVectors, shelleyRestoreVectors, signingVectors)
 import Test.Provider (runProviderContractTests)
+import Test.Offline (runOfflineTests)
 
 main :: Effect Unit
 main = launchAff_ do
   runBookableIdentifierTests
   runProviderContractTests
+  runOfflineTests
   wasmAvailable <- tryWasm
   when wasmAvailable do
     traverse_ assertDerivationVector derivationVectors
@@ -56,7 +57,7 @@ assertDerivationVector vector = do
 
 assertInspectionVector :: InspectionVector -> Aff Unit
 assertInspectionVector vector = do
-  result <- eitherInspectAddress vector.address
+  result <- Inspect.eitherInspectAddress vector.address
   case result of
     Right actual | actual == vector.expected -> pure unit
     Right _ ->

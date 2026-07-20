@@ -2,13 +2,13 @@ module Main (main) where
 
 import Prelude
 
-import Cardano.Address.Bootstrap as Bootstrap
 import Cardano.BookableIdentifier (isBookableIdentifierKind)
-import Cardano.Address.Derivation as Derivation
-import Cardano.Address.Shelley as Shelley
-import Cardano.Address.Signing as Signing
-import Cardano.Address.Script as Script
-import Cardano.Mnemonic as Mnemonic
+import Cardano.Offline.Key as Bootstrap
+import Cardano.Offline.Key as Derivation
+import Cardano.Offline.Key as Shelley
+import Cardano.Offline.Mnemonic as Mnemonic
+import Cardano.Offline.Payload as Signing
+import Cardano.Offline.Script as Script
 import Control.Promise (Promise, toAff)
 import Data.Array as Array
 import Data.Either (Either(..))
