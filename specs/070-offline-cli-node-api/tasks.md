@@ -33,9 +33,9 @@
 
 ## Orchestrator-owned finalization
 
-- [ ] T020 Audit every inventory row against PureScript, ESM, CLI, vectors, and typed failures; verify no open implementation task remains.
-- [ ] T021 Run the final gate and commit-message audit, update the draft PR body with proof and residual risk, and remove `gate.sh` only under the resolve-ticket finalization rule.
-- [ ] T022 Push the finalized branch, mark the PR ready, report `COMPLETE`, and do not merge.
+- [X] T020 Audit every inventory row against PureScript, ESM, CLI, vectors, and typed failures; verify no open implementation task remains.
+- [X] T021 Run the final gate and commit-message audit, update the draft PR body with proof and residual risk, and remove `gate.sh` only under the resolve-ticket finalization rule.
+- [X] T022 Push the finalized branch, mark the PR ready, report `COMPLETE`, and do not merge.
 
 ## Slice 5 — Final-audit package-check repair
 
