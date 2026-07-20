@@ -191,6 +191,7 @@ rendered_resolution_journey_inventory
 provider_validation_truth_inventory
 product_branding_inventory
 address_label_view_inventory
+bash scripts/check-architecture-boundary.sh
 nix build .#checks.x86_64-linux.test --no-link
 nix run .#ci-check
 nix run .#ci-haskell-quality

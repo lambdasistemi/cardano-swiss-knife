@@ -24,6 +24,17 @@ is its ledger engine.
 
 ## Core subsystems
 
+<!-- architecture-boundary: responsibility-table -->
+### Responsibility boundary
+
+| Area | Owns | Must not own |
+| --- | --- | --- |
+| Browser host and UI state | Halogen rendering, navigation, form and vault state, and translating explicit capability outcomes into user-visible diagnostics | Provider endpoint policy, Cardano/CBOR/RDF/SPARQL/SHACL semantics, or fallback results |
+| Shared provider capability | Provider/network types, selected-provider endpoint and request policy, authentication, status/error classification, response decoding, and validation-context assembly in lib/src/Cardano/Provider.purs | DOM, browser storage, Node filesystem, CLI parsing, transaction entry/store/persistence, witnesses, completeness, or submission |
+| Address engine | Address inspection, mnemonic and key operations through cardano-addresses.wasm | Browser reimplementation of address semantics |
+| Transaction engine | Ledger decoding, transaction analysis, witnesses, and transaction-tree semantics through wasm-tx-inspector.wasm | JavaScript or PureScript substitutes for ledger semantics |
+| RDF/SHACL engine | RDF graph and shape semantics through the RDF-shapes WASM artifact; the approved RDF editor only owns editing UI | Host-side RDF, SPARQL, or SHACL semantic fallback |
+
 ### Browser shell
 
 The Halogen application in `docs/inspector/` coordinates navigation, form state, vault usage, and rendering.
@@ -57,6 +68,59 @@ The Transactions page can fetch CBOR from external providers when the user start
 - Koios
 
 Those provider credentials are UI inputs, not backend secrets. They belong in the encrypted vault because the app is entirely client-side.
+
+lib/src/Cardano/Provider.purs is the sole production owner of provider endpoint
+bases and paths, authentication/header policy, HTTP method and request-body
+selection, status classification, provider/network types, and selected-provider
+behavior. lib/src/Cardano/Provider.js is deliberately host-neutral: it only
+transfers generic Fetch bodies, adapts JSON response shapes, and maintains the
+resolution envelope. The WebUI Provider and FFI.Blockfrost modules are
+compatibility delegates, not another HTTP implementation.
+
+<!-- architecture-boundary: artifact-provenance-pins -->
+## Artifact provenance and pins
+
+The browser never invents engine artifact hashes. flake.nix names the
+authoritative producers and flake.lock pins their resolved revisions:
+
+| Artifact | Authoritative flake input | Packaging path |
+| --- | --- | --- |
+| cardano-addresses.wasm | cardano-addresses | cardano-addresses.packages.<system>.wasm |
+| wasm-tx-inspector.wasm | cardano-ledger-inspector | cardano-ledger-inspector.packages.<system>.wasm-tx-inspector |
+| RDF-shapes WASM | rdf-shapes-wasm | rdf-shapes-wasm.packages.<system>.wasm-pkg |
+
+Updating an artifact therefore means updating the named flake input and
+reviewing its corresponding flake.lock change, then rebuilding through Nix.
+The host consumes the resulting artifacts; it does not replace their
+Cardano, CBOR, RDF, SPARQL, or SHACL meaning with a package dependency.
+
+<!-- architecture-boundary: fail-hard-behavior -->
+## Explicit failure behavior
+
+Provider and engine failures are fail-hard and remain visible to the caller.
+Missing credentials, transport failures, HTTP status failures, malformed
+responses, decode failures, engine-load failures, protocol failures, and
+semantic failures do not trigger a second provider, a JavaScript/PureScript
+semantic fallback, or a synthetic partial context. A validation-context
+sub-request failure makes the context operation fail explicitly; it is never
+quietly converted into a successful-looking result.
+
+<!-- architecture-boundary: provider-extension-process -->
+## Extending a provider operation
+
+To add or change a provider operation:
+
+1. Change the shared Provider/Network types, request construction, decode
+   rules, and typed error outcomes together in Cardano.Provider; keep request
+   policy in Provider.purs and only generic Fetch/JSON adaptation in
+   Provider.js.
+2. Add hermetic contracts with real provider response envelopes for every
+   selected provider, including explicit error outcomes. Do not make a host
+   reconstruct the contract.
+3. Preserve WebUI compatibility solely by delegation through the existing thin
+   adapters; do not restore WebUI HTTP modules or provider fallback.
+4. Update the architecture-boundary self-tests and this documentation, then run
+   the focused boundary check and the full repository proofs.
 
 ## Deployment shape
 
