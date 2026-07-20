@@ -252,6 +252,72 @@ bookable_identifier_restriction_inventory() {
   done
 }
 
+text_envelope_codec_inventory() {
+  local codec="lib/src/Cardano/TextEnvelope.purs"
+  local adapter="lib/src/Cardano/TextEnvelope.js"
+  local codec_test="test/src/Test/TextEnvelope.purs"
+  local test_main="test/src/Test/Main.purs"
+  local required
+
+  for required in \
+    'module Cardano.TextEnvelope' \
+    'data TextEnvelopeType' \
+    'Transaction -> "Tx ConwayEra"' \
+    'TransactionWitness -> "TxWitness ConwayEra"' \
+    'decodeCborInput :: String -> Either TextEnvelopeError DecodedCborInput' \
+    'encodeTextEnvelope :: TextEnvelopeType -> String -> Either TextEnvelopeError String' \
+    '"Ledger Cddl Format"' \
+    'beginsWithObject normalized' \
+    'validateCborHex'; do
+    rg -Fq "$required" "$codec" || {
+      echo "TextEnvelope codec missing shared contract anchor: $required" >&2
+      return 1
+    }
+  done
+
+  for required in \
+    'JSON.parse(input)' \
+    'JSON.stringify({ type, description, cborHex })'; do
+    rg -Fq "$required" "$adapter" || {
+      echo "TextEnvelope JSON adapter missing proof anchor: $required" >&2
+      return 1
+    }
+  done
+
+  if rg -n 'window\.|document\.|localStorage|sessionStorage|fetch\(|node:|process\.' "$codec" "$adapter"; then
+    echo "TextEnvelope codec must remain host-neutral" >&2
+    return 1
+  fi
+
+  for required in \
+    'assertRawHex' \
+    'assertDecodedEnvelope "Tx ConwayEra" Transaction' \
+    'assertDecodedEnvelope "TxWitness ConwayEra" TransactionWitness' \
+    'assertEncoding Transaction "aBcD" "Tx ConwayEra"' \
+    'assertEncoding TransactionWitness "1234" "TxWitness ConwayEra"' \
+    'assertRoundTrip Transaction "aBcD"' \
+    'assertRoundTrip TransactionWitness "1234"' \
+    'MissingTextEnvelopeField "description"' \
+    'NonStringTextEnvelopeField "type"' \
+    'NonStringTextEnvelopeField "cborHex"' \
+    'UnsupportedTextEnvelopeType "Tx BabbageEra"' \
+    'assertEncodeError TransactionWitness "abcz" InvalidCborHex'; do
+    rg -Fq "$required" "$codec_test" || {
+      echo "TextEnvelope direct proof missing coverage anchor: $required" >&2
+      return 1
+    }
+  done
+
+  for required in \
+    'import Test.TextEnvelope (runTextEnvelopeTests)' \
+    'runTextEnvelopeTests'; do
+    rg -Fq "$required" "$test_main" || {
+      echo "TextEnvelope direct proof is not wired into Test.Main: $required" >&2
+      return 1
+    }
+  done
+}
+
 git diff --check
 git diff --check origin/main...HEAD
 legacy_secret_storage_inventory
@@ -261,6 +327,7 @@ provider_validation_truth_inventory
 product_branding_inventory
 address_label_view_inventory
 bookable_identifier_restriction_inventory
+text_envelope_codec_inventory
 bash scripts/check-architecture-boundary.sh
 nix build .#checks.x86_64-linux.test --no-link
 nix run .#ci-check
