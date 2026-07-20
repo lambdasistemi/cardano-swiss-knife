@@ -41,7 +41,7 @@ Tasks: T651, T652, T653, T654, T655
 **Goal**: Pin the delivered behavior into the accumulated gate and complete
 issue/PR accounting without editing behavior files.
 
-- [ ] T656 Extend—not replace—the existing `gate.sh` list with engine pin, typed model, recursive rendering, fixture, and focused browser anchors; run `./gate.sh`; commit the extension.
+- [X] T656 Extend—not replace—the existing `gate.sh` list with engine pin, typed model, recursive rendering, fixture, and focused browser anchors; run `./gate.sh`; commit the extension.
 - [ ] T657 Audit issue #65 requirements and task accounting, update the draft PR body with exact local proof, run the final commit/task audit, and drop `gate.sh` only when marking the PR ready.
 
 **Owned Files**:
