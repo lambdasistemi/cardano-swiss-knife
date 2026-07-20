@@ -318,6 +318,69 @@ text_envelope_codec_inventory() {
   done
 }
 
+input_resolution_inventory() {
+  local model="docs/inspector/src/FFI/Json.purs"
+  local adapter="docs/inspector/src/FFI/Json.js"
+  local ui="docs/inspector/src/Main.purs"
+  local journey="docs/inspector/tests/tx-identify.spec.mjs"
+  local required
+
+  for required in \
+    'type ResolvedInput =' \
+    'resolvedInputs :: Array ResolvedInput' \
+    'coinLovelace :: String' \
+    'quantity :: String'; do
+    rg -Fq "$required" "$model" || {
+      echo "input-resolution typed model missing proof anchor: $required" >&2
+      return 1
+    }
+  done
+
+  for required in \
+    'resolvedInputs.map((item) => resolvedInput(item, "Regular input"))' \
+    'resolvedReferenceInputs.map((item) => resolvedInput(item, "Reference input"))' \
+    ').sort((a, b) => `${a.policyId}:${a.assetName}`.localeCompare(`${b.policyId}:${b.assetName}`))' \
+    'coin_lovelace'; do
+    rg -Fq "$required" "$adapter" || {
+      echo "input-resolution adapter missing proof anchor: $required" >&2
+      return 1
+    }
+  done
+
+  for required in \
+    'renderResolvedInputs state' \
+    'not (Array.elem input.txId acc.seen)' \
+    'No native assets' \
+    'Inspect producer transaction' \
+    'InspectProducer txId -> do' \
+    'handleAction Decode'; do
+    rg -Fq "$required" "$ui" || {
+      echo "input-resolution UI missing proof anchor: $required" >&2
+      return 1
+    }
+  done
+
+  for required in \
+    'resolves input and reference input context in Structure and Witness' \
+    'const producerCborRequests = new Set();' \
+    'expect(producerCborRequests.size).toBe(1)' \
+    'expect(utxoRequests).toBe(0)' \
+    'Transaction hash (64 hex chars)' \
+    'https://cardano-mainnet.blockfrost.io/api/v0/txs/${producerHash}/cbor' \
+    '613c12f6735ef87655c5b27bced3f828d857d0a27fd20f2cda18ebf2fb' \
+    '7015148761'; do
+    rg -Fq "$required" "$journey" || {
+      echo "input-resolution browser journey missing proof anchor: $required" >&2
+      return 1
+    }
+  done
+
+  if rg -q '(^|[^A-Za-z])(test|describe)\.only\(' "$journey"; then
+    echo "input-resolution browser journey must not remain focused-only" >&2
+    return 1
+  fi
+}
+
 git diff --check
 git diff --check origin/main...HEAD
 legacy_secret_storage_inventory
@@ -328,6 +391,7 @@ product_branding_inventory
 address_label_view_inventory
 bookable_identifier_restriction_inventory
 text_envelope_codec_inventory
+input_resolution_inventory
 bash scripts/check-architecture-boundary.sh
 nix build .#checks.x86_64-linux.test --no-link
 nix run .#ci-check
