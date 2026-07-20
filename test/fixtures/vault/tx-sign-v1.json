@@ -1,0 +1,21 @@
+{
+  "cardanoTxSignVault": {
+    "version": 1,
+    "identities": {
+      "Payment signing key": {
+        "label": "Payment signing key",
+        "network": "preprod",
+        "keyHash": "deadbeef",
+        "description": "Synthetic payment key",
+        "source": {
+          "kind": "cardano-cli-skey",
+          "keyEnvelope": {
+            "type": "PaymentSigningKeyShelley_ed25519",
+            "description": "Synthetic payment key",
+            "cborHex": "5820deadbeef"
+          }
+        }
+      }
+    }
+  }
+}

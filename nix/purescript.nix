@@ -11,12 +11,12 @@ let
   }) [ "@bjorn3/browser_wasi_shim" "@noble/hashes" "@scure/base" "@scure/bip39" "bech32" "events" ]);
 
   runtimePackage = (builtins.removeAttrs packageJson [ "devDependencies" "scripts" ]) // {
-    dependencies = runtimeDependencies;
+    dependencies = runtimeDependencies // packageJson.dependencies;
   };
   runtimePackageLock = packageLock // {
     packages = packageLock.packages // {
       "" = (builtins.removeAttrs packageLock.packages."" [ "devDependencies" "scripts" ]) // {
-        dependencies = runtimeDependencies;
+        dependencies = runtimeDependencies // packageLock.packages."".dependencies;
       };
     };
   };
@@ -126,11 +126,12 @@ in
       spago build --pure -p cardano-addresses
       cd ..
       mkdir node-api-build
-      cp -a output node node-api-build/
+      cp -a output node cli lib node-api-build/
       ln -s ${nodeModules}/node_modules node-api-build/node_modules
       cd node-api-build
       mkdir -p node/dist
       esbuild node/src/index.js --bundle --platform=node --format=esm --outfile=node/dist/index.js
+      esbuild cli/csk.mjs --bundle --platform=node --format=esm --outfile=node/dist/csk.mjs
       cp ${wasmBinary}/cardano-addresses.wasm node/dist/cardano-addresses.wasm
     '';
     installPhase = ''

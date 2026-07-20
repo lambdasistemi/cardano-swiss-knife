@@ -8,6 +8,9 @@
   "exports": {
     ".": "./node/dist/index.js"
   },
+  "bin": {
+    "csk": "./node/dist/csk.mjs"
+  },
   "files": [
     "node/dist"
   ],
@@ -15,7 +18,10 @@
     "build:lib": "npx spago build -p cardano-addresses",
     "test": "npx spago test -p cardano-addresses-test",
     "bundle:lib": "npx esbuild output/Cardano.Address/index.js --bundle --outfile=dist/cardano-addresses.js --format=esm --minify",
-    "build:node-api": "npx spago build -p cardano-addresses && npx esbuild node/src/index.js --bundle --platform=node --format=esm --outfile=node/dist/index.js"
+    "build:node-api": "npx spago build -p cardano-addresses && npx esbuild node/src/index.js --bundle --platform=node --format=esm --outfile=node/dist/index.js && npx esbuild cli/csk.mjs --bundle --platform=node --format=esm --outfile=node/dist/csk.mjs"
+  },
+  "dependencies": {
+    "age-encryption": "^0.3.0"
   },
   "devDependencies": {
     "@bjorn3/browser_wasi_shim": "^0.4.2",

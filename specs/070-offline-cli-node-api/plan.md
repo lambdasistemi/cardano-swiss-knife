@@ -40,9 +40,14 @@ until the release answer identifies the integration contract
   codec, validation algorithm, hash, or fallback implementation.
 - The root package is private and browser-oriented; there is no importable
   package entry or CLI bin yet.
-- #69 owns CLI bootstrap/root/parser and secret-source plumbing. The CLI slice
-  remains parked until `A-NNN` delivers `vault-cli-bootstrap-ready` and exact
-  owned paths.
+- #69 owns CLI bootstrap/root/parser and secret-source plumbing. Release answer
+  `A-001-waiting-on-vault-bootstrap.md` identifies commit
+  `8623f81088509fc047243e6c58d9462da8068cf9` on
+  `feat/69-portable-age-vault` as the integration baseline and permits
+  extensions to `cli/csk.mjs`, `cli/vault-host.mjs`, `nix/apps/csk.nix`, and
+  `nix/apps/default.nix`. The existing `test/vault-cli.test.mjs` and
+  `test/vault-cross-host.test.mjs` define compatibility conventions and remain
+  reference tests rather than #70-owned semantics.
 
 ## Design
 
@@ -134,25 +139,46 @@ change to lockfiles must be mechanical and add no dependency.
 
 ### Slice 3 — CLI command families over #69 bootstrap
 
-After the release answer, integrate handlers for every inventory ID with stable
-human/JSON output, exit mappings, and secret descriptors. Before dispatch, amend
-this plan/tasks with the exact #69-owned integration paths named by the answer;
-do not guess or edit the sibling contract.
+Integrate the exact #69 release commit as the stacked dependency baseline, then
+add handlers for every inventory ID with stable human/JSON output, exit mappings,
+and stdin/inherited-FD/vault secret descriptors. Preserve the #69 vault command
+surface and vault tests unchanged in behavior; extend its released root and host
+adapter without changing vault schema, encryption, migration, or persistence
+semantics.
 
-**Provisional owned files (must be reconciled with the release answer)**:
+**Owned files reconciled from the release answer**:
 
+- `cli/csk.mjs`
+- `cli/vault-host.mjs`
 - `node/src/commands/address.js`
 - `node/src/commands/mnemonic.js`
 - `node/src/commands/key.js`
 - `node/src/commands/script.js`
 - `node/src/commands/payload.js`
+- `lib/src/Cardano/Address/Wasm.js` (preserve structured engine domain failures
+  when the CLI delegates invalid input)
+- `lib/src/Cardano/Address/Inspect.js` (same shared WASI exit contract)
+- `lib/src/Cardano/Address/Derivation.js` (same shared WASI exit contract)
+- `lib/src/Cardano/Address/Bootstrap.js` (same shared WASI exit contract)
+- `lib/src/Cardano/Address/Signing.js` (same shared WASI exit contract)
 - `node/test/cli.test.mjs`
-- exact CLI registry/root integration file released by #69
+- `nix/apps/csk.nix`
+- `nix/apps/default.nix`
+- `nix/purescript.nix` (install the built CLI beside the packaged API/WASM)
+- `flake.nix` (pass the packaged Node artifact to the csk app)
+- `test/src/Test/Main.purs` (mechanical merge resolution retaining both test registries)
 - `package.json`
 - `package-lock.json`
 
+**Reference-only compatibility files**:
+
+- `test/vault-cli.test.mjs`
+- `test/vault-cross-host.test.mjs`
+
 **Focused proof**: the new CLI contract test covering every command family,
-JSON/human modes, typed failures, exit codes, and non-argv secret sources.
+JSON/human modes, typed failures, exit codes, and non-argv secret sources,
+followed by the two #69 vault CLI compatibility tests and a direct
+`nix run .#csk` proof against the built package/WASM closure.
 
 ### Slice 4 — Offline portability and cross-OS gates
 

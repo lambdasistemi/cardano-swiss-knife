@@ -82,6 +82,7 @@
           };
           apps = import ./nix/apps {
             inherit pkgs checks system repoRoot playwrightBrowsers txInspectorUi inspectorSource protocolRegistry uxJudgeSource;
+            nodeApi = packages.node-api;
             combinedSite = packages.combined-site;
             webDist = packages.web-dist;
           };

@@ -252,6 +252,39 @@ bookable_identifier_restriction_inventory() {
   done
 }
 
+portable_age_vault_contract_inventory() {
+  local spec="specs/069-portable-age-vault/spec.md"
+  local plan="specs/069-portable-age-vault/plan.md"
+  local required
+
+  for required in \
+    'age-encryption.org/v1' \
+    'cardanoSwissKnifeVault' \
+    'cardanoTxSignVault' \
+    'amaruTreasuryWitnessVault' \
+    'PBKDF2-SHA256/AES-256-GCM' \
+    'unknown future kind' \
+    'no-echo TTY' \
+    'inherited descriptor' \
+    'explicit `--force`'; do
+    rg -Fq "$required" "$spec" || {
+      echo "portable age vault contract missing required term: $required" >&2
+      return 1
+    }
+  done
+
+  for required in \
+    'lib/src/Cardano/Vault.purs' \
+    'docs/inspector/src/Vault.purs' \
+    'cli/csk.mjs' \
+    'NOTE RELEASE: vault-cli-bootstrap-ready'; do
+    rg -Fq "$required" "$plan" || {
+      echo "portable age vault plan missing boundary or release anchor: $required" >&2
+      return 1
+    }
+  done
+}
+
 git diff --check
 git diff --check origin/main...HEAD
 legacy_secret_storage_inventory
@@ -261,6 +294,7 @@ provider_validation_truth_inventory
 product_branding_inventory
 address_label_view_inventory
 bookable_identifier_restriction_inventory
+portable_age_vault_contract_inventory
 bash scripts/check-architecture-boundary.sh
 nix build .#checks.x86_64-linux.test --no-link
 nix run .#ci-check
@@ -274,4 +308,5 @@ nix run .#ci-ux-capture
 nix run .#ci-combined-site-smoke
 nix develop github:paolino/dev-assets?dir=mkdocs --quiet -c mkdocs build --strict
 nix run .#ci-test
+nix run .#ci-vault
 nix run .#ci-playwright

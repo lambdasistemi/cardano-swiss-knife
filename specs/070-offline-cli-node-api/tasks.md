@@ -17,11 +17,11 @@
 
 ## Slice 3 — CLI command families over #69 bootstrap
 
-- [ ] T010-S3 Receive `vault-cli-bootstrap-ready`, reconcile the exact CLI integration paths in plan/tasks, and record the resumed release contract before dispatch.
-- [ ] T011-S3 Add failing command tests covering every inventory mapping, JSON/human output, exit codes, and the #69 stdin/vault/fd secret descriptors.
-- [ ] T012-S3 Implement address, mnemonic, key, script, and payload handlers as thin calls to the shared ESM/PureScript services.
-- [ ] T013-S3 Wire handlers into #69's released registry/root without changing its vault schema, crypto, parser ownership, or secret-source semantics.
-- [ ] T014-S3 Run the focused CLI contract proof and `./gate.sh`, then commit exactly `feat(cli): expose offline capability commands` with `Tasks: T010, T011, T012, T013, T014`.
+- [X] T010-S3 Consume #69 release commit `8623f81088509fc047243e6c58d9462da8068cf9`, reconcile `cli/csk.mjs`, `cli/vault-host.mjs`, the built-package csk/Nix app wiring, the test-registry merge, handler, package, and CLI-test paths, and preserve its vault compatibility tests.
+- [X] T011-S3 Add failing command tests covering every inventory mapping, JSON/human output, exit codes, and the #69 stdin/vault/fd secret descriptors.
+- [X] T012-S3 Implement address, mnemonic, key, script, and payload handlers as thin calls to the shared ESM/PureScript services, preserving the engine's structured domain failures across the shared WASI boundary.
+- [X] T013-S3 Wire handlers into #69's released registry/root without changing its vault schema, crypto, parser ownership, or secret-source semantics.
+- [X] T014-S3 Run the focused CLI contract proof and `./gate.sh`, then commit exactly `feat(cli): expose offline capability commands` with `Tasks: T010, T011, T012, T013, T014`.
 
 ## Slice 4 — Offline portability and cross-OS gates
 

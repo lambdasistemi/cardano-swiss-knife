@@ -22,12 +22,14 @@ import Partial.Unsafe (unsafeCrashWith)
 import Test.Vectors (BootstrapVector, DerivationVector, FamilyRestoreVector, InspectionVector, ScriptHashVector, ScriptTemplateVector, ShelleyRestoreVector, SigningVector, bootstrapVectors, derivationVectors, familyRestoreVectors, inspectionVectors, scriptHashVectors, scriptTemplateVectors, shelleyRestoreVectors, signingVectors)
 import Test.Provider (runProviderContractTests)
 import Test.Offline (runOfflineTests)
+import Test.Vault (runVaultContractTests)
 
 main :: Effect Unit
 main = launchAff_ do
   runBookableIdentifierTests
   runProviderContractTests
   runOfflineTests
+  liftEffect runVaultContractTests
   wasmAvailable <- tryWasm
   when wasmAvailable do
     traverse_ assertDerivationVector derivationVectors

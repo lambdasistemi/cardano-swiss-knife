@@ -43,3 +43,5 @@ Use the Vault page to create or unlock the encrypted secret store. Feature pages
 - provider credentials on Transactions
 
 This keeps copy-paste of sensitive material to a minimum.
+
+For offline automation, see [the vault CLI](vault.md).
