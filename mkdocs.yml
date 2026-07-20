@@ -58,6 +58,7 @@ nav:
       - Release flow: architecture/release-flow.md
   - User Manual:
       - Usage: user/usage.md
+      - Offline vault CLI: user/vault.md
       - Versions and releases: user/versions.md
   - Developer:
       - Workflows: dev/workflows.md
