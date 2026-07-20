@@ -72,7 +72,7 @@ lifecycle on Node 22+.
 
 ## Slice 4 — Final audit and handoff (orchestrator-owned)
 
-- [ ] T022 Extend the cumulative gate with every focused proof, audit commit
+- [X] T022 Extend the cumulative gate with every focused proof, audit commit
   messages/task closure and PR metadata, publish the CLI-bootstrap release
   signal, mark the draft ready, and hand back without merging.
 

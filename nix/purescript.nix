@@ -7,7 +7,7 @@ let
 
   runtimeDependencies = builtins.listToAttrs (map (name: {
     inherit name;
-    value = packageJson.devDependencies.${name};
+    value = packageJson.dependencies.${name};
   }) [ "@bjorn3/browser_wasi_shim" "@noble/hashes" "@scure/base" "@scure/bip39" "bech32" "events" ]);
 
   runtimePackage = (builtins.removeAttrs packageJson [ "devDependencies" "scripts" ]) // {

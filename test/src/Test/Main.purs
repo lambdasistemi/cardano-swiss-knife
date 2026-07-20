@@ -2,12 +2,13 @@ module Test.Main where
 
 import Prelude
 
-import Cardano.Offline.Address as Inspect
-import Cardano.Offline.Key as Bootstrap
-import Cardano.Offline.Key as Shelley
-import Cardano.Offline.Key (Role(..), derivePipeline)
-import Cardano.Offline.Payload as Signing
-import Cardano.Offline.Script (analyzeNativeScriptHex, analyzeNativeScriptJson, analyzeScriptTemplateJson)
+import Cardano.Address.Bootstrap as Bootstrap
+import Cardano.Address.Derivation (Role(..), derivePipeline)
+import Cardano.Address.Inspect as Inspect
+import Cardano.Address.Inspect (eitherInspectAddress)
+import Cardano.Address.Shelley as Shelley
+import Cardano.Address.Signing as Signing
+import Cardano.Address.Script (analyzeNativeScriptHex, analyzeNativeScriptJson, analyzeScriptTemplateJson)
 import Test.BookableIdentifier (runBookableIdentifierTests)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
@@ -22,6 +23,7 @@ import Partial.Unsafe (unsafeCrashWith)
 import Test.Vectors (BootstrapVector, DerivationVector, FamilyRestoreVector, InspectionVector, ScriptHashVector, ScriptTemplateVector, ShelleyRestoreVector, SigningVector, bootstrapVectors, derivationVectors, familyRestoreVectors, inspectionVectors, scriptHashVectors, scriptTemplateVectors, shelleyRestoreVectors, signingVectors)
 import Test.Provider (runProviderContractTests)
 import Test.Offline (runOfflineTests)
+import Test.TextEnvelope (runTextEnvelopeTests)
 import Test.Vault (runVaultContractTests)
 
 main :: Effect Unit
@@ -29,6 +31,7 @@ main = launchAff_ do
   runBookableIdentifierTests
   runProviderContractTests
   runOfflineTests
+  runTextEnvelopeTests
   liftEffect runVaultContractTests
   wasmAvailable <- tryWasm
   when wasmAvailable do
@@ -43,7 +46,7 @@ main = launchAff_ do
 
 tryWasm :: Aff Boolean
 tryWasm = do
-  result <- try (Inspect.eitherInspectAddress "addr1vyeq0sedsphv9j4u0rlhakrfh5cf3d7mj0zrej92jw44n6c0fpycd")
+  result <- try (eitherInspectAddress "addr1vyeq0sedsphv9j4u0rlhakrfh5cf3d7mj0zrej92jw44n6c0fpycd")
   case result of
     Right (Right _) -> pure true
     _ -> do
@@ -59,7 +62,7 @@ assertDerivationVector vector = do
 
 assertInspectionVector :: InspectionVector -> Aff Unit
 assertInspectionVector vector = do
-  result <- Inspect.eitherInspectAddress vector.address
+  result <- eitherInspectAddress vector.address
   case result of
     Right actual | actual == vector.expected -> pure unit
     Right _ ->
