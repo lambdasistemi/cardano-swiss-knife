@@ -1,0 +1,17 @@
+{
+  "amaruTreasuryWitnessVault": {
+    "version": 1,
+    "identities": {
+      "Treasury root": {
+        "label": "Treasury root",
+        "network": "mainnet",
+        "keyHash": "c0ffee",
+        "description": "Synthetic treasury root",
+        "source": {
+          "kind": "cardano-addresses-addr-xsk",
+          "bech32": "root_xsk1syntheticamarutreasuryroot"
+        }
+      }
+    }
+  }
+}
