@@ -1,6 +1,7 @@
 module FFI.Blockfrost
   ( Network(..)
   , networkName
+  , toSharedNetwork
   , fetchTxCbor
   , fetchTxCborEffect
   , fetchValidationContextEffect
@@ -8,39 +9,29 @@ module FFI.Blockfrost
 
 import Prelude
 
-import Control.Promise (Promise, toAffE)
-import Effect (Effect)
 import Effect.Aff (Aff)
+import Control.Promise (Promise)
+import Effect (Effect)
+import Cardano.Provider as Shared
 
 data Network = Mainnet | Preprod | Preview
 
 derive instance eqNetwork :: Eq Network
 
+toSharedNetwork :: Network -> Shared.Network
+toSharedNetwork = case _ of
+  Mainnet -> Shared.Mainnet
+  Preprod -> Shared.Preprod
+  Preview -> Shared.Preview
+
 networkName :: Network -> String
-networkName = case _ of
-  Mainnet -> "mainnet"
-  Preprod -> "preprod"
-  Preview -> "preview"
-
-foreign import fetchTxCborImpl
-  :: String -- network
-  -> String -- projectId
-  -> String -- tx hash
-  -> Effect (Promise String)
-
-foreign import fetchValidationContextImpl
-  :: String -- network
-  -> String -- projectId
-  -> Effect (Promise String)
+networkName = Shared.networkName <<< toSharedNetwork
 
 fetchTxCbor :: Network -> String -> String -> Aff String
-fetchTxCbor net projectId hash =
-  toAffE (fetchTxCborEffect net projectId hash)
+fetchTxCbor network = Shared.fetchTxCbor Shared.Blockfrost (toSharedNetwork network)
 
 fetchTxCborEffect :: Network -> String -> String -> Effect (Promise String)
-fetchTxCborEffect net projectId hash =
-  fetchTxCborImpl (networkName net) projectId hash
+fetchTxCborEffect network = Shared.fetchTxCborEffect Shared.Blockfrost (toSharedNetwork network)
 
 fetchValidationContextEffect :: Network -> String -> Effect (Promise String)
-fetchValidationContextEffect net projectId =
-  fetchValidationContextImpl (networkName net) projectId
+fetchValidationContextEffect network = Shared.fetchValidationContextEffect Shared.Blockfrost (toSharedNetwork network)
