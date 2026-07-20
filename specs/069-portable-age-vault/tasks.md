@@ -56,17 +56,17 @@ shelves working while migration is explicit and future entries survive.
 **Goal**: Publish the CLI bootstrap and complete the safe create/list/migrate
 lifecycle on Node 22+.
 
-- [ ] T016 Add RED CLI cases for root/parser/help, no-echo pseudo-TTY and
+- [X] T016 Add RED CLI cases for root/parser/help, no-echo pseudo-TTY and
   inherited-FD intake, safe JSON/human listing, and every failure category.
-- [ ] T017 Implement `csk vault create|list|migrate` as thin filesystem/parser
+- [X] T017 Implement `csk vault create|list|migrate` as thin filesystem/parser
   adapters over the shared core, with no passphrase argv/env option.
-- [ ] T018 Enforce confirmation, `0600` adjacent-temp atomic writes, explicit
+- [X] T018 Enforce confirmation, `0600` adjacent-temp atomic writes, explicit
   `--force`, unchanged inputs/targets on failure, and redacted output/errors.
-- [ ] T019 Prove browser-to-CLI and CLI-to-browser portability plus all three
+- [X] T019 Prove browser-to-CLI and CLI-to-browser portability plus all three
   migration formats using the same binary `.age` files.
-- [ ] T020 Package the offline Node 22 `csk` app and document the exact lifecycle,
+- [X] T020 Package the offline Node 22 `csk` app and document the exact lifecycle,
   descriptor automation, overwrite policy, and migration safety.
-- [ ] T021 Obtain navigator RED/GREEN approval, run `nix run .#ci-vault-cli` and
+- [X] T021 Obtain navigator RED/GREEN approval, run `nix run .#ci-vault-cli` and
   `./gate.sh`, and commit once with
   `Tasks: T016, T017, T018, T019, T020, T021`.
 

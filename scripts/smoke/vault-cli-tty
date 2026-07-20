@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -euo pipefail
+script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+root=$(cd -- "$script_dir/../.." && pwd)
+test -t 0
+test -r /dev/tty
+node "$root/cli/csk.mjs" vault create --out "$1"
