@@ -10,6 +10,10 @@ in
   "ci-check-vectors" = import ./check-vectors.nix { inherit lib; };
   "ci-test" = import ./test.nix { inherit lib; };
   "ci-node-api" = import ./node-api.nix { inherit lib; };
+  "ci-node-package" = lib.mkCheckApp {
+    name = "cardano-swiss-knife-ci-node-package";
+    checkName = "node-package";
+  };
   "ci-vault" = import ./vault-test.nix { inherit pkgs repoRoot; };
   "csk" = import ./csk.nix { inherit pkgs nodeApi; };
   "ci-vault-cli" = import ./vault-cli-test.nix { inherit pkgs repoRoot; };

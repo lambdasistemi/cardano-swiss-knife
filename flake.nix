@@ -93,6 +93,7 @@
           packages.test-vectors = test-vectors-json;
           packages.wasm = wasmBinary;
           packages.node-api = packages.node-api;
+          packages.node-package = packages.node-package;
           packages.tx-inspector-wasm = txInspectorWasmBinary;
           packages.tx-inspector-ui = packages.tx-inspector-ui;
           packages.web-dist = packages.web-dist;

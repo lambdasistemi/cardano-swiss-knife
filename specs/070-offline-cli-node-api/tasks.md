@@ -25,11 +25,11 @@
 
 ## Slice 4 — Offline portability and cross-OS gates
 
-- [ ] T015-S4 Add a failing packed-artifact smoke that detects CWD-dependent WASM discovery, network access, secret leakage, or native addon/build hooks.
-- [ ] T016-S4 Make the package/API/CLI pass the foreign-directory network-denial smoke without semantic fallback.
-- [ ] T017-S4 Add flake-owned package checks/apps; the orchestrator separately extends, never replaces, the existing `gate.sh` check list.
-- [ ] T018-S4 Add Node 22+ Linux/macOS/Windows CI smokes using the same portable package command and preserve the mandatory Nix dev-shell gate.
-- [ ] T019-S4 Run the package smoke, `nix develop --quiet -c just ci`, and `./gate.sh`, then commit exactly `ci(node): prove offline package portability` with `Tasks: T015, T016, T017, T018, T019`.
+- [X] T015-S4 Add a failing packed-artifact smoke that detects CWD-dependent WASM discovery, network access, secret leakage, or native addon/build hooks.
+- [X] T016-S4 Make the package/API/CLI pass the foreign-directory network-denial smoke without semantic fallback.
+- [X] T017-S4 Add flake-owned package checks/apps; the orchestrator separately extends, never replaces, the existing `gate.sh` check list.
+- [X] T018-S4 Add Node 22+ Linux/macOS/Windows CI smokes using the same portable package command and preserve the mandatory Nix dev-shell gate.
+- [X] T019-S4 Run the package smoke, `nix develop --quiet -c just ci`, and `./gate.sh`, then commit exactly `ci(node): prove offline package portability` with `Tasks: T015, T016, T017, T018, T019`.
 
 ## Orchestrator-owned finalization
 
