@@ -183,6 +183,75 @@ address_label_view_inventory() {
   done
 }
 
+bookable_identifier_restriction_inventory() {
+  local policy="lib/src/Cardano/BookableIdentifier.purs"
+  local policy_test="test/src/Test/BookableIdentifier.purs"
+  local test_main="test/src/Test/Main.purs"
+  local ui="docs/inspector/src/Main.purs"
+  local journey="docs/inspector/tests/tx-identify.spec.mjs"
+  local required
+
+  for required in \
+    'module Cardano.BookableIdentifier (isBookableIdentifierKind) where' \
+    'isBookableIdentifierKind :: String -> Boolean' \
+    '"address" -> true' \
+    '"key" -> true' \
+    '"script" -> true' \
+    '"script_hash" -> true' \
+    '_ -> false'; do
+    rg -Fq "$required" "$policy" || {
+      echo "bookable identifier policy missing proof anchor: $required" >&2
+      return 1
+    }
+  done
+
+  for required in \
+    'module Test.BookableIdentifier (runBookableIdentifierTests) where' \
+    'traverse_ assertBookable [ "address", "key", "script", "script_hash" ]' \
+    'traverse_ assertNotBookable [ "", "unknown", "hash", "tx-out-ref", "output", "integer", "raw-bytes" ]'; do
+    rg -Fq "$required" "$policy_test" || {
+      echo "bookable identifier direct test missing proof anchor: $required" >&2
+      return 1
+    }
+  done
+
+  for required in \
+    'import Test.BookableIdentifier (runBookableIdentifierTests)' \
+    'runBookableIdentifierTests'; do
+    rg -Fq "$required" "$test_main" || {
+      echo "bookable identifier direct test is not wired into Test.Main: $required" >&2
+      return 1
+    }
+  done
+
+  for required in \
+    'import Cardano.BookableIdentifier (isBookableIdentifierKind)' \
+    'if isBookableIdentifierKind row.kind && row.resolvedLabel == "" && row.annotationPredicate /= "" && row.annotationValue /= "" then'; do
+    rg -Fq "$required" "$ui" || {
+      echo "bookable identifier policy missing WebUI consumption anchor: $required" >&2
+      return 1
+    }
+  done
+
+  for required in \
+    'for (const label of ["auxiliary_data_hash", "script_data_hash"])' \
+    'const nonBookableRows = [' \
+    '"transaction_hash"' \
+    '"Input 0"' \
+    '"Output 0"' \
+    '"Datum hash"' \
+    '"Datum raw bytes"' \
+    'decodedTreeAnnotationActionLayout(firstAddressRow)' \
+    'getByRole("radio", { name: "Create new local book" }).check()' \
+    'decodedTreeAnnotationActionLayout(verificationKeyRow)' \
+    'getByRole("radio", { name: "Append to existing book" }).check()'; do
+    rg -Fq "$required" "$journey" || {
+      echo "bookable identifier browser regression missing proof anchor: $required" >&2
+      return 1
+    }
+  done
+}
+
 git diff --check
 git diff --check origin/main...HEAD
 legacy_secret_storage_inventory
@@ -191,6 +260,7 @@ rendered_resolution_journey_inventory
 provider_validation_truth_inventory
 product_branding_inventory
 address_label_view_inventory
+bookable_identifier_restriction_inventory
 bash scripts/check-architecture-boundary.sh
 nix build .#checks.x86_64-linux.test --no-link
 nix run .#ci-check
