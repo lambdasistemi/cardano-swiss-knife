@@ -16,7 +16,7 @@ if (!signingVector) {
   throw new Error("Missing signing fixture: message-sign-address-hex");
 }
 
-test("vault stores mnemonic and signing secrets without clipboard roundtrips", async ({
+test("vault creates portable age files before storing mnemonic and signing secrets", async ({
   page,
 }) => {
   await page.goto("/vault");
@@ -24,7 +24,10 @@ test("vault stores mnemonic and signing secrets without clipboard roundtrips", a
   await expect(page.getByRole("heading", { name: "Vault", exact: true })).toBeVisible();
   await page.getByLabel("Vault passphrase").fill("correct horse battery staple");
   await page.getByRole("button", { name: "Show passphrase" }).click();
+  const createDownloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Create vault" }).click();
+  const createDownload = await createDownloadPromise;
+  expect(createDownload.suggestedFilename()).toBe("cardano-swiss-knife.vault.age");
   await expect(page.locator(".vault-summary")).toContainText("Unlocked");
 
   await page.getByRole("navigation", { name: "Primary" }).getByRole("link", { name: "Keys" }).click();

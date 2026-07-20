@@ -430,6 +430,7 @@ data Action
   | ToggleVaultPassphrase
   | CreateVault
   | OpenVault
+  | MigrateLegacyVault
   | ExportVault
   | LockVault
   | SetMnemonicVaultLabel String
@@ -1499,6 +1500,7 @@ inspectorComponent initial =
                   [ keyButton false (if state.showVaultPassphrase then "Hide passphrase" else "Show passphrase") ToggleVaultPassphrase
                   , keyButton true "Create vault" CreateVault
                   , keyButton false "Open vault" OpenVault
+                  , keyButton false "Migrate legacy vault" MigrateLegacyVault
                   , keyButton false "Download backup" ExportVault
                   , keyButton false "Lock vault" LockVault
                   ]
@@ -5261,6 +5263,26 @@ inspectorComponent initial =
                 , vaultErrorMessage = Nothing
                 , vaultStatusMessage = Just ("Opened encrypted vault " <> imported.fileName <> ".")
                 }
+    MigrateLegacyVault -> do
+      state <- H.get
+      if String.trim state.vaultPassphraseInput == "" then
+        vaultError "Enter the vault passphrase before migrating a legacy vault file."
+      else do
+        result <- H.liftAff (attempt (Vault.migrateLegacyVaultFile state.vaultPassphraseInput))
+        case result of
+          Left err -> vaultError (message err)
+          Right imported ->
+            if imported.canceled then
+              H.modify_ _ { vaultErrorMessage = Nothing, vaultStatusMessage = Just "Legacy vault migration canceled." }
+            else
+              H.modify_ _
+                { vaultFileName = imported.fileName
+                , vaultUnlocked = true
+                , vaultEntries = imported.entries
+                , vaultDirty = true
+                , vaultErrorMessage = Nothing
+                , vaultStatusMessage = Just ("Migrated legacy vault in memory. Download a canonical backup to persist " <> imported.fileName <> ".")
+                }
     ExportVault -> do
       state <- H.get
       if not state.vaultUnlocked then
@@ -5979,9 +6001,7 @@ inspectorComponent initial =
       result <- H.liftAff (attempt (Vault.persistVaultFile state.vaultFileName state.vaultPassphraseInput entries))
       case result of
         Left err -> H.modify_ _
-          { vaultEntries = entries
-          , vaultDirty = true
-          , vaultErrorMessage = Just ("Vault save failed: " <> message err)
+          { vaultErrorMessage = Just (message err)
           , vaultStatusMessage = Nothing
           }
         Right fileName -> H.modify_ _
@@ -6095,7 +6115,7 @@ inspectorComponent initial =
     | kind == Vault.kindTag Vault.VaultKoiosBearerToken = Vault.labelForKind Vault.VaultKoiosBearerToken
     | otherwise = kind
 
-  defaultVaultFileName = "cardano-swiss-knife.vault.json"
+  defaultVaultFileName = "cardano-swiss-knife.vault.age"
 
   vaultStateLabel state
     | state.vaultUnlocked && state.vaultDirty = "Unlocked, modified in memory"
