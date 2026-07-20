@@ -13,9 +13,9 @@ address, credential-key, and script identifier kinds.
 `script`, and `script_hash`, rejects representative generic and
 transaction-scoped kinds, and exits zero without importing WebUI modules.
 
-- [ ] T631 [US2] Add failing accepted/rejected kind assertions in `test/src/Test/BookableIdentifier.purs` and wire them through `test/src/Test/Main.purs`.
-- [ ] T632 [US2] Implement the minimal pure closed allowlist in `lib/src/Cardano/BookableIdentifier.purs`.
-- [ ] T633 [US2] Run `nix develop --quiet -c spago test -p cardano-addresses-test` and `./gate.sh`, then commit the reviewed slice with the required task trailer.
+- [X] T631 [US2] Add failing accepted/rejected kind assertions in `test/src/Test/BookableIdentifier.purs` and wire them through `test/src/Test/Main.purs`.
+- [X] T632 [US2] Implement the minimal pure closed allowlist in `lib/src/Cardano/BookableIdentifier.purs`.
+- [X] T633 [US2] Run `nix develop --quiet -c spago test -p cardano-addresses-test` and `./gate.sh`, then commit the reviewed slice with the required task trailer.
 
 **Owned Files**:
 

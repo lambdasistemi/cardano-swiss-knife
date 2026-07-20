@@ -9,6 +9,7 @@ import Cardano.Address.Inspect (eitherInspectAddress)
 import Cardano.Address.Shelley as Shelley
 import Cardano.Address.Signing as Signing
 import Cardano.Address.Script (analyzeNativeScriptHex, analyzeNativeScriptJson, analyzeScriptTemplateJson)
+import Test.BookableIdentifier (runBookableIdentifierTests)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Data.ArrayBuffer.Types (Uint8Array)
@@ -24,6 +25,7 @@ import Test.Provider (runProviderContractTests)
 
 main :: Effect Unit
 main = launchAff_ do
+  runBookableIdentifierTests
   runProviderContractTests
   wasmAvailable <- tryWasm
   when wasmAvailable do
