@@ -222,6 +222,19 @@ it must not change public API, CLI, Cardano, crypto, CBOR, or WASI semantics.
 **Focused proof**: `nix run .#ci-node-api` from a clean derivation rebuild,
 followed by `nix run .#ci-node-package` and local `./gate.sh`.
 
+### Slice 6 — Windows npm launcher repair
+
+The first real OS matrix run passed on Linux and macOS but failed on Windows
+before installation: Node 22 returned `spawn EINVAL` while launching
+`npm.cmd` directly. Keep the smoke logic and artifact identical across hosts;
+invoke the npm JavaScript entrypoint supplied by `npm run` through the current
+Node executable, avoiding shell quoting and platform-specific command files.
+
+**Owned file**: `node/test/package-smoke.mjs`
+
+**Focused proof**: `nix run .#ci-node-package` and local `./gate.sh`; the
+GitHub Node 22 Linux/macOS/Windows matrix is the required live-boundary GREEN.
+
 ## Dependency and ordering constraints
 
 1. Slice 1 is independent and lands first.

@@ -42,3 +42,9 @@
 - [X] T023-S5 Preserve the final-audit RED where `nix run .#ci-node-api` rebuilds in a clean sandbox and the foreign install fails by trying to resolve bundled runtime dependencies from an empty offline npm cache.
 - [X] T024-S5 Make the flake-owned Node API check consume the exact dependency-free `node-package` tarball produced by Nix, without network access or a second packaging contract.
 - [X] T025-S5 Run the Node API check, package smoke, and `./gate.sh`, then commit exactly `fix(node): check the packed API artifact` with `Tasks: T023, T024, T025`.
+
+## Slice 6 — Windows npm launcher repair
+
+- [X] T026-S6 Preserve the GitHub Windows Node 22 RED where the shared package smoke fails before install with `spawn EINVAL` while launching `npm.cmd` directly.
+- [X] T027-S6 Invoke npm's cross-platform JavaScript entrypoint through Node for the same OS-neutral package smoke, without shell quoting or per-host test semantics.
+- [X] T028-S6 Run the package smoke and `./gate.sh`, then commit exactly `fix(ci): invoke npm portably in package smoke` with `Tasks: T026, T027, T028`; the pushed Linux/macOS/Windows matrix is the live-boundary GREEN.

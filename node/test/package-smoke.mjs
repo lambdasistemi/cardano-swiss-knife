@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
-import { platform, tmpdir } from "node:os";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
@@ -10,7 +10,7 @@ const tarball = process.env.CSK_PACKAGE_TARBALL;
 const vectors = JSON.parse(await readFile(new URL("../../test-vectors/vectors.json", import.meta.url), "utf8"));
 const mnemonic = vectors.derivationVectors[0].mnemonic.join(" ");
 const signing = vectors.signingVectors[0];
-const npm = platform() === "win32" ? "npm.cmd" : "npm";
+const npmExecPath = process.env.npm_execpath;
 
 const run = (command, args, options = {}) => new Promise((resolve, reject) => {
   const child = spawn(command, args, { ...options, stdio: ["pipe", "pipe", "pipe"] });
@@ -35,10 +35,11 @@ const filesBelow = async (root) => {
 
 test("installs a prepacked artifact outside the checkout without network, native hooks, or secret leakage", async () => {
   assert.ok(tarball, "CSK_PACKAGE_TARBALL must name the prebuilt npm pack artifact");
+  assert.ok(npmExecPath, "npm_execpath must name npm's JavaScript entrypoint; run this smoke through npm run");
   const foreignProject = await mkdtemp(join(tmpdir(), "csk-package-smoke-"));
   try {
     await writeFile(join(foreignProject, "package.json"), '{"private":true,"type":"module"}\n');
-    const installed = await run(npm, ["install", "--ignore-scripts", "--no-audit", "--no-fund", "--offline", tarball], {
+    const installed = await run(process.execPath, [npmExecPath, "install", "--ignore-scripts", "--no-audit", "--no-fund", "--offline", tarball], {
       cwd: foreignProject,
       env: { ...process.env, HOME: foreignProject, npm_config_cache: join(foreignProject, ".npm-cache") },
     });
