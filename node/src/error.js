@@ -9,6 +9,6 @@ export class CskError extends Error {
 export const toCskError = (error) => {
   if (error instanceof CskError) return error;
   const message = error instanceof Error ? error.message : String(error);
-  const match = /^\[(ENGINE_(?:NOT_FOUND|INCOMPATIBLE|EXECUTION|PROTOCOL))\]\s*(.*)$/.exec(message);
+  const match = /^\[(ENGINE_(?:NOT_FOUND|INCOMPATIBLE|EXECUTION|PROTOCOL)|PROVIDER_(?:AUTHENTICATION|RATE_LIMIT|SERVER|TRANSPORT|DECODE))\]\s*(.*)$/.exec(message);
   return new CskError(match?.[1] || "DOMAIN_ERROR", match?.[2] || message, error);
 };

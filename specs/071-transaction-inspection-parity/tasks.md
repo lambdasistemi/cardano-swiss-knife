@@ -11,11 +11,11 @@
 
 ## Slice 2 — Shared provider loading and context failures
 
-- [ ] T007-S2 Add RED fixtures for Blockfrost and Koios network mapping plus authentication, rate-limit, server, transport, and malformed/decode failures.
-- [ ] T008-S2 Add RED fixtures distinguishing complete, partial, and total producer/validation context outcomes with ordered unresolved identifiers.
-- [ ] T009-S2 Route transaction-hash loading and identify/intent context only through `Cardano.Provider` and expose its existing failure categories without credential leakage.
-- [ ] T010-S2 Prove mainnet, preprod, and preview for both providers and preserve the WebUI's shared provider consumption.
-- [ ] T011-S2 Run `nix run .#ci-test`, `nix run .#ci-node-api`, and `./gate.sh`, then commit exactly `feat(provider): share transaction loading and context` with `Tasks: T007, T008, T009, T010, T011`.
+- [X] T007-S2 Add RED fixtures for Blockfrost and Koios network mapping plus authentication, rate-limit, server, transport, and malformed/decode failures.
+- [X] T008-S2 Add RED fixtures distinguishing complete, partial, and total producer/validation context outcomes with ordered unresolved identifiers.
+- [X] T009-S2 Route transaction-hash loading and identify/intent context only through `Cardano.Provider` and expose its existing failure categories without credential leakage.
+- [X] T010-S2 Prove mainnet, preprod, and preview for both providers and preserve the WebUI's shared provider consumption.
+- [X] T011-S2 Run `nix run .#ci-test`, `nix run .#ci-node-api`, and `./gate.sh`, then commit exactly `feat(provider): share transaction loading and context` with `Tasks: T007, T008, T009, T010, T011`.
 
 ## Slice 3 — Shared book parsing and RDF resolution
 

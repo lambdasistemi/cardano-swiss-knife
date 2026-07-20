@@ -4,6 +4,7 @@ import * as Mnemonic from "../../output/Cardano.Offline.Mnemonic/index.js";
 import * as Payload from "../../output/Cardano.Offline.Payload/index.js";
 import * as Script from "../../output/Cardano.Offline.Script/index.js";
 import * as Transaction from "../../output/Cardano.Transaction/index.js";
+import * as Provider from "../../output/Cardano.Provider/index.js";
 import * as Aff from "../../output/Effect.Aff/index.js";
 import * as Either from "../../output/Data.Either/index.js";
 import * as Maybe from "../../output/Data.Maybe/index.js";
@@ -78,15 +79,28 @@ export const analyzeNativeScriptHex = (input) => operation(async () => fromEithe
 export const analyzeNativeScriptJson = (input) => operation(async () => fromEither(Script.analyzeNativeScriptJson(typeof input === "string" ? input : input.json)));
 export const analyzeScriptTemplateJson = (input) => operation(async () => fromEither(Script.analyzeScriptTemplateJson(typeof input === "string" ? input : input.json)));
 
-const transactionInput = (input) => {
+const provider = (value) => ({ blockfrost: Provider.Blockfrost.value, koios: Provider.Koios.value })[value];
+const providerNetwork = (value) => ({ mainnet: Provider.Mainnet.value, preprod: Provider.Preprod.value, preview: Provider.Preview.value })[value];
+
+const transactionInput = async (input) => {
   if (!input || typeof input !== "object" || Array.isArray(input)) {
-    throw new CskError("DOMAIN_ERROR", "Transaction input must be an object with cborHex or textEnvelope.");
+    throw new CskError("DOMAIN_ERROR", "Transaction input must be an object with cborHex, textEnvelope, or txHash provider source.");
   }
 
   const hasCbor = Object.hasOwn(input, "cborHex");
   const hasEnvelope = Object.hasOwn(input, "textEnvelope");
-  if (hasCbor === hasEnvelope) {
-    throw new CskError("DOMAIN_ERROR", "Transaction input must contain exactly one of cborHex or textEnvelope.");
+  const hasHash = Object.hasOwn(input, "txHash") || Object.hasOwn(input, "provider") || Object.hasOwn(input, "network") || Object.hasOwn(input, "credential");
+  if (Number(hasCbor) + Number(hasEnvelope) + Number(hasHash) !== 1) {
+    throw new CskError("DOMAIN_ERROR", "Transaction input must contain exactly one of cborHex, textEnvelope, or txHash provider source.");
+  }
+
+  if (hasHash) {
+    const selectedProvider = provider(input.provider);
+    const selectedNetwork = providerNetwork(input.network);
+    if (typeof input.txHash !== "string" || !selectedProvider || !selectedNetwork || (input.credential != null && typeof input.credential !== "string")) {
+      throw new CskError("DOMAIN_ERROR", "Transaction hash input requires txHash, provider, network, and an optional string credential.");
+    }
+    return awaitAff(Provider.fetchTxCborForNode(selectedProvider)(selectedNetwork)(input.credential ?? "")(input.txHash));
   }
 
   const value = hasCbor
@@ -101,9 +115,21 @@ const transactionInput = (input) => {
   return fromEither(Transaction.decodeTransactionInput(value));
 };
 
-const transactionOperation = (name, input, options = {}) => operation(async () =>
-  runTransactionOperation(name, transactionInput(input), options),
-);
+const transactionOperation = (name, input, options = {}) => operation(async () => {
+  const txCbor = await transactionInput(input);
+  if ((name !== "tx.identify" && name !== "tx.intent") || !Object.hasOwn(input, "txHash")) {
+    return runTransactionOperation(name, txCbor, options);
+  }
+
+  const selectedProvider = provider(input.provider);
+  const selectedNetwork = providerNetwork(input.network);
+  const credential = input.credential ?? "";
+  const inspection = await runTransactionOperation("tx.inspect", txCbor, options);
+  const context = await awaitAff(Provider.resolveProducerTxContext(selectedProvider)(selectedNetwork)(credential)(!Provider.needsKey(selectedProvider) || credential !== "")(JSON.stringify(inspection)));
+  const contextArgs = JSON.parse(context);
+  const value = await runTransactionOperation(name, txCbor, { ...options, ...contextArgs });
+  return { ...value, context: contextArgs.context };
+});
 
 export const inspectTransaction = (input, options) => transactionOperation("tx.inspect", input, options);
 export const browseTransaction = (input, options = {}) => transactionOperation("tx.browse", input, options);

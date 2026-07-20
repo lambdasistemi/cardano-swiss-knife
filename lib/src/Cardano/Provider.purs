@@ -13,11 +13,13 @@ module Cardano.Provider
   , renderProviderError
   , fetchTxCbor
   , fetchTxCborWith
+  , fetchTxCborForNode
   , fetchTxCborEffect
   , fetchValidationContext
   , fetchValidationContextWith
   , fetchValidationContextEffect
   , resolveProducerTxContext
+  , resolveProducerTxContextWith
   ) where
 
 import Prelude
@@ -25,6 +27,7 @@ import Prelude
 import Control.Promise (Promise, fromAff, toAffE)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
+import Data.String (Pattern(..), Replacement(..), replaceAll) as String
 import Effect (Effect)
 import Effect.Aff (Aff, try, throwError)
 import Effect.Exception (error, message)
@@ -106,6 +109,13 @@ fetchTxCborWith transport provider network credential txHash = do
       in
         if decoded.ok then Right decoded.value else Left (DecodeError provider "tx cbor" (Just body.status) decoded.error)
 
+fetchTxCborForNode :: Provider -> Network -> String -> String -> Aff String
+fetchTxCborForNode provider network credential txHash = do
+  result <- fetchTxCborWith standardTransport provider network credential txHash
+  case result of
+    Right value -> pure value
+    Left err -> throwProviderError credential err
+
 fetchValidationContext :: Provider -> Network -> String -> Aff String
 fetchValidationContext provider network credential = do
   result <- fetchValidationContextWith standardTransport provider network credential
@@ -133,16 +143,34 @@ fetchValidationContextWith transport provider network credential = do
 
 resolveProducerTxContext :: Provider -> Network -> String -> Boolean -> String -> Aff String
 resolveProducerTxContext provider network credential canFetchProducerTxs inspectionResponse =
+  resolveProducerTxContextWith standardTransport provider network credential canFetchProducerTxs inspectionResponse
+
+resolveProducerTxContextWith :: Transport -> Provider -> Network -> String -> Boolean -> String -> Aff String
+resolveProducerTxContextWith transport provider network credential canFetchProducerTxs inspectionResponse =
   toAffE
     ( resolveProducerTxContextImpl
         (resolutionProvider provider)
         (producerTxSource provider)
         inspectionResponse
-        (fetchTxCborEffect provider network credential)
-        (fetchValidationContextEffect provider network credential)
+        (\txHash -> fromAff (fetchTxCborWithTransport transport provider network credential txHash))
+        (fromAff (fetchValidationContextWithTransport transport provider network credential))
         (not (needsKey provider) || credential /= "")
         canFetchProducerTxs
     )
+
+fetchTxCborWithTransport :: Transport -> Provider -> Network -> String -> String -> Aff String
+fetchTxCborWithTransport transport provider network credential txHash = do
+  result <- fetchTxCborWith transport provider network credential txHash
+  case result of
+    Right value -> pure value
+    Left err -> throwProviderError credential err
+
+fetchValidationContextWithTransport :: Transport -> Provider -> Network -> String -> Aff String
+fetchValidationContextWithTransport transport provider network credential = do
+  result <- fetchValidationContextWith transport provider network credential
+  case result of
+    Left err -> throwProviderError credential err
+    Right context -> pure (encodeValidationContext context)
 
 standardTransport :: Transport
 standardTransport request = do
@@ -206,6 +234,23 @@ producerTxSource :: Provider -> String
 producerTxSource = case _ of
   Blockfrost -> "blockfrost.txs.cbor"
   Koios -> "koios.tx_cbor"
+
+providerNodeErrorCode :: ProviderError -> String
+providerNodeErrorCode = case _ of
+  AuthenticationError _ _ _ _ -> "PROVIDER_AUTHENTICATION"
+  RateLimitError _ _ _ _ -> "PROVIDER_RATE_LIMIT"
+  ServerError _ _ _ _ -> "PROVIDER_SERVER"
+  TransportError _ _ _ -> "PROVIDER_TRANSPORT"
+  DecodeError _ _ _ _ -> "PROVIDER_DECODE"
+
+redactCredential :: String -> String -> String
+redactCredential credential detail
+  | credential == "" = detail
+  | otherwise = String.replaceAll (String.Pattern credential) (String.Replacement "[redacted]") detail
+
+throwProviderError :: String -> ProviderError -> Aff String
+throwProviderError credential err =
+  throwError (error ("[" <> providerNodeErrorCode err <> "] " <> redactCredential credential (renderProviderError err)))
 
 unwrap :: Either ProviderError String -> Aff String
 unwrap = case _ of
