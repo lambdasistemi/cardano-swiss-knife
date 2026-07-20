@@ -18,14 +18,14 @@ transaction and detached-witness TextEnvelopes.
 **Goal**: Decode raw hex or either supported Conway TextEnvelope and encode
 transaction/witness envelopes with the exact cardano-cli shape.
 
-- [ ] T674 [US1] Add failing direct tests for raw hexadecimal input, transaction
+- [X] T674 [US1] Add failing direct tests for raw hexadecimal input, transaction
   and witness envelope input, whitespace handling, and deterministic malformed,
   unsupported, missing-field, wrong-field-type, and invalid-hex failures.
-- [ ] T675 [US2] Add failing direct tests for exact transaction/witness output
+- [X] T675 [US2] Add failing direct tests for exact transaction/witness output
   fields and encode/decode round-trips.
-- [ ] T676 [US1] [US2] Implement the host-neutral closed artifact type,
+- [X] T676 [US1] [US2] Implement the host-neutral closed artifact type,
   validation, auto-detection, decoder, and encoder in the shared library.
-- [ ] T677 Run the focused shared test command and `./gate.sh`, then commit the
+- [X] T677 Run the focused shared test command and `./gate.sh`, then commit the
   reviewed slice with the required task trailer.
 
 **Owned Files**:
