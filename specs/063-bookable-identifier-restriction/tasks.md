@@ -67,8 +67,8 @@ Tasks: T634, T635, T636
 **Goal**: Pin the delivered policy and WebUI restriction into the accumulated
 repository gate without replacing any existing checks.
 
-- [ ] T637 Extend the existing `gate.sh` with predicate, direct-test, WebUI-consumption, and browser-proof anchors; run `./gate.sh`; commit the gate extension.
-- [ ] T638 Audit all issue #63 requirements and task accounting, update the draft PR body with exact local proof, and run the final commit/task audit.
+- [X] T637 Extend the existing `gate.sh` with predicate, direct-test, WebUI-consumption, and browser-proof anchors; run `./gate.sh`; commit the gate extension.
+- [X] T638 Audit all issue #63 requirements and task accounting, update the draft PR body with exact local proof, and run the final commit/task audit.
 
 **Owned Files**:
 
