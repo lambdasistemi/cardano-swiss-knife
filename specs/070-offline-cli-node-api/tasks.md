@@ -9,11 +9,11 @@
 
 ## Slice 2 — Importable ESM package and package-relative engine
 
-- [ ] T005-S2 Add a failing Node test for named ESM exports, stable typed failures, and canonical vector equality from a foreign current working directory.
-- [ ] T006-S2 Add the delegation-only ESM API and normalize PureScript results without implementing Cardano, crypto, CBOR, or validation semantics in JavaScript.
-- [ ] T007-S2 Resolve the pinned WASI artifact relative to the installed module and type missing/incompatible/protocol failures with no fallback.
-- [ ] T008-S2 Build and install a packable `@lambdasistemi/cardano-swiss-knife` ESM artifact through the flake, including the WASM asset and no new runtime dependency.
-- [ ] T009-S2 Run the focused API/package proof and `./gate.sh`, then commit exactly `feat(node): expose offline ESM API` with `Tasks: T005, T006, T007, T008, T009`.
+- [x] T005-S2 Add a failing Node test for named ESM exports, stable typed failures, and canonical vector equality from a foreign current working directory.
+- [x] T006-S2 Add the delegation-only ESM API and normalize PureScript results without implementing Cardano, crypto, CBOR, or validation semantics in JavaScript.
+- [x] T007-S2 Resolve the pinned WASI artifact relative to the installed module and type missing/incompatible/protocol failures with no fallback.
+- [x] T008-S2 Build and install a packable `@lambdasistemi/cardano-swiss-knife` ESM artifact through the flake, including the WASM asset and no new runtime dependency.
+- [x] T009-S2 Run the focused API/package proof and `./gate.sh`, then commit exactly `feat(node): expose offline ESM API` with `Tasks: T005, T006, T007, T008, T009`.
 
 ## Slice 3 — CLI command families over #69 bootstrap
 

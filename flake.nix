@@ -72,7 +72,7 @@
           '';
           testVectorsPath = test-vectors-json;
           purescript = import ./nix/purescript.nix {
-            inherit pkgs repoRoot txInspectorUi;
+            inherit pkgs repoRoot txInspectorUi wasmBinary;
           };
           packages = import ./nix/packages {
             inherit pkgs repoRoot purescript haskellProject playwrightBrowsers testVectorsPath txInspectorUi;
@@ -91,6 +91,7 @@
           packages.test-vectors-exe = haskellProject.packages.test-vectors-exe;
           packages.test-vectors = test-vectors-json;
           packages.wasm = wasmBinary;
+          packages.node-api = packages.node-api;
           packages.tx-inspector-wasm = txInspectorWasmBinary;
           packages.tx-inspector-ui = packages.tx-inspector-ui;
           packages.web-dist = packages.web-dist;

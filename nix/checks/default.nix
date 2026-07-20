@@ -8,4 +8,5 @@
   app-build = import ./app-build.nix { inherit purescript; };
   test = import ./test.nix { inherit purescript; };
   playwright = import ./playwright.nix { inherit pkgs repoRoot purescript playwrightBrowsers wasmBinary txInspectorWasmBinary; };
+  node-api = import ./node-api.nix { inherit pkgs repoRoot; nodeApi = packages.node-api; };
 }

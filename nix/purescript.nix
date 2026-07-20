@@ -1,14 +1,23 @@
-{ pkgs, repoRoot, txInspectorUi }:
+{ pkgs, repoRoot, txInspectorUi, wasmBinary }:
 
 let
   nodejs = pkgs.nodejs_22;
   packageJson = builtins.fromJSON (builtins.readFile (repoRoot + /package.json));
   packageLock = builtins.fromJSON (builtins.readFile (repoRoot + /package-lock.json));
 
-  runtimePackage = builtins.removeAttrs packageJson [ "devDependencies" "scripts" ];
+  runtimeDependencies = builtins.listToAttrs (map (name: {
+    inherit name;
+    value = packageJson.devDependencies.${name};
+  }) [ "@bjorn3/browser_wasi_shim" "@noble/hashes" "@scure/base" "@scure/bip39" "bech32" "events" ]);
+
+  runtimePackage = (builtins.removeAttrs packageJson [ "devDependencies" "scripts" ]) // {
+    dependencies = runtimeDependencies;
+  };
   runtimePackageLock = packageLock // {
     packages = packageLock.packages // {
-      "" = builtins.removeAttrs packageLock.packages."" [ "devDependencies" "scripts" ];
+      "" = (builtins.removeAttrs packageLock.packages."" [ "devDependencies" "scripts" ]) // {
+        dependencies = runtimeDependencies;
+      };
     };
   };
 
@@ -105,6 +114,30 @@ in
       cd test
       ln -sfn ../node_modules node_modules
       spago test --pure -p cardano-addresses-test
+    '';
+  };
+
+  node-api = mkWorkspaceDerivation {
+    name = "cardano-swiss-knife-node-api";
+    spagoYaml = repoRoot + /lib/spago.yaml;
+    buildPhase = ''
+      cd lib
+      ln -sfn ../node_modules node_modules
+      spago build --pure -p cardano-addresses
+      cd ..
+      mkdir node-api-build
+      cp -a output node node-api-build/
+      ln -s ${nodeModules}/node_modules node-api-build/node_modules
+      cd node-api-build
+      mkdir -p node/dist
+      esbuild node/src/index.js --bundle --platform=node --format=esm --outfile=node/dist/index.js
+      cp ${wasmBinary}/cardano-addresses.wasm node/dist/cardano-addresses.wasm
+    '';
+    installPhase = ''
+      mkdir -p $out
+      cp ../package.json $out/
+      mkdir -p $out/node/dist
+      cp -a node/dist/. $out/node/dist/
     '';
   };
 

@@ -6,4 +6,5 @@
   test-vectors-exe = haskellProject.packages.test-vectors-exe;
   tx-inspector-ui = txInspectorUi;
   combined-site = purescript.web-dist;
+  node-api = purescript.node-api;
 }
