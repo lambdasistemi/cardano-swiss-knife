@@ -8,7 +8,7 @@
   app-build = import ./app-build.nix { inherit purescript; };
   test = import ./test.nix { inherit purescript; };
   playwright = import ./playwright.nix { inherit pkgs repoRoot purescript playwrightBrowsers wasmBinary txInspectorWasmBinary; };
-  node-api = import ./node-api.nix { inherit pkgs repoRoot; nodeApi = packages.node-api; };
+  node-api = import ./node-api.nix { inherit pkgs repoRoot; nodePackage = packages.node-package; };
   node-package = pkgs.runCommand "cardano-swiss-knife-node-package-check" {
     nativeBuildInputs = [ pkgs.nodejs_22 pkgs.bash ];
   } ''

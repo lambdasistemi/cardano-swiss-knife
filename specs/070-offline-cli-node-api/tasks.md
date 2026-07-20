@@ -36,3 +36,9 @@
 - [ ] T020 Audit every inventory row against PureScript, ESM, CLI, vectors, and typed failures; verify no open implementation task remains.
 - [ ] T021 Run the final gate and commit-message audit, update the draft PR body with proof and residual risk, and remove `gate.sh` only under the resolve-ticket finalization rule.
 - [ ] T022 Push the finalized branch, mark the PR ready, report `COMPLETE`, and do not merge.
+
+## Slice 5 — Final-audit package-check repair
+
+- [X] T023-S5 Preserve the final-audit RED where `nix run .#ci-node-api` rebuilds in a clean sandbox and the foreign install fails by trying to resolve bundled runtime dependencies from an empty offline npm cache.
+- [X] T024-S5 Make the flake-owned Node API check consume the exact dependency-free `node-package` tarball produced by Nix, without network access or a second packaging contract.
+- [X] T025-S5 Run the Node API check, package smoke, and `./gate.sh`, then commit exactly `fix(node): check the packed API artifact` with `Tasks: T023, T024, T025`.

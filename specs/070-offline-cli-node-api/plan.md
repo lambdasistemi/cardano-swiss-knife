@@ -204,6 +204,24 @@ network access or engine fallback.
 **Focused proof**: flake-owned package smoke, `nix develop --quiet -c just ci`,
 and local `./gate.sh`; GitHub matrix success is required before readiness.
 
+### Slice 5 — Final-audit package-check repair
+
+The orchestrator's T020 clean-store audit exposed that `ci-node-api` still
+repacked the intermediate `node-api` directory and attempted an offline npm
+resolution of dependencies already bundled by esbuild. Preserve that RED, then
+make the API check install and mutate the exact dependency-free
+`node-package` tarball built by Nix. This is a test/packaging-contract repair;
+it must not change public API, CLI, Cardano, crypto, CBOR, or WASI semantics.
+
+**Owned files**:
+
+- `node/test/api.test.mjs`
+- `nix/checks/node-api.nix`
+- `nix/checks/default.nix`
+
+**Focused proof**: `nix run .#ci-node-api` from a clean derivation rebuild,
+followed by `nix run .#ci-node-package` and local `./gate.sh`.
+
 ## Dependency and ordering constraints
 
 1. Slice 1 is independent and lands first.

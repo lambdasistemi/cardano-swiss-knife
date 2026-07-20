@@ -24,13 +24,13 @@ const publicOperations = [
   "analyzeNativeScriptJson",
   "analyzeScriptTemplateJson",
 ];
-const repoRoot = new URL("../../", import.meta.url);
 const vectors = JSON.parse(
   await readFile(new URL("../../test-vectors/vectors.json", import.meta.url), "utf8"),
 );
 
 let foreignProject;
-let packedTarball;
+const packedTarball = process.env.CSK_PACKAGE_TARBALL;
+assert.ok(packedTarball, "CSK_PACKAGE_TARBALL must name the prebuilt npm pack artifact");
 
 const runForeignProgram = async (program) => {
   const script = join(foreignProject, "foreign-import.mjs");
@@ -48,9 +48,6 @@ const npmEnvironment = () => ({
 before(async () => {
   foreignProject = await mkdtemp(join(tmpdir(), "csk-node-api-"));
   await writeFile(join(foreignProject, "package.json"), '{"private":true,"type":"module"}\n');
-  const { stdout } = await run("npm", ["pack", "--json"], { cwd: repoRoot.pathname, env: npmEnvironment() });
-  const [{ filename }] = JSON.parse(stdout);
-  packedTarball = join(repoRoot.pathname, filename);
   await run("npm", ["install", "--ignore-scripts", "--no-audit", "--no-fund", "--offline", packedTarball], {
     cwd: foreignProject, env: npmEnvironment(),
   });
@@ -58,7 +55,6 @@ before(async () => {
 
 after(async () => {
   if (foreignProject) await rm(foreignProject, { recursive: true, force: true });
-  if (packedTarball) await rm(packedTarball, { force: true });
 });
 
 test("publishes the complete ESM surface from an installed package in a foreign current working directory", async () => {
