@@ -72,7 +72,7 @@
           '';
           testVectorsPath = test-vectors-json;
           purescript = import ./nix/purescript.nix {
-            inherit pkgs repoRoot txInspectorUi;
+            inherit pkgs repoRoot txInspectorUi wasmBinary;
           };
           packages = import ./nix/packages {
             inherit pkgs repoRoot purescript haskellProject playwrightBrowsers testVectorsPath txInspectorUi;
@@ -82,6 +82,7 @@
           };
           apps = import ./nix/apps {
             inherit pkgs checks system repoRoot playwrightBrowsers txInspectorUi inspectorSource protocolRegistry uxJudgeSource;
+            nodeApi = packages.node-api;
             combinedSite = packages.combined-site;
             webDist = packages.web-dist;
           };
@@ -91,6 +92,8 @@
           packages.test-vectors-exe = haskellProject.packages.test-vectors-exe;
           packages.test-vectors = test-vectors-json;
           packages.wasm = wasmBinary;
+          packages.node-api = packages.node-api;
+          packages.node-package = packages.node-package;
           packages.tx-inspector-wasm = txInspectorWasmBinary;
           packages.tx-inspector-ui = packages.tx-inspector-ui;
           packages.web-dist = packages.web-dist;
@@ -99,6 +102,11 @@
           inherit apps;
           devShells.default = pkgs.mkShell {
             inputsFrom = [ haskellProject.devShells.default ];
+            shellHook = ''
+              if [ ! -e node_modules ] && [ ! -L node_modules ]; then
+                ln -s ${purescript.nodeModules}/node_modules node_modules
+              fi
+            '';
             packages = [
               pkgs.cabal-install
               pkgs.fourmolu

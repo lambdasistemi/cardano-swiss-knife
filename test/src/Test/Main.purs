@@ -22,6 +22,7 @@ import Effect.Exception (throw)
 import Partial.Unsafe (unsafeCrashWith)
 import Test.Vectors (BootstrapVector, DerivationVector, FamilyRestoreVector, InspectionVector, ScriptHashVector, ScriptTemplateVector, ShelleyRestoreVector, SigningVector, bootstrapVectors, derivationVectors, familyRestoreVectors, inspectionVectors, scriptHashVectors, scriptTemplateVectors, shelleyRestoreVectors, signingVectors)
 import Test.Provider (runProviderContractTests)
+import Test.Offline (runOfflineTests)
 import Test.TextEnvelope (runTextEnvelopeTests)
 import Test.Vault (runVaultContractTests)
 
@@ -29,6 +30,7 @@ main :: Effect Unit
 main = launchAff_ do
   runBookableIdentifierTests
   runProviderContractTests
+  runOfflineTests
   runTextEnvelopeTests
   liftEffect runVaultContractTests
   wasmAvailable <- tryWasm
@@ -44,7 +46,7 @@ main = launchAff_ do
 
 tryWasm :: Aff Boolean
 tryWasm = do
-  result <- try (Inspect.eitherInspectAddress "addr1vyeq0sedsphv9j4u0rlhakrfh5cf3d7mj0zrej92jw44n6c0fpycd")
+  result <- try (eitherInspectAddress "addr1vyeq0sedsphv9j4u0rlhakrfh5cf3d7mj0zrej92jw44n6c0fpycd")
   case result of
     Right (Right _) -> pure true
     _ -> do
