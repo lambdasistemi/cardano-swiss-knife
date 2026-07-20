@@ -235,6 +235,19 @@ Node executable, avoiding shell quoting and platform-specific command files.
 **Focused proof**: `nix run .#ci-node-package` and local `./gate.sh`; the
 GitHub Node 22 Linux/macOS/Windows matrix is the required live-boundary GREEN.
 
+### Slice 7 — Windows ESM preload URL repair
+
+The second real OS matrix run proved the npm launcher repair and reached the
+foreign packed program, then Windows rejected the absolute drive path passed to
+Node's `--import` flag with `ERR_UNSUPPORTED_ESM_URL_SCHEME`. Convert the shared
+network-denial preload path to a canonical `file:` URL before invoking Node;
+preserve the same preload, API/CLI program, and denial semantics on every host.
+
+**Owned file**: `node/test/package-smoke.mjs`
+
+**Focused proof**: `nix run .#ci-node-package` and local `./gate.sh`; the
+GitHub Node 22 Linux/macOS/Windows matrix is the required live-boundary GREEN.
+
 ## Dependency and ordering constraints
 
 1. Slice 1 is independent and lands first.

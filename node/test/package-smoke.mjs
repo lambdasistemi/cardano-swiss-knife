@@ -4,6 +4,7 @@ import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import { pathToFileURL } from "node:url";
 
 const packageName = "@lambdasistemi/cardano-swiss-knife";
 const tarball = process.env.CSK_PACKAGE_TARBALL;
@@ -77,6 +78,7 @@ test("installs a prepacked artifact outside the checkout without network, native
       dns.lookup = denied("dns.lookup"); dns.resolve = denied("dns.resolve");
       globalThis.fetch = denied("fetch"); syncBuiltinESMExports();
     `);
+    const networkGuardUrl = pathToFileURL(networkGuard).href;
     const program = join(foreignProject, "foreign-program.mjs");
     await writeFile(program, `
       const secrets = ${JSON.stringify([mnemonic, signing.signingKeyBech32])};
@@ -89,7 +91,7 @@ test("installs a prepacked artifact outside the checkout without network, native
       const verified = await api.verifySignature({ payloadMode: vectors.signing.payloadMode, payloadInput: vectors.signing.payloadInput, verificationKeyBech32: vectors.signing.verificationKeyBech32, signatureHex: signed.value.signatureHex });
       console.log(JSON.stringify({ inspection, derivation, signed: signed.ok, verified }));
     `);
-    const api = await run(process.execPath, ["--import", networkGuard, program], { cwd: foreignProject });
+    const api = await run(process.execPath, ["--import", networkGuardUrl, program], { cwd: foreignProject });
     assert.equal(api.code, 0, api.stderr);
     const result = JSON.parse(api.stdout);
     assert.equal(result.inspection.ok, true);
@@ -98,7 +100,7 @@ test("installs a prepacked artifact outside the checkout without network, native
     assert.deepEqual(result.verified, { ok: true, value: true });
 
     const cli = join(packageRoot, "node", "dist", "csk.mjs");
-    const command = await run(process.execPath, ["--import", networkGuard, cli, "payload", "sign", "--secret-stdin", "--payload-mode", signing.payloadMode, "--payload-input", signing.payloadInput, "--output", "json"], {
+    const command = await run(process.execPath, ["--import", networkGuardUrl, cli, "payload", "sign", "--secret-stdin", "--payload-mode", signing.payloadMode, "--payload-input", signing.payloadInput, "--output", "json"], {
       cwd: foreignProject,
       input: `${signing.signingKeyBech32}\n`,
     });

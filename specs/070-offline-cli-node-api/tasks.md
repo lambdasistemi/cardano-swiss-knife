@@ -48,3 +48,9 @@
 - [X] T026-S6 Preserve the GitHub Windows Node 22 RED where the shared package smoke fails before install with `spawn EINVAL` while launching `npm.cmd` directly.
 - [X] T027-S6 Invoke npm's cross-platform JavaScript entrypoint through Node for the same OS-neutral package smoke, without shell quoting or per-host test semantics.
 - [X] T028-S6 Run the package smoke and `./gate.sh`, then commit exactly `fix(ci): invoke npm portably in package smoke` with `Tasks: T026, T027, T028`; the pushed Linux/macOS/Windows matrix is the live-boundary GREEN.
+
+## Slice 7 — Windows ESM preload URL repair
+
+- [X] T029-S7 Preserve the GitHub Windows Node 22 RED where the repaired smoke reaches the foreign program but `--import` rejects the absolute drive path with `ERR_UNSUPPORTED_ESM_URL_SCHEME`.
+- [X] T030-S7 Convert the shared network-denial preload path to a canonical `file:` URL without changing its API/CLI coverage or denial semantics on any host.
+- [X] T031-S7 Run the package smoke and `./gate.sh`, then commit exactly `fix(ci): normalize Windows preload URL` with `Tasks: T029, T030, T031`; the pushed Linux/macOS/Windows matrix is the live-boundary GREEN.
