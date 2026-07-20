@@ -375,6 +375,7 @@ data Action
   | CancelDecodedTreeAnnotation
   | SaveDecodedTreeAnnotation RdfShapes.DecodedTreeRow
   | Decode
+  | InspectProducer String
   | Copy
   | CopyValue String String
   | BrowseJson String
@@ -2165,9 +2166,8 @@ inspectorComponent initial =
       ]
 
   renderDecodedStructure state =
-    HH.section
-      [ classNames [ "decoded-screen" ] ]
-      [ case state.decodedTreeLens of
+    let children =
+          ([ case state.decodedTreeLens of
           Just lens ->
             renderDecodedTreeLens state lens
           Nothing ->
@@ -2177,6 +2177,32 @@ inspectorComponent initial =
               , HH.div [ classNames [ "li-empty-title" ] ] [ HH.text "No decoded tree yet" ]
               , HH.p [ classNames [ "li-empty-copy" ] ] [ HH.text "Decode a transaction to populate the structured Conway tree." ]
               ]
+          ] <> renderResolvedInputs state)
+    in HH.section [ classNames [ "decoded-screen" ] ] children
+
+  renderResolvedInputs state = case state.witnessPlan of
+    Just plan | plan.valid ->
+      (Array.foldl
+        (\acc input ->
+          let showDrill = input.txId /= "" && not (Array.elem input.txId acc.seen)
+          in { seen: Array.snoc acc.seen input.txId, nodes: Array.snoc acc.nodes (renderResolvedInput state showDrill input) }
+        )
+        { seen: [], nodes: [] }
+        plan.resolvedInputs
+      ).nodes
+    _ -> []
+
+  renderResolvedInput state showDrill input =
+    HH.div [ classNames [ "resolved-input-context" ] ]
+      [ HH.strong_ [ HH.text input.kind ]
+      , HH.code_ [ HH.text input.key ]
+      , if input.resolved then HH.div_
+          [ HH.code_ [ HH.text input.addressHex ]
+          , HH.code_ [ HH.text input.coinLovelace ]
+          , if Array.null input.assets then HH.text "No native assets" else HH.div_ (map (\asset -> HH.code_ [ HH.text (asset.policyId <> " " <> asset.assetName <> " " <> asset.quantity) ]) input.assets)
+          , if showDrill then HH.button [ HE.onClick (\_ -> InspectProducer input.txId) ] [ HH.text "Inspect producer transaction" ] else HH.text ""
+          ]
+        else HH.text input.reason
       ]
 
   renderDecodedTreeLens state lens =
@@ -3759,6 +3785,7 @@ inspectorComponent initial =
       , renderWitnessWarnings witnessPlan.warnings
       , HH.div_
           (map (renderWitnessSection state) witnessPlan.sections)
+      , HH.div_ (renderResolvedInputs state)
       ]
 
   renderValidation state validation =
@@ -5835,6 +5862,9 @@ inspectorComponent initial =
               , decodedTreeExpanded = defaultDecodedTreeExpanded lenses.decodedTreeLens
               , browserPath = browser.currentPath
               }
+    InspectProducer txId -> do
+      H.modify_ _ { mode = ByHash, txHash = txId, fetchError = Nothing }
+      handleAction Decode
     Copy -> do
       mr <- H.gets _.result
       case mr of

@@ -12,12 +12,12 @@ inputs in both inspection tabs and let the operator load the producer.
 one request per producer, zero `/utxos` calls, exact regular/reference input
 details on both tabs, and a successful producer drill-in.
 
-- [ ] T641 [US1] Extend the existing producer-CBOR Playwright journey first and capture expected RED for missing full address/value/asset and drill-in behavior.
-- [ ] T642 [US1] Project ledger `resolved_inputs` and `resolved_reference_inputs` into typed presentation records without numeric coercion or Cardano semantic derivation.
-- [ ] T643 [US1] Render regular/reference resolution records in Witness with full copyable references, addresses, lovelace, native assets, source/status, and truthful missing reasons.
-- [ ] T644 [US1] Match the same records to Structure input rows by exact full output reference and expose their address/value context there.
-- [ ] T645 [US2] Add producer drill-in through the existing hash-mode `Decode` path while preserving current provider/network configuration.
-- [ ] T646 [US1] Prove unique producer-CBOR requests, zero `/utxos` calls, partial-context truthfulness, focused GREEN, and full `./gate.sh`; commit the reviewed slice.
+- [X] T641 [US1] Extend the existing producer-CBOR Playwright journey first and capture expected RED for missing full address/value/asset and drill-in behavior.
+- [X] T642 [US1] Project ledger `resolved_inputs` and `resolved_reference_inputs` into typed presentation records without numeric coercion or Cardano semantic derivation.
+- [X] T643 [US1] Render regular/reference resolution records in Witness with full copyable references, addresses, lovelace, native assets, source/status, and truthful missing reasons.
+- [X] T644 [US1] Match the same records to Structure input rows by exact full output reference and expose their address/value context there.
+- [X] T645 [US2] Add producer drill-in through the existing hash-mode `Decode` path while preserving current provider/network configuration.
+- [X] T646 [US1] Prove unique producer-CBOR requests, zero `/utxos` calls, partial-context truthfulness, focused GREEN, and full `./gate.sh`; commit the reviewed slice.
 
 **Owned Files**:
 
