@@ -308,4 +308,5 @@ nix run .#ci-ux-capture
 nix run .#ci-combined-site-smoke
 nix develop github:paolino/dev-assets?dir=mkdocs --quiet -c mkdocs build --strict
 nix run .#ci-test
+nix run .#ci-vault
 nix run .#ci-playwright
