@@ -12,11 +12,11 @@ recursive value to a transaction signer in Structure.
 text and an all-types fixture with lossless scalar strings, nesting, and ordered
 map entries.
 
-- [ ] T651 [US1] Add focused Playwright assertions first for the treasury rationale and all-types recursive tree; capture RED on the old engine pin/count-only Structure.
-- [ ] T652 [US2] Advance `flake.lock` to a ledger-inspector revision containing merged typed metadata support and copy the canonical all-types transaction fixture.
-- [ ] T653 [US2] Project `auxiliary_data.metadata` into recursive PureScript presentation types while preserving exact scalar strings and array order.
-- [ ] T654 [US1] Render labels and recursive int/bytes/text/list/map nodes in Structure with self-declared-data wording and truthful empty/malformed behavior.
-- [ ] T655 [US2] Prove non-text/duplicate ordered map keys, nested values, large/negative integers, lowercase bytes, existing no-metadata behavior, focused GREEN, and full `./gate.sh`; commit the reviewed slice.
+- [X] T651 [US1] Add focused Playwright assertions first for the treasury rationale and all-types recursive tree; capture RED on the old engine pin/count-only Structure.
+- [X] T652 [US2] Advance `flake.lock` to a ledger-inspector revision containing merged typed metadata support and copy the canonical all-types transaction fixture.
+- [X] T653 [US2] Project `auxiliary_data.metadata` into recursive PureScript presentation types while preserving exact scalar strings and array order.
+- [X] T654 [US1] Render labels and recursive int/bytes/text/list/map nodes in Structure with self-declared-data wording and truthful empty/malformed behavior.
+- [X] T655 [US2] Prove non-text/duplicate ordered map keys, nested values, large/negative integers, lowercase bytes, existing no-metadata behavior, focused GREEN, and full `./gate.sh`; commit the reviewed slice.
 
 **Owned Files**:
 
