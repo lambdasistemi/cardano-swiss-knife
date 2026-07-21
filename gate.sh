@@ -355,6 +355,68 @@ auxiliary_metadata_rendering_inventory() {
   done
 }
 
+witness_validate_parity_inventory() {
+  local api="node/src/index.js"
+  local cli="cli/csk.mjs"
+  local package_smoke="node/test/package-smoke.mjs"
+  local boundary="scripts/check-architecture-boundary.sh"
+  local fixture required
+
+  for required in \
+    'export const planTransactionWitnesses' \
+    'export const attachTransactionWitness' \
+    'export const validateTransaction' \
+    'export const evaluateTransactionScripts'; do
+    rg -Fq "$required" "$api" || {
+      echo "witness/validation shared API missing operation: $required" >&2
+      return 1
+    }
+  done
+
+  for required in \
+    'command === "evaluate-scripts"' \
+    'subcommand === "plan"' \
+    'subcommand === "attach"' \
+    '"witnessPlan", "validate", "evaluateScripts", "attachWitness"'; do
+    rg -Fq "$required" "$cli" || {
+      echo "witness/validation CLI route missing anchor: $required" >&2
+      return 1
+    }
+  done
+
+  for fixture in \
+    node/test/fixtures/transaction-ledger.json \
+    node/test/fixtures/transaction-witnesses.json; do
+    git ls-files --error-unmatch "$fixture" >/dev/null 2>&1 || {
+      echo "witness/validation fixture is not committed: $fixture" >&2
+      return 1
+    }
+    [[ -s "$fixture" ]] || {
+      echo "witness/validation fixture is empty: $fixture" >&2
+      return 1
+    }
+  done
+
+  for required in \
+    'package must contain exactly one ledger engine' \
+    'package must not contain a fallback Plutus engine'; do
+    rg -Fq "$required" "$package_smoke" || {
+      echo "installed package no-fallback proof missing anchor: $required" >&2
+      return 1
+    }
+  done
+
+  for required in \
+    'CLI/Node host must not own Cardano/CBOR/RDF/SPARQL/SHACL semantics or fallbacks' \
+    'negative fixture rejected host Plutus fallback' \
+    'negative fixture rejected direct host ledger routing'; do
+    rg -Fq "$required" "$boundary" || {
+      echo "host no-fallback boundary missing anchor: $required" >&2
+      return 1
+    }
+  done
+}
+
 git diff --check
 git diff --check origin/main...HEAD
 legacy_secret_storage_inventory
@@ -366,6 +428,7 @@ address_label_view_inventory
 bookable_identifier_restriction_inventory
 portable_age_vault_contract_inventory
 auxiliary_metadata_rendering_inventory
+witness_validate_parity_inventory
 bash scripts/check-architecture-boundary.sh
 nix build .#checks.x86_64-linux.test --no-link
 nix run .#ci-check
