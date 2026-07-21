@@ -10,6 +10,7 @@ module FFI.Json
   , MetadataValue(..)
   , IntentSummary
   , Inspection
+  , EntrySeed
   , Metric
   , MintRow
   , OutputRow
@@ -30,6 +31,7 @@ module FFI.Json
   , operationWitnessPlan
   , operationRdfGraph
   , operationScriptEvaluation
+  , operationEntrySeed
   , operationArgsMerged
   , providerResolutionErrorArgs
   , operationArgsWithPath
@@ -45,6 +47,7 @@ import Control.Monad.Except (runExcept)
 import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Nullable (Nullable, toMaybe)
 import Foreign (Foreign, isNull, isUndefined, readArray, readString)
 import Foreign.Index (readProp)
 
@@ -58,6 +61,7 @@ foreign import operationValidationImpl :: String -> Validation
 foreign import operationWitnessPlanImpl :: String -> WitnessPlan
 foreign import operationRdfGraphImpl :: String -> RdfGraph
 foreign import operationScriptEvaluationImpl :: String -> ScriptEvaluation
+foreign import operationEntrySeedImpl :: String -> String -> String -> Nullable EntrySeed
 foreign import operationArgsMergedImpl :: String -> String -> String
 foreign import providerResolutionErrorArgsImpl :: String -> String -> String
 foreign import operationArgsWithPathImpl :: String -> String -> String
@@ -92,6 +96,12 @@ type Inspection =
   , outputNote :: String
   , mintNote :: String
   , inputNote :: String
+  }
+
+type EntrySeed =
+  { entryId :: String
+  , requiredSigners :: Array String
+  , invalidAfterSlot :: Int
   }
 
 type Breadcrumb =
@@ -276,6 +286,10 @@ operationRdfGraph = operationRdfGraphImpl
 
 operationScriptEvaluation :: String -> ScriptEvaluation
 operationScriptEvaluation = operationScriptEvaluationImpl
+
+operationEntrySeed :: String -> String -> String -> Maybe EntrySeed
+operationEntrySeed inspectionRaw identificationRaw witnessPlanRaw =
+  toMaybe (operationEntrySeedImpl inspectionRaw identificationRaw witnessPlanRaw)
 
 operationArgsMerged :: String -> String -> String
 operationArgsMerged = operationArgsMergedImpl
