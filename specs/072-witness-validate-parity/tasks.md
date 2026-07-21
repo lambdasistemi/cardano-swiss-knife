@@ -12,13 +12,13 @@
 
 ## Slice 2 — Shared safe witness preparation and attachment
 
-- [ ] T008-S2 Add RED direct/Node tests for raw and `TxWitness ConwayEra` input, inserted attachment, default replacement refusal, authorized replacement, unrelated signer, malformed witness, and engine failure.
-- [ ] T009-S2 Prove body identity and all non-target witness/script/datum/redeemer content survive attachment and secret sentinels never appear in structured results or diagnostics.
-- [ ] T010-S2 Move signature preparation and signer-plan safety policy into `Cardano.Transaction.Witness`, backed by existing Haskell-derived signing and ledger attachment operations.
-- [ ] T011-S2 Make transaction/witness artifact-type checks use `Cardano.TextEnvelope` and emit both detached-witness and signed-transaction TextEnvelopes without changing CBOR bytes.
-- [ ] T012-S2 Expose detached-witness attachment through the Node result envelope and keep the WebUI compatibility module thin over the shared capability.
-- [ ] T013-S2 Run `nix run .#ci-test`, `nix run .#ci-node-api`, `nix build .#tx-inspector-ui --no-link`, and `./gate.sh`.
-- [ ] T014-S2 Commit exactly `feat(transaction): attach vkey witnesses safely` with `Tasks: T008, T009, T010, T011, T012, T013, T014`.
+- [X] T008-S2 Add RED direct/Node tests for raw and `TxWitness ConwayEra` input, inserted attachment, default replacement refusal, authorized replacement, unrelated signer, malformed witness, and engine failure.
+- [X] T009-S2 Prove body identity and all non-target witness/script/datum/redeemer content survive attachment and secret sentinels never appear in structured results or diagnostics.
+- [X] T010-S2 Move signature preparation and signer-plan safety policy into `Cardano.Transaction.Witness`, backed by existing Haskell-derived signing and ledger attachment operations.
+- [X] T011-S2 Make transaction/witness artifact-type checks use `Cardano.TextEnvelope` and emit both detached-witness and signed-transaction TextEnvelopes without changing CBOR bytes.
+- [X] T012-S2 Expose detached-witness attachment through the Node result envelope and keep the WebUI compatibility module thin over the shared capability.
+- [X] T013-S2 Run `nix run .#ci-test`, `nix run .#ci-node-api`, `nix build .#tx-inspector-ui --no-link`, and `./gate.sh`.
+- [X] T014-S2 Commit exactly `feat(transaction): attach vkey witnesses safely` with `Tasks: T008, T009, T010, T011, T012, T013, T014`.
 
 ## Slice 3 — WebUI validation and script-evaluation parity
 

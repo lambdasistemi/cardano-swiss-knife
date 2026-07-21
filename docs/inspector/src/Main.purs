@@ -3,6 +3,7 @@ module Main (main) where
 import Prelude
 
 import Cardano.BookableIdentifier (isBookableIdentifierKind)
+import Cardano.Transaction.Witness as Witness
 import Cardano.Offline.Key as Bootstrap
 import Cardano.Offline.Key as Derivation
 import Cardano.Offline.Key as Shelley
@@ -5464,19 +5465,20 @@ inspectorComponent initial =
                       Left err ->
                         H.modify_ _ { txSigningRunning = false, txSigningResult = Just (Left err) }
                       Right detached ->
-                        if witnessPlanHasSigner "Present vkey witnesses" detached.signerHashHex witnessPlan then
-                          H.modify_ _
-                            { txSigningRunning = false
-                            , txSigningResult = Just (Left "Signer already present in the witness set.")
-                            }
-                        else if witnessPlanHasSigner "Missing declared signers" detached.signerHashHex witnessPlan then do
-                          attached <- H.liftAff (TxSigning.attachWitness txCbor detached)
-                          H.modify_ _ { txSigningRunning = false, txSigningResult = Just attached }
-                        else
-                          H.modify_ _
-                            { txSigningRunning = false
-                            , txSigningResult = Just (Left "Signer is not required by the current witness plan.")
-                            }
+                        case
+                          Witness.attachmentSafety
+                            (witnessPlanHasSigner "Missing declared signers" detached.signerHashHex witnessPlan)
+                            (witnessPlanHasSigner "Present vkey witnesses" detached.signerHashHex witnessPlan)
+                            false
+                          of
+                          Left err ->
+                            H.modify_ _
+                              { txSigningRunning = false
+                              , txSigningResult = Just (Left err)
+                              }
+                          Right expectedAction -> do
+                            attached <- H.liftAff (TxSigning.attachWitness txCbor detached expectedAction)
+                            H.modify_ _ { txSigningRunning = false, txSigningResult = Just attached }
     SetAddressInput value ->
       H.modify_ _ { addressInput = value, addressResult = Nothing }
     InspectAddress -> do

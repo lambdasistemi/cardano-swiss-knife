@@ -5,6 +5,7 @@ import * as Payload from "../../output/Cardano.Offline.Payload/index.js";
 import * as Script from "../../output/Cardano.Offline.Script/index.js";
 import * as Transaction from "../../output/Cardano.Transaction/index.js";
 import * as TransactionLedger from "../../output/Cardano.Transaction.Ledger/index.js";
+import * as TransactionWitness from "../../output/Cardano.Transaction.Witness/index.js";
 import * as Provider from "../../output/Cardano.Provider/index.js";
 import * as Aff from "../../output/Effect.Aff/index.js";
 import * as Either from "../../output/Data.Either/index.js";
@@ -117,6 +118,110 @@ const transactionInput = async (input) => {
 
   return fromEither(Transaction.decodeTransactionInput(value));
 };
+
+const witnessInput = (input) => {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    throw new CskError("WITNESS_INPUT", "Witness input must be an object with cborHex or textEnvelope.");
+  }
+  const hasCbor = Object.hasOwn(input, "cborHex");
+  const hasEnvelope = Object.hasOwn(input, "textEnvelope");
+  if (Number(hasCbor) + Number(hasEnvelope) !== 1) {
+    throw new CskError("WITNESS_INPUT", "Witness input must contain exactly one of cborHex or textEnvelope.");
+  }
+  const value = hasCbor
+    ? input.cborHex
+    : typeof input.textEnvelope === "string"
+      ? input.textEnvelope
+      : JSON.stringify(input.textEnvelope);
+  if (typeof value !== "string") {
+    throw new CskError("WITNESS_INPUT", "Witness input must be CBOR hex or a TextEnvelope value.");
+  }
+  try {
+    return fromEither(TransactionWitness.decodeWitnessInput(value));
+  } catch (error) {
+    throw new CskError("WITNESS_INPUT", error.message, error);
+  }
+};
+
+const witnessPlan = (value) => value?.result?.witness_plan ?? value?.witness_plan;
+const attachmentResult = (value) => value?.result?.witness_attachment ?? value?.witness_attachment;
+const witnessPlanHashes = (plan, field) => {
+  const entries = plan?.[field];
+  if (!Array.isArray(entries)) throw new CskError("ENGINE_PROTOCOL", `The ledger-inspector witness plan omitted ${field}.`);
+  const hashes = entries.map((entry) => typeof entry === "string" ? entry : entry?.hash);
+  if (hashes.some((hash) => typeof hash !== "string")) throw new CskError("ENGINE_PROTOCOL", `The ledger-inspector witness plan contained an invalid ${field} entry.`);
+  return new Set(hashes);
+};
+
+const encodeTransactionEnvelope = (cborHex) => {
+  const serialized = fromEither(Transaction.encodeTransactionTextEnvelope(cborHex));
+  return JSON.parse(serialized);
+};
+
+export const prepareTransactionWitness = (input) => operation(async () => {
+  if (!input || typeof input !== "object" || Array.isArray(input) || typeof input.bodyHashHex !== "string" || typeof input.signingKeyBech32 !== "string") {
+    throw new CskError("WITNESS_INPUT", "Witness preparation requires bodyHashHex and signingKeyBech32 strings.");
+  }
+  const detached = await awaitAff(TransactionWitness.prepareWitness(input.bodyHashHex)(input.signingKeyBech32));
+  const witness = fromEither(detached);
+  return { ...witness, textEnvelope: JSON.parse(fromEither(TransactionWitness.encodeWitnessTextEnvelope(witness.vkeyWitnessCborHex))) };
+});
+
+const attachmentOperationOptions = async (input, txCbor, options) => {
+  if (!Object.hasOwn(input, "txHash")) return options;
+  const selectedProvider = provider(input.provider);
+  const selectedNetwork = providerNetwork(input.network);
+  const credential = input.credential ?? "";
+  const inspection = await runTransactionOperation("tx.inspect", txCbor, options);
+  const context = await awaitAff(Provider.resolveProducerTxContext(selectedProvider)(selectedNetwork)(credential)(!Provider.needsKey(selectedProvider) || credential !== "")(JSON.stringify(inspection)));
+  return { ...options, ...JSON.parse(context) };
+};
+
+export const attachTransactionWitness = (input, witness, options = {}) => operation(async () => {
+  const txCbor = await transactionInput(input);
+  const witnessCbor = witnessInput(witness);
+  const operationOptions = await attachmentOperationOptions(input, txCbor, options);
+
+  const planResponse = await runTransactionOperation(TransactionLedger.planTransactionWitnessesOperation, txCbor, operationOptions);
+  const plan = witnessPlan(planResponse);
+  if (!plan || typeof plan !== "object") {
+    throw new CskError("ENGINE_PROTOCOL", "The ledger-inspector witness plan response was malformed.");
+  }
+  const replaceExisting = options?.replaceExisting === true;
+  const attached = attachmentResult(await runTransactionOperation(TransactionLedger.attachTransactionWitnessOperation, txCbor, { ...operationOptions, vkey_witness_cbor_hex: witnessCbor }));
+  if (!attached || typeof attached !== "object" || attached.status !== "applied") {
+    const message = attached?.errors?.map((error) => error?.message).filter(Boolean).join("; ") || "The ledger-inspector rejected the detached witness.";
+    const code = /not required|unrelated/i.test(message) ? "WITNESS_UNRELATED_SIGNER" : "WITNESS_ATTACHMENT_REJECTED";
+    throw new CskError(code, message);
+  }
+  const signedTxCborHex = attached.signed_tx_cbor_hex ?? attached.tx_cbor;
+  const witnessPatchAction = attached.witness_patch_action;
+  if (typeof signedTxCborHex !== "string" || signedTxCborHex === "" || typeof witnessPatchAction !== "string" || witnessPatchAction === "") {
+    throw new CskError("ENGINE_PROTOCOL", "The ledger-inspector attachment response was incomplete.");
+  }
+  const beforePresent = witnessPlanHashes(plan, "present_vkey_witnesses");
+  const required = new Set([...witnessPlanHashes(plan, "required_signers"), ...witnessPlanHashes(plan, "missing_vkey_witnesses")]);
+  const afterResponse = await runTransactionOperation(TransactionLedger.planTransactionWitnessesOperation, signedTxCborHex, operationOptions);
+  const afterPlan = witnessPlan(afterResponse);
+  if (!afterPlan || typeof afterPlan !== "object") throw new CskError("ENGINE_PROTOCOL", "The ledger-inspector post-attachment witness plan response was malformed.");
+  const afterPresent = witnessPlanHashes(afterPlan, "present_vkey_witnesses");
+  const insertedSignerHashes = [...afterPresent].filter((hash) => !beforePresent.has(hash));
+  const insertedIsRequired = insertedSignerHashes.length === 1 && required.has(insertedSignerHashes[0]);
+  if (witnessPatchAction === "inserted" && !insertedIsRequired) {
+    throw new CskError("WITNESS_UNRELATED_SIGNER", "The detached witness did not add exactly one signer required by the pre-mutation witness plan.");
+  }
+  let expectedAction;
+  try {
+    expectedAction = fromEither(TransactionWitness.attachmentSafety(witnessPatchAction === "inserted" && insertedIsRequired)(witnessPatchAction === "replaced")(replaceExisting));
+  } catch (error) {
+    const code = error.message.startsWith("Signer already present") ? "WITNESS_REPLACEMENT_FORBIDDEN" : "WITNESS_ACTION_MISMATCH";
+    throw new CskError(code, error.message, error);
+  }
+  if (witnessPatchAction !== expectedAction) {
+    throw new CskError("WITNESS_ACTION_MISMATCH", `The ledger-inspector reported ${witnessPatchAction}; signer safety requires ${expectedAction}.`);
+  }
+  return { signedTxCborHex, textEnvelope: encodeTransactionEnvelope(signedTxCborHex), witnessPatchAction };
+});
 
 const transactionOperation = (name, input, options = {}) => operation(async () => {
   let books;

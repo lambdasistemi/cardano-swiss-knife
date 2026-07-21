@@ -9,6 +9,7 @@ const operations = new Set([
   "tx.intent",
   "tx.rdf",
   "tx.witness.plan",
+  "tx.witness.attach",
   "tx.validate",
   "tx.evaluate.scripts",
 ]);
