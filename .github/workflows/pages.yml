@@ -36,7 +36,7 @@ jobs:
         run: nix build .#combined-site --out-link result-dist
 
       - name: Build docs
-        run: nix develop github:paolino/dev-assets?dir=mkdocs --quiet -c mkdocs build --strict
+        run: nix develop --quiet -c just build-docs
 
       - name: Assemble Pages artifact
         run: |

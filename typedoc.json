@@ -1,0 +1,8 @@
+{
+  "entryPoints": ["node/src/index.d.ts"],
+  "plugin": ["typedoc-plugin-markdown"],
+  "out": "docs/api",
+  "entryFileName": "index",
+  "cleanOutputDir": true,
+  "treatWarningsAsErrors": true
+}

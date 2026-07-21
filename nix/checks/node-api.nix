@@ -21,5 +21,7 @@ pkgs.runCommand "cardano-swiss-knife-node-api-check" {
   bash ${repoRoot}/scripts/check-architecture-boundary.sh ${repoRoot}
   node scripts/check-node-api-exports.mjs --runtime ../unpacked-package/package/node/dist/index.js --facade ../unpacked-package/package/node/dist/index.d.ts
   CSK_PACKAGE_TARBALL="$(echo ${nodePackage}/*.tgz)" node --test node/test/api-contract.test.mjs node/test/api.test.mjs node/test/cli.test.mjs node/test/transaction-api.test.mjs node/test/transaction-provider.test.mjs node/test/transaction-books.test.mjs node/test/transaction-ledger.test.mjs node/test/transaction-witness.test.mjs
+  test -f ${purescript.node-api-docs}/index.md
+  rg --fixed-strings --quiet 'https://github.com/lambdasistemi/cardano-swiss-knife/blob/main/node/test/api-properties.test.mjs' ${purescript.node-api-docs}/index.md
   mkdir -p $out
 ''

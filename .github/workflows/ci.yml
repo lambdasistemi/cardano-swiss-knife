@@ -47,8 +47,11 @@ jobs:
       - name: Build app
         run: nix run .#ci-build
 
+      - name: Run Node API contract checks
+        run: nix run .#ci-node-api
+
       - name: Build docs
-        run: nix develop github:paolino/dev-assets?dir=mkdocs --quiet -c mkdocs build --strict
+        run: nix develop --quiet -c just build-docs
 
       - name: Run PureScript tests
         run: nix run .#ci-test
@@ -140,7 +143,7 @@ jobs:
         run: nix build .#combined-site --out-link result-dist
 
       - name: Build docs
-        run: nix develop github:paolino/dev-assets?dir=mkdocs --quiet -c mkdocs build --strict
+        run: nix develop --quiet -c just build-docs
 
       - name: Assemble preview artifact
         run: |

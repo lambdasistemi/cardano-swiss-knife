@@ -1,4 +1,4 @@
-node_modules/
+node_modules
 output/
 .spago/
 dist/app.js
@@ -10,6 +10,8 @@ WIP.md
 result
 result-tx-inspector
 result-dist
+result-api-docs
+docs/api/
 site/
 site-root/
 test-results/

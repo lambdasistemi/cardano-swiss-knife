@@ -15,7 +15,14 @@ test:
 test-playwright:
   nix run .#ci-playwright
 
-build-docs:
+build-api-docs:
+  rm -rf result-api-docs docs/api
+  nix build .#node-api-docs --out-link result-api-docs
+  mkdir -p docs/api
+  cp -LR result-api-docs/. docs/api/
+  chmod -R u+w docs/api
+
+build-docs: build-api-docs
   nix develop github:paolino/dev-assets?dir=mkdocs --quiet -c mkdocs build --strict
 
 assemble-site:
