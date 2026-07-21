@@ -23,23 +23,23 @@ witnesses, and exposes swappable persistence/coordination ports.
 **Goal**: Deliver the complete pure TxEntry surface and adapter seams in one
 bisect-safe RED/GREEN commit without adding a backend or semantic fallback.
 
-- [ ] T754 [US1] Add failing direct tests for ordered required, satisfied, and
+- [X] T754 [US1] Add failing direct tests for ordered required, satisfied, and
   missing signer derivation across empty, partial, full, duplicate, and
   unrelated-witness cases.
-- [ ] T755 [US1] Add failing direct tests for open/complete derivation, exact
+- [X] T755 [US1] Add failing direct tests for open/complete derivation, exact
   invalid-after expiry boundary, expiry-over-completeness precedence, and
   submitted/expired terminal preservation.
-- [ ] T756 [US2] Add failing direct tests proving raw and `TxWitness ConwayEra`
+- [X] T756 [US2] Add failing direct tests proving raw and `TxWitness ConwayEra`
   inputs normalize to identical collected witness CBOR and update completeness.
-- [ ] T757 [US2] Add failing direct tests for wrong envelope/malformed input,
+- [X] T757 [US2] Add failing direct tests for wrong envelope/malformed input,
   non-required signer, duplicate refusal, explicit replacement, and terminal
   mutation rejection.
-- [ ] T758 [US3] Add compile/runtime proof for every polymorphic `EntryStore`
+- [X] T758 [US3] Add compile/runtime proof for every polymorphic `EntryStore`
   and `CoordinationPort` operation through test implementations.
-- [ ] T759 [US1] [US2] [US3] Implement the pure TxEntry types, completeness and
+- [X] T759 [US1] [US2] [US3] Implement the pure TxEntry types, completeness and
   lifecycle functions, #67-backed witness collection, and backend-neutral port
   records with no FFI, manifest, host, provider, or engine change.
-- [ ] T760 Obtain navigator RED/GREEN approval, run the focused shared test and
+- [X] T760 Obtain navigator RED/GREEN approval, run the focused shared test and
   `./gate.sh`, and commit exactly once with
   `Tasks: T754, T755, T756, T757, T758, T759, T760`.
 
