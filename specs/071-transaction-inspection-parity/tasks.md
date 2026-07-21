@@ -28,12 +28,12 @@
 
 ## Slice 4 — CLI, vault credentials, and packaged smokes
 
-- [ ] T018-S4 Add RED CLI tests for all four commands, exclusive raw/file/hash sources, browse paths, repeatable books, JSON/human output, and typed exit codes.
-- [ ] T019-S4 Add RED vault tests proving Blockfrost/Koios entry-kind selection and absence of credential values from argv, environment, output, errors, and temporary files.
-- [ ] T020-S4 Implement `csk tx inspect|browse|identify|intent` as thin ESM calls while preserving every #69/#70 command and vault behavior.
-- [ ] T021-S4 Extend the foreign installed-package smoke to cover raw CBOR and TextEnvelope CLI/API operations under network denial plus packaged ledger/RDF engine discovery.
-- [ ] T022-S4 Extend the architecture boundary proof so provider endpoints/decoders, ledger semantics, and RDF query semantics cannot appear in host code.
-- [ ] T023-S4 Run `nix run .#ci-node-api`, `nix run .#ci-node-package`, the packaged `csk` smoke, and `./gate.sh`, then commit exactly `feat(cli): expose transaction inspection commands` with `Tasks: T018, T019, T020, T021, T022, T023`.
+- [X] T018-S4 Add RED CLI tests for all four commands, exclusive raw/file/hash sources, browse paths, repeatable books, JSON/human output, and typed exit codes.
+- [X] T019-S4 Add RED vault tests proving Blockfrost/Koios entry-kind selection and absence of credential values from argv, environment, output, errors, and temporary files.
+- [X] T020-S4 Implement `csk tx inspect|browse|identify|intent` as thin ESM calls while preserving every #69/#70 command and vault behavior.
+- [X] T021-S4 Extend the foreign installed-package smoke to cover raw CBOR and TextEnvelope CLI/API operations under network denial plus packaged ledger/RDF engine discovery.
+- [X] T022-S4 Extend the architecture boundary proof so provider endpoints/decoders, ledger semantics, and RDF query semantics cannot appear in host code.
+- [X] T023-S4 Run `nix run .#ci-node-api`, `nix run .#ci-node-package`, the packaged `csk` smoke, and `./gate.sh`, then commit exactly `feat(cli): expose transaction inspection commands` with `Tasks: T018, T019, T020, T021, T022, T023`.
 
 ## Orchestrator-owned finalization
 
