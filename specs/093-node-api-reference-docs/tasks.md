@@ -28,7 +28,7 @@
 **Goal**: Build browsable Markdown from the live contract on every docs and Node-source CI path without committing generated output.
 
 - [ ] T010-S3 Add a RED docs-generation/site proof for the missing `docs/api/index.md` target.
-- [ ] T011-S3 Configure TypeDoc plus `typedoc-plugin-markdown` to generate an `index.md`-rooted API tree from the facade, including the parent-confirmed #92 property-suite source link.
+- [ ] T011-S3 Configure TypeDoc plus `typedoc-plugin-markdown` to generate an `index.md`-rooted API tree from the facade, expose it as the Q-002-authorized `node-api-docs` flake package, and include the #92 property-suite source link.
 - [ ] T012-S3 Ignore `docs/api/`, add the MkDocs **API Reference** nav, and make local, main CI, PR preview, and Pages builds generate before strict MkDocs.
 - [ ] T013-S3 Run TypeDoc generation inside `ci-node-api` and invoke that check explicitly as merge-blocking GitHub CI.
 - [ ] T014-S3 Prove generated Markdown remains untracked, strict MkDocs and `nix run .#ci-node-api` pass, run `./gate.sh`, and commit `docs(node): publish generated API reference` with `Tasks: T010, T011, T012, T013, T014`.
@@ -40,5 +40,6 @@ Audit all task/commit links, rerun the final gate, update PR #94 to the delivere
 ## Dependencies and forbidden scope
 
 - Slices run strictly S1 → S2 → S3; Q-001 is resolved with `node/test/api-properties.test.mjs` as the canonical cross-link target.
+- Q-002 authorizes Slice 3 to edit `flake.nix` solely for `packages.node-api-docs = purescript.node-api-docs`; no other widening is authorized.
 - Workers must not edit `specs/093-node-api-reference-docs/`, `gate.sh`, PR metadata, `node/test/` property files owned by csk-92, or any sibling worktree.
 - Reordering exports, changing runtime behavior, or restructuring `node/src/index.js` requires a parent Q-file before work continues.
