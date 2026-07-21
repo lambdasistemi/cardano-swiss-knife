@@ -112,20 +112,20 @@ Tasks: T781, T782, T783, T784, T785, T786
 **Goal**: Integrate with #76's committed active-entry/store/action shape and no
 other browser state model.
 
-- [ ] T787 [US3] Receive and inspect #76's committed release point, rebase or
+- [X] T787 [US3] Receive and inspect #76's committed release point, rebase or
   merge it as directed, replace the provisional plan paths with exact owned
   files, and obtain parent/cross-lane resolution for any overlap before
   dispatch.
-- [ ] T788 [US3] Add browser RED for unavailable incomplete/expired submit and
+- [X] T788 [US3] Add browser RED for unavailable incomplete/expired submit and
   confirmation cancellation with zero provider requests.
-- [ ] T789 [US3] Add browser RED for engine-backed signed-CBOR assembly,
+- [X] T789 [US3] Add browser RED for engine-backed signed-CBOR assembly,
   selected-provider submission, success receipt, and persistence of the
   returned submitted entry.
-- [ ] T790 [US3] Add browser RED for provider failure leaving the entry
+- [X] T790 [US3] Add browser RED for provider failure leaving the entry
   complete/retryable with an actionable redacted error.
-- [ ] T791 [US3] Implement the explicit workbench action using only #76's
+- [X] T791 [US3] Implement the explicit workbench action using only #76's
   state/store seam, existing ledger engine adapter, and shared provider submit.
-- [ ] T792 Obtain navigator RED/GREEN approval, run focused Playwright and the
+- [X] T792 Obtain navigator RED/GREEN approval, run focused Playwright and the
   extended `./gate.sh`, and commit exactly once with
   `Tasks: T787, T788, T789, T790, T791, T792`.
 

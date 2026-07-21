@@ -186,6 +186,7 @@ type State =
   { provider :: Provider
   , blockfrostKey :: String
   , koiosBearer :: String
+  , providerCapabilityRevision :: Int
   , mode :: Mode
   , network :: Network
   , txHash :: String
@@ -482,6 +483,7 @@ inspectorComponent initial =
         { provider: initial.prov
         , blockfrostKey: ""
         , koiosBearer: ""
+        , providerCapabilityRevision: 0
         , mode: ByHash
         , network: initial.network
         , txHash: ""
@@ -654,7 +656,7 @@ inspectorComponent initial =
   renderWorkbench state =
     HH.slot
       _workbench
-      unit
+      (Provider.providerName state.provider <> ":" <> networkName state.network <> ":" <> show state.providerCapabilityRevision)
       Workbench.component
       { store: EntryStore.entryStore
       , candidate: state.workbenchCandidate
@@ -664,6 +666,11 @@ inspectorComponent initial =
             (\entry -> { id: entry.id, label: entry.label, value: entry.value })
             (vaultEntriesForKinds signingAcceptedKinds state.vaultEntries)
       , fetchCurrentSlot: currentSlotFor state
+      , submission:
+          { providerLabel: Provider.providerName state.provider
+          , networkLabel: networkName state.network
+          , submit: Provider.submitTxEntry state.provider state.network (providerSecret state)
+          }
       }
       WorkbenchOutput
 
@@ -5639,13 +5646,13 @@ inspectorComponent initial =
       nextTheme <- liftEffect (Shell.toggleThemeEff theme)
       H.modify_ _ { theme = nextTheme }
     SetBlockfrostKey s -> do
-      H.modify_ _ { blockfrostKey = s }
+      H.modify_ \state -> state { blockfrostKey = s, providerCapabilityRevision = state.providerCapabilityRevision + 1 }
     SetKoiosBearer s -> do
       if looksLikeBlockfrostProjectId s then do
-        H.modify_ _ { provider = Blockfrost, blockfrostKey = s, fetchError = Nothing }
+        H.modify_ \state -> state { provider = Blockfrost, blockfrostKey = s, fetchError = Nothing, providerCapabilityRevision = state.providerCapabilityRevision + 1 }
         liftEffect (Storage.setItem providerKey (Provider.providerName Blockfrost))
       else do
-        H.modify_ _ { koiosBearer = s }
+        H.modify_ \state -> state { koiosBearer = s, providerCapabilityRevision = state.providerCapabilityRevision + 1 }
     SelectProvider p -> do
       H.modify_ _ { provider = p, fetchError = Nothing }
       liftEffect (Storage.setItem providerKey (Provider.providerName p))
@@ -6290,8 +6297,8 @@ inspectorComponent initial =
   setProviderEntry entry = do
     provider <- H.gets _.provider
     case provider of
-      Blockfrost -> H.modify_ _ { blockfrostKey = entry.value }
-      Koios -> H.modify_ _ { koiosBearer = entry.value }
+      Blockfrost -> H.modify_ \state -> state { blockfrostKey = entry.value, providerCapabilityRevision = state.providerCapabilityRevision + 1 }
+      Koios -> H.modify_ \state -> state { koiosBearer = entry.value, providerCapabilityRevision = state.providerCapabilityRevision + 1 }
 
   restoreAcceptedKinds = [ Vault.kindTag Vault.VaultMnemonic ]
 

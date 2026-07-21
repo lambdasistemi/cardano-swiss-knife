@@ -5,12 +5,14 @@ module TxSigning
   , prepareWitness
   , attachWitness
   , attachPastedWitness
+  , assembleEntry
   , fetchCurrentSlot
   ) where
 
 import Prelude
 
 import Cardano.Transaction.Witness as Witness
+import Cardano.Transaction.Entry (TxEntry)
 import Cardano.Transaction.Ledger as Ledger
 import Data.Array as Array
 import Data.Either (Either(..))
@@ -149,6 +151,19 @@ attachPastedWitness txCborHex witnessCborHex replaceExisting = do
           | Array.elem signerHashHex required ->
               pure (Right { signerHashHex, signedTxCborHex: attachment.signedTxCborHex })
         _, _ -> pure (Left "Pasted witness does not satisfy exactly one required signer for this entry.")
+
+assembleEntry :: TxEntry -> Aff (Either String String)
+assembleEntry entry = go entry.unsignedTxCborHex entry.collectedWitnesses
+  where
+  go signedTxCborHex witnesses = case Array.uncons witnesses of
+    Nothing -> pure (Right signedTxCborHex)
+    Just { head: witness, tail } -> do
+      attached <- attachPastedWitness signedTxCborHex witness.witnessCborHex false
+      case attached of
+        Left err -> pure (Left err)
+        Right material
+          | material.signerHashHex /= witness.signerId -> pure (Left "Ledger witness attachment signer did not match the stored entry witness.")
+          | otherwise -> go material.signedTxCborHex tail
 
 fetchCurrentSlot :: Aff String -> Aff (Either String Int)
 fetchCurrentSlot fetchValidationContext = do
