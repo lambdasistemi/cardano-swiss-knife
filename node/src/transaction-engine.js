@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { WASI, File, OpenFile, ConsoleStdout } from "@bjorn3/browser_wasi_shim";
 import { CskError } from "./error.js";
 
-const operations = new Set(["tx.inspect", "tx.browse", "tx.identify", "tx.intent"]);
+const operations = new Set(["tx.inspect", "tx.browse", "tx.identify", "tx.intent", "tx.rdf"]);
 let wasmModule;
 
 const engineError = (code, message, cause) => new CskError(code, message, cause);

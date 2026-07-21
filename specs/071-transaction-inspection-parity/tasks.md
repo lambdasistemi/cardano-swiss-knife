@@ -19,12 +19,12 @@
 
 ## Slice 3 — Shared book parsing and RDF resolution
 
-- [ ] T012-S3 Add RED tests for Turtle, CIP-57, `amaru.book.bundle.v1`, and store documents, including repeat order and rejected transactional imports.
-- [ ] T013-S3 Add RED treasury assertions for exact resolved labels/types beside unchanged address, key, and script raw identifiers.
-- [ ] T014-S3 Move book parsing and RDF query facades into shared modules consumed by WebUI and Node without copying semantic implementations.
-- [ ] T015-S3 Generate transaction graphs only with ledger-inspector `tx.rdf`, resolve only with the pinned RDF-shapes engine, and type its load/protocol failures without fallback.
-- [ ] T016-S3 Package the pinned RDF engine, expose ordered `books`/`resolutions` in Node results, and keep existing WebUI build/journeys compatible.
-- [ ] T017-S3 Run `nix run .#ci-node-api`, `nix build .#tx-inspector-ui --no-link`, and `./gate.sh`, then commit exactly `feat(transaction): resolve inspection books` with `Tasks: T012, T013, T014, T015, T016, T017`.
+- [X] T012-S3 Add RED tests for Turtle, CIP-57, `amaru.book.bundle.v1`, and store documents, including repeat order and rejected transactional imports.
+- [X] T013-S3 Add RED treasury assertions for exact resolved labels/types beside unchanged address, key, and script raw identifiers.
+- [X] T014-S3 Move book parsing and RDF query facades into shared modules consumed by WebUI and Node without copying semantic implementations.
+- [X] T015-S3 Generate transaction graphs only with ledger-inspector `tx.rdf`, resolve only with the pinned RDF-shapes engine, and type its load/protocol failures without fallback.
+- [X] T016-S3 Package the pinned RDF engine, expose ordered `books`/`resolutions` in Node results, and keep existing WebUI build/journeys compatible.
+- [X] T017-S3 Run `nix run .#ci-node-api`, `nix build .#tx-inspector-ui --no-link`, and `./gate.sh`, then commit exactly `feat(transaction): resolve inspection books` with `Tasks: T012, T013, T014, T015, T016, T017`.
 
 ## Slice 4 — CLI, vault credentials, and packaged smokes
 

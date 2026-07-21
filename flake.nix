@@ -53,6 +53,7 @@
           };
           wasmBinary = cardano-addresses.packages.${system}.wasm;
           txInspectorWasmBinary = cardano-ledger-inspector.packages.${system}.wasm-tx-inspector;
+          rdfShapesWasmPkg = rdf-shapes-wasm.packages.${system}.wasm-pkg;
           txInspectorUi = import ./nix/wasm-ui.nix {
             inherit system nixpkgs purescript-overlay mkSpagoDerivation;
             wasmArtifact = cardano-ledger-inspector.packages.${system}.wasm-tx-inspector;
@@ -72,7 +73,7 @@
           '';
           testVectorsPath = test-vectors-json;
           purescript = import ./nix/purescript.nix {
-            inherit pkgs repoRoot txInspectorUi wasmBinary txInspectorWasmBinary;
+            inherit pkgs repoRoot txInspectorUi wasmBinary txInspectorWasmBinary rdfShapesWasmPkg;
           };
           packages = import ./nix/packages {
             inherit pkgs repoRoot purescript haskellProject playwrightBrowsers testVectorsPath txInspectorUi;
