@@ -263,6 +263,15 @@ const invalidValidation = (title, subtitle) => ({
   sections: [],
 });
 
+const invalidScriptEvaluation = (title, subtitle) => ({
+  valid: false,
+  title,
+  subtitle,
+  status: "unknown",
+  redeemers: [],
+  missingContext: [],
+});
+
 const uniqueIdentifierCandidates = (values) =>
   Array.from(new Set(values.map(text).filter((value) => value !== "")));
 
@@ -728,7 +737,7 @@ const normalizeValidation = (validation) => {
   const validForSuppliedContext = validation.valid_for_supplied_context === true;
 
   return {
-    valid: true,
+    valid: ["valid", "invalid", "incomplete", "rejected"].includes(status),
     title: "Ledger validation",
     subtitle: validationStatusSubtitle(status, failures, missingContext, errors),
     status,
@@ -793,6 +802,80 @@ const normalizeValidation = (validation) => {
         ),
       },
     ],
+  };
+};
+
+const executionUnits = (units) => {
+  if (!units || typeof units !== "object") return "";
+  const memory = text(units.memory);
+  const steps = text(units.steps);
+  if (memory === "" && steps === "") return "";
+  return `${memory || "?"} memory / ${steps || "?"} steps`;
+};
+
+const contextDetail = (item) =>
+  text(item?.message) || text(item?.kind) || (item ? jsonCopy(item) : "");
+
+const normalizeScriptRedeemer = (redeemer) => {
+  const failure =
+    redeemer?.failure && typeof redeemer.failure === "object" ? redeemer.failure : {};
+  const missingContext = Array.isArray(redeemer?.missing_context)
+    ? redeemer.missing_context.map(contextDetail).filter((detail) => detail !== "")
+    : [];
+  return {
+    purpose: text(redeemer?.purpose),
+    index: text(redeemer?.index),
+    status: text(redeemer?.status),
+    declaredExUnits: executionUnits(redeemer?.declared_ex_units),
+    evaluatedExUnits: executionUnits(redeemer?.evaluated_ex_units),
+    failureCode: text(failure.code),
+    failureMessage: text(failure.message),
+    missingContext,
+  };
+};
+
+const scriptEvaluationSubtitle = (status, redeemers, missingContext) => {
+  switch (status) {
+    case "succeeded":
+      return plural(redeemers.length, "redeemer evaluated");
+    case "failed":
+      return plural(redeemers.length, "redeemer reported a failure");
+    case "incomplete":
+      return plural(missingContext.length, "missing context item");
+    case "rejected":
+      return "evaluator rejected the supplied context";
+    case "not_applicable":
+      return "No scripts apply to this transaction.";
+    default:
+      return "script evaluation response";
+  }
+};
+
+const normalizeScriptEvaluation = (evaluation) => {
+  if (!evaluation || typeof evaluation !== "object") {
+    return invalidScriptEvaluation(
+      "Script evaluation",
+      "Ledger script evaluation response was not JSON."
+    );
+  }
+
+  const redeemers = Array.isArray(evaluation.redeemers)
+    ? evaluation.redeemers.map(normalizeScriptRedeemer)
+    : [];
+  const missingContext = Array.isArray(evaluation.missing_context)
+    ? evaluation.missing_context.map(contextDetail).filter((detail) => detail !== "")
+    : [];
+  const status = text(evaluation.status || "unknown");
+  const valid = ["succeeded", "failed", "incomplete", "rejected", "not_applicable"].includes(status);
+  return {
+    valid,
+    title: "Script evaluation",
+    subtitle: valid
+      ? scriptEvaluationSubtitle(status, redeemers, missingContext)
+      : "Ledger script evaluation response had an unsupported status.",
+    status,
+    redeemers,
+    missingContext,
   };
 };
 
@@ -1002,5 +1085,17 @@ export const operationValidationImpl = (raw) => {
     return normalizeValidation(operationResult(parsed)?.validation);
   } catch (_err) {
     return invalidValidation("Ledger validation", "Ledger operation response was not JSON.");
+  }
+};
+
+export const operationScriptEvaluationImpl = (raw) => {
+  try {
+    const parsed = JSON.parse(raw);
+    return normalizeScriptEvaluation(operationResult(parsed)?.script_evaluation);
+  } catch (_err) {
+    return invalidScriptEvaluation(
+      "Script evaluation",
+      "Ledger script evaluation response was not JSON."
+    );
   }
 };

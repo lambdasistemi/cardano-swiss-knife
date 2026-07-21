@@ -8,6 +8,7 @@ module TxSigning
 import Prelude
 
 import Cardano.Transaction.Witness as Witness
+import Cardano.Transaction.Ledger as Ledger
 import Data.Array as Array
 import Data.Either (Either(..))
 import Data.String (joinWith)
@@ -46,12 +47,12 @@ foreign import operationWitnessAttachmentImpl :: String -> WitnessAttachment
 prepareWitness :: String -> String -> Aff (Either String DetachedWitness)
 prepareWitness = Witness.prepareWitness
 
-attachWitness :: String -> DetachedWitness -> String -> Aff (Either String WitnessMaterial)
-attachWitness txCborHex detached expectedAction = do
+attachWitness :: String -> DetachedWitness -> String -> Boolean -> Aff (Either String WitnessMaterial)
+attachWitness txCborHex detached expectedAction replaceExisting = do
   attachResult <- Inspector.runLedgerOperation
     txCborHex
-    "tx.witness.attach"
-    (witnessAttachmentArgs detached.vkeyWitnessCborHex)
+    Ledger.attachTransactionWitnessOperation
+    (witnessAttachmentArgs detached.vkeyWitnessCborHex replaceExisting)
   let attachment = operationWitnessAttachmentImpl attachResult.stdout
   pure case unit of
     _
@@ -95,9 +96,10 @@ attachWitness txCborHex detached expectedAction = do
             , witnessPatchAction: attachment.witnessPatchAction
             }
 
-witnessAttachmentArgs :: String -> String
-witnessAttachmentArgs vkeyWitnessCborHex =
-  "{\"vkey_witness_cbor_hex\":\"" <> vkeyWitnessCborHex <> "\"}"
+witnessAttachmentArgs :: String -> Boolean -> String
+witnessAttachmentArgs vkeyWitnessCborHex replaceExisting =
+  "{\"vkey_witness_cbor_hex\":\"" <> vkeyWitnessCborHex <> "\",\"replace_existing\":" <>
+    (if replaceExisting then "true" else "false") <> "}"
 
 renderWitnessAttachmentProblems
   :: Array WitnessAttachmentIssue

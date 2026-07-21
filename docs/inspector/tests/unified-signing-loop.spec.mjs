@@ -479,6 +479,31 @@ test("workbench derives and vaults the missing signer before attaching exactly o
   ).toHaveLength(1);
 });
 
+test("workbench refuses replacement by default and permits it only after explicit authorization", async ({
+  page,
+}) => {
+  await page.goto("/inspect");
+  await decodeTransaction(page);
+  const panel = signingPanel(page);
+  await panel.getByRole("button", { name: "Show signing key" }).click();
+  await panel.getByLabel("Transaction signing key").fill(addressSigningKey);
+  await panel.getByRole("button", { name: "Create signed transaction" }).click();
+  const patchedTx = await signingOutput(panel, "Patched signed transaction CBOR")
+    .locator(".signing-output-value")
+    .textContent();
+
+  await page.getByRole("button", { name: "Change input" }).click();
+  await decodeTransaction(page, patchedTx.trim());
+  await panel.getByRole("button", { name: "Create signed transaction" }).click();
+  await expect(panel.getByRole("alert")).toContainText(
+    "Signer already present in the witness set.",
+  );
+
+  await panel.getByRole("checkbox", { name: "Replace existing witness" }).check();
+  await panel.getByRole("button", { name: "Create signed transaction" }).click();
+  await expect(panel.getByText("Replaced existing witness", { exact: true })).toBeVisible();
+});
+
 test("workbench validates inspection, body hash, key, signer plan, and local signing boundaries", async ({
   page,
 }) => {
