@@ -2,13 +2,13 @@
 
 ## Slice 1 — Offline API contracts and reusable harness
 
-- [ ] T001-S1 Pin `fast-check` in `package.json` and `package-lock.json` without changing runtime package dependencies.
-- [ ] T002-S1 Add an installed-package property harness with reproducible seeds/run budgets and no Cardano semantic implementation.
-- [ ] T003-S1 Add commented RED→GREEN properties covering `CskError` and all 14 offline address, mnemonic, key, payload, and script exports.
-- [ ] T004-S1 Prove valid composition/determinism/round trips plus exact malformed-input, applicable engine-failure, and secret-free result taxonomy.
-- [ ] T005-S1 Wire canonical `node/test/api-properties.test.mjs` into `ci-node-api` while retaining every example test.
-- [ ] T006-S1 Run `nix run .#ci-node-api` and `./gate.sh`.
-- [ ] T007-S1 Commit exactly `test(node): specify offline API properties` with `Tasks: T001, T002, T003, T004, T005, T006, T007`.
+- [X] T001-S1 Pin `fast-check` in `package.json` and `package-lock.json` without changing runtime package dependencies.
+- [X] T002-S1 Add an installed-package property harness with reproducible seeds/run budgets and no Cardano semantic implementation.
+- [X] T003-S1 Add commented RED→GREEN properties covering `CskError` and all 14 offline address, mnemonic, key, payload, and script exports.
+- [X] T004-S1 Prove valid composition/determinism/round trips plus exact malformed-input, applicable engine-failure, and secret-free result taxonomy.
+- [X] T005-S1 Wire canonical `node/test/api-properties.test.mjs` into `ci-node-api` while retaining every example test.
+- [X] T006-S1 Run `nix run .#ci-node-api` and `./gate.sh`.
+- [X] T007-S1 Commit exactly `test(node): specify offline API properties` with `Tasks: T001, T002, T003, T004, T005, T006, T007`.
 
 ## Slice 2 — Transaction, provider, and book contracts
 
