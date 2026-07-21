@@ -5,3 +5,4 @@ git diff --check
 git diff --check origin/main...HEAD
 bash scripts/check-architecture-boundary.sh
 nix run .#ci-test
+nix run .#ci-node-api
