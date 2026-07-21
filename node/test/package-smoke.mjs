@@ -11,6 +11,8 @@ const tarball = process.env.CSK_PACKAGE_TARBALL;
 const vectors = JSON.parse(await readFile(new URL("../../test-vectors/vectors.json", import.meta.url), "utf8"));
 const mnemonic = vectors.derivationVectors[0].mnemonic.join(" ");
 const signing = vectors.signingVectors[0];
+const transactionCbor = (await readFile(new URL("../../fixtures/conway-mainnet-tx.hex", import.meta.url), "utf8")).trim();
+const textEnvelope = JSON.stringify({ type: "Tx ConwayEra", description: "Ledger Cddl Format", cborHex: transactionCbor });
 const npmExecPath = process.env.npm_execpath;
 
 const run = (command, args, options = {}) => new Promise((resolve, reject) => {
@@ -89,7 +91,14 @@ test("installs a prepacked artifact outside the checkout without network, native
       const derivation = await api.deriveKeys({ mnemonic: vectors.derivation.mnemonic, accountIndex: vectors.derivation.accountIndex, role: vectors.derivation.role, addressIndex: vectors.derivation.addressIndex });
       const signed = await api.signPayload({ payloadMode: vectors.signing.payloadMode, payloadInput: vectors.signing.payloadInput, signingKeyBech32: vectors.signing.signingKeyBech32 });
       const verified = await api.verifySignature({ payloadMode: vectors.signing.payloadMode, payloadInput: vectors.signing.payloadInput, verificationKeyBech32: vectors.signing.verificationKeyBech32, signatureHex: signed.value.signatureHex });
-      console.log(JSON.stringify({ inspection, derivation, signed: signed.ok, verified }));
+      const transaction = ${JSON.stringify({ cborHex: transactionCbor })};
+      const envelope = ${JSON.stringify({ textEnvelope })};
+      const books = ["@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> ."];
+      const transactions = await Promise.all([
+        api.inspectTransaction(transaction, { books }), api.browseTransaction(transaction, { path: ["body", "fee"], books }), api.identifyTransaction(transaction, { books }), api.transactionIntent(transaction, { books }),
+        api.inspectTransaction(envelope, { books }), api.browseTransaction(envelope, { path: ["body", "fee"], books }), api.identifyTransaction(envelope, { books }), api.transactionIntent(envelope, { books }),
+      ]);
+      console.log(JSON.stringify({ inspection, derivation, signed: signed.ok, verified, transactions }));
     `);
     const api = await run(process.execPath, ["--import", networkGuardUrl, program], { cwd: foreignProject });
     assert.equal(api.code, 0, api.stderr);
@@ -98,8 +107,12 @@ test("installs a prepacked artifact outside the checkout without network, native
     assert.equal(result.derivation.ok, true);
     assert.equal(result.signed, true);
     assert.deepEqual(result.verified, { ok: true, value: true });
+    for (const transaction of result.transactions) assert.equal(transaction.ok, true, JSON.stringify(transaction));
 
     const cli = join(packageRoot, "node", "dist", "csk.mjs");
+    await writeFile(join(foreignProject, "transaction.json"), textEnvelope);
+    await writeFile(join(foreignProject, "transaction.cbor"), `${transactionCbor}\n`);
+    await writeFile(join(foreignProject, "book.ttl"), "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n");
     const command = await run(process.execPath, ["--import", networkGuardUrl, cli, "payload", "sign", "--secret-stdin", "--payload-mode", signing.payloadMode, "--payload-input", signing.payloadInput, "--output", "json"], {
       cwd: foreignProject,
       input: `${signing.signingKeyBech32}\n`,
@@ -108,6 +121,12 @@ test("installs a prepacked artifact outside the checkout without network, native
     assert.equal(JSON.parse(command.stdout).ok, true);
     assert.equal(`${command.stdout}${command.stderr}`.includes(mnemonic), false);
     assert.equal(`${command.stdout}${command.stderr}`.includes(signing.signingKeyBech32), false);
+
+    for (const source of [["--cbor-hex", transactionCbor], ["--tx-file", join(foreignProject, "transaction.cbor")], ["--tx-file", join(foreignProject, "transaction.json")]]) for (const [operation, extra = []] of [["inspect"], ["browse", ["--path", '["body","fee"]']], ["identify"], ["intent"]]) {
+      const txCommand = await run(process.execPath, ["--import", networkGuardUrl, cli, "tx", operation, ...source, "--book", join(foreignProject, "book.ttl"), ...extra, "--output", "json"], { cwd: foreignProject });
+      assert.equal(txCommand.code, 0, txCommand.stderr);
+      assert.equal(JSON.parse(txCommand.stdout).ok, true);
+    }
   } finally {
     await rm(foreignProject, { recursive: true, force: true });
   }

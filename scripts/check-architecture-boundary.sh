@@ -91,6 +91,15 @@ check_semantic_dependencies() {
   fi
 }
 
+check_host_ownership() {
+  local root="$1"
+  local host="$root/cli" node="$root/node/src"
+  local provider='blockfrost[^" ]*api/v0|koios\.rest/api/v1|"project_id"|Authorization|_tx_hashes'
+  local semantics='cardano-serialization|cbor-x|\bcborg\b|@rdfjs|rdf-ext|\bn3\b|sparqljs|sparql-engine|shacl-engine|shacl-js|semantic-fallback'
+  if rg -n -i -e "$provider" "$host" "$node"; then fail "CLI/Node host must delegate provider endpoints, authentication, and decoders to Cardano.Provider"; fi
+  if rg -n -i -e "$semantics" "$host" "$node"; then fail "CLI/Node host must not own Cardano/CBOR/RDF/SPARQL/SHACL semantics or fallbacks"; fi
+}
+
 check_documentation_anchors() {
   local root="$1"
   local architecture="$root/docs/architecture/system.md"
@@ -112,6 +121,7 @@ check_tree() {
   check_provider_policy "$1"
   check_compatibility_adapters "$1"
   check_semantic_dependencies "$1"
+  check_host_ownership "$1"
   check_documentation_anchors "$1"
 }
 
@@ -120,9 +130,10 @@ run_negative_self_tests() {
   fixture_root="$(mktemp -d "${TMPDIR:-/tmp}/csk-architecture-boundary.XXXXXX")"
   trap 'rm -rf -- "$fixture_root"' RETURN
 
-  mkdir -p "$fixture_root/docs/architecture" "$fixture_root/docs/inspector"
+  mkdir -p "$fixture_root/docs/architecture" "$fixture_root/docs/inspector" "$fixture_root/cli" "$fixture_root/node/src"
   cp -R "$repo_root/lib" "$fixture_root/lib"
   cp -R "$repo_root/docs/inspector/src" "$fixture_root/docs/inspector/src"
+  chmod -R u+w "$fixture_root/lib" "$fixture_root/docs/inspector/src"
   cp "$repo_root/docs/architecture/system.md" "$fixture_root/docs/architecture/system.md"
   cp "$repo_root/package.json" "$fixture_root/package.json"
   cp "$repo_root/spago.yaml" "$fixture_root/spago.yaml"
@@ -135,6 +146,7 @@ run_negative_self_tests() {
   cp "$repo_root/packages/purescript-rdf-editor/spago.yaml" "$fixture_root/packages/purescript-rdf-editor/spago.yaml"
   mkdir -p "$fixture_root/test"
   mv "$fixture_root/test-spago.yaml" "$fixture_root/test/spago.yaml"
+  chmod -R u+w "$fixture_root"
 
   mkdir -p "$fixture_root/lib/src/Cardano/Injected"
   printf '%s\n' 'duplicate = "https://api.koios.rest/api/v1/tx_cbor"' > "$fixture_root/lib/src/Cardano/Injected/Provider.purs"
@@ -145,6 +157,38 @@ run_negative_self_tests() {
     fail "negative fixture emitted the wrong duplicate-provider diagnostic: $duplicate_output"
   rm "$fixture_root/lib/src/Cardano/Injected/Provider.purs"
 
+  printf '%s\n' 'const endpoint = "https://api.koios.rest/api/v1/tx_cbor";' > "$fixture_root/cli/injected-provider.mjs"
+  if duplicate_output="$(check_tree "$fixture_root" 2>&1)"; then
+    fail "negative fixture unexpectedly accepted host provider implementation"
+  fi
+  [[ "$duplicate_output" == *'CLI/Node host must delegate provider'* ]] ||
+    fail "negative fixture emitted the wrong host-provider diagnostic: $duplicate_output"
+  rm "$fixture_root/cli/injected-provider.mjs"
+
+  printf '%s\n' 'const requestPolicy = "Authorization: project_id";' > "$fixture_root/node/src/injected-provider-policy.mjs"
+  if duplicate_output="$(check_tree "$fixture_root" 2>&1)"; then
+    fail "negative fixture unexpectedly accepted host provider decoder/policy"
+  fi
+  [[ "$duplicate_output" == *'CLI/Node host must delegate provider'* ]] ||
+    fail "negative fixture emitted the wrong host-provider-policy diagnostic: $duplicate_output"
+  rm "$fixture_root/node/src/injected-provider-policy.mjs"
+
+  printf '%s\n' 'import "cbor-x";' > "$fixture_root/node/src/injected-cbor.mjs"
+  if duplicate_output="$(check_tree "$fixture_root" 2>&1)"; then
+    fail "negative fixture unexpectedly accepted host ledger/CBOR semantics"
+  fi
+  [[ "$duplicate_output" == *'CLI/Node host must not own'* ]] ||
+    fail "negative fixture emitted the wrong host-ledger diagnostic: $duplicate_output"
+  rm "$fixture_root/node/src/injected-cbor.mjs"
+
+  printf '%s\n' 'import "sparqljs";' > "$fixture_root/node/src/injected-rdf.mjs"
+  if duplicate_output="$(check_tree "$fixture_root" 2>&1)"; then
+    fail "negative fixture unexpectedly accepted host RDF semantics"
+  fi
+  [[ "$duplicate_output" == *'CLI/Node host must not own'* ]] ||
+    fail "negative fixture emitted the wrong host-semantics diagnostic: $duplicate_output"
+  rm "$fixture_root/node/src/injected-rdf.mjs"
+
   printf '%s\n' '    "cbor-x": "fixture-only"' >> "$fixture_root/package.json"
   if dependency_output="$(check_tree "$fixture_root" 2>&1)"; then
     fail "negative fixture unexpectedly accepted forbidden semantic dependency"
@@ -153,6 +197,10 @@ run_negative_self_tests() {
     fail "negative fixture emitted the wrong semantic-dependency diagnostic: $dependency_output"
 
   echo "architecture boundary: negative fixture rejected duplicate provider implementation"
+  echo "architecture boundary: negative fixture rejected host provider implementation"
+  echo "architecture boundary: negative fixture rejected host provider decoder/policy"
+  echo "architecture boundary: negative fixture rejected host ledger/CBOR semantics"
+  echo "architecture boundary: negative fixture rejected host RDF semantics"
   echo "architecture boundary: negative fixture rejected forbidden semantic dependency"
 }
 
