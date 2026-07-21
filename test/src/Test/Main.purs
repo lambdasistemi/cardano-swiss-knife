@@ -24,6 +24,7 @@ import Test.Vectors (BootstrapVector, DerivationVector, FamilyRestoreVector, Ins
 import Test.Provider (runProviderContractTests)
 import Test.Offline (runOfflineTests)
 import Test.TextEnvelope (runTextEnvelopeTests)
+import Test.TransactionLedger (runTransactionLedgerTests)
 import Test.Vault (runVaultContractTests)
 
 main :: Effect Unit
@@ -32,6 +33,7 @@ main = launchAff_ do
   runProviderContractTests
   runOfflineTests
   runTextEnvelopeTests
+  runTransactionLedgerTests
   liftEffect runVaultContractTests
   wasmAvailable <- tryWasm
   when wasmAvailable do

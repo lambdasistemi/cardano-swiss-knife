@@ -69,16 +69,16 @@ test("routes hash loading for all transaction operations through the selected sh
       source("koios", "preprod"),
       source("koios", "preview"),
     ])};
-    const operations = ["inspectTransaction", "browseTransaction", "identifyTransaction", "transactionIntent"];
+    const operations = ["inspectTransaction", "browseTransaction", "identifyTransaction", "transactionIntent", "planTransactionWitnesses", "validateTransaction", "evaluateTransactionScripts"];
     const results = [];
     for (const input of sources) for (const operation of operations) {
-      results.push(await api[operation](input, operation === "browseTransaction" ? { path: ["body"] } : undefined));
+      results.push((await api[operation](input, operation === "browseTransaction" ? { path: ["body"] } : undefined)).ok);
     }
     console.log(JSON.stringify({ calls, results }));
   `);
 
-  assert.equal(results.results.length, 24);
-  for (const result of results.results) assert.equal(result.ok, true, JSON.stringify(result));
+  assert.equal(results.results.length, 42);
+  for (const result of results.results) assert.equal(result, true);
   assert.ok(results.calls.some(({ url }) => url === "https://cardano-mainnet.blockfrost.io/api/v0/txs/" + "a".repeat(64) + "/cbor"));
   assert.ok(results.calls.some(({ url }) => url === "https://cardano-preprod.blockfrost.io/api/v0/txs/" + "a".repeat(64) + "/cbor"));
   assert.ok(results.calls.some(({ url }) => url === "https://cardano-preview.blockfrost.io/api/v0/txs/" + "a".repeat(64) + "/cbor"));

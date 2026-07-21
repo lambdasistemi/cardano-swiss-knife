@@ -4,6 +4,7 @@ import * as Mnemonic from "../../output/Cardano.Offline.Mnemonic/index.js";
 import * as Payload from "../../output/Cardano.Offline.Payload/index.js";
 import * as Script from "../../output/Cardano.Offline.Script/index.js";
 import * as Transaction from "../../output/Cardano.Transaction/index.js";
+import * as TransactionLedger from "../../output/Cardano.Transaction.Ledger/index.js";
 import * as Provider from "../../output/Cardano.Provider/index.js";
 import * as Aff from "../../output/Effect.Aff/index.js";
 import * as Either from "../../output/Data.Either/index.js";
@@ -122,7 +123,11 @@ const transactionOperation = (name, input, options = {}) => operation(async () =
   try { books = importBooks(options.books ?? []); }
   catch (error) { throw new CskError("BOOK_IMPORT", error.message, error); }
   const txCbor = await transactionInput(input);
-  if ((name !== "tx.identify" && name !== "tx.intent") || !Object.hasOwn(input, "txHash")) {
+  const hashSource = Object.hasOwn(input, "txHash");
+  const needsProviderContext = TransactionLedger.requiresProviderContext(name)
+    || name === "tx.identify"
+    || name === "tx.intent";
+  if (!hashSource || !needsProviderContext) {
     const value = await runTransactionOperation(name, txCbor, options);
     if (books.length === 0) return value;
     const rdf = await runTransactionOperation("tx.rdf", txCbor, options);
@@ -149,3 +154,6 @@ export const inspectTransaction = (input, options) => transactionOperation("tx.i
 export const browseTransaction = (input, options = {}) => transactionOperation("tx.browse", input, options);
 export const identifyTransaction = (input, options) => transactionOperation("tx.identify", input, options);
 export const transactionIntent = (input, options) => transactionOperation("tx.intent", input, options);
+export const planTransactionWitnesses = (input, options) => transactionOperation(TransactionLedger.planTransactionWitnessesOperation, input, options);
+export const validateTransaction = (input, options) => transactionOperation(TransactionLedger.validateTransactionOperation, input, options);
+export const evaluateTransactionScripts = (input, options) => transactionOperation(TransactionLedger.evaluateTransactionScriptsOperation, input, options);
