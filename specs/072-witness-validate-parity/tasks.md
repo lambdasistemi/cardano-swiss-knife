@@ -41,7 +41,7 @@
 
 ## Orchestrator-owned finalization
 
-- [ ] T028 Append ticket-specific shared-operation, CLI-route, fixture, and no-fallback inventory checks to the inherited `gate.sh` without replacing existing functions or commands.
-- [ ] T029 Audit every issue acceptance criterion, host export/command, provider-context path, TextEnvelope type boundary, validation/script truth state, witness safety transition, secret boundary, fixture, and task/commit link.
-- [ ] T030 Run the final `./gate.sh` and commit-message audit, update draft PR #91 with exact proof and residual risks, and push the final implementation SHA.
+- [X] T028 Append ticket-specific shared-operation, CLI-route, fixture, and no-fallback inventory checks to the inherited `gate.sh` without replacing existing functions or commands.
+- [X] T029 Audit every issue acceptance criterion, host export/command, provider-context path, TextEnvelope type boundary, validation/script truth state, witness safety transition, secret boundary, fixture, and task/commit link.
+- [X] T030 Run the final `./gate.sh` and commit-message audit, update draft PR #91 with exact proof and residual risks, and push the final implementation SHA.
 - [ ] T031 Wait for fresh GitHub Actions on that pushed SHA; only after green, drop `gate.sh` in `chore: drop gate.sh (ready for review)`, mark PR #91 ready, report `COMPLETE`, and do not merge.
