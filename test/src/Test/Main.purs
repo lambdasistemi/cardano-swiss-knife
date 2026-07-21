@@ -25,6 +25,7 @@ import Test.Provider (runProviderContractTests)
 import Test.Offline (runOfflineTests)
 import Test.TextEnvelope (runTextEnvelopeTests)
 import Test.TransactionLedger (runTransactionLedgerTests)
+import Test.TransactionEntry (runTransactionEntryTests)
 import Test.TransactionWitness (runTransactionWitnessTests)
 import Test.Vault (runVaultContractTests)
 
@@ -35,6 +36,7 @@ main = launchAff_ do
   runOfflineTests
   runTextEnvelopeTests
   runTransactionLedgerTests
+  runTransactionEntryTests
   runTransactionWitnessTests
   liftEffect runVaultContractTests
   wasmAvailable <- tryWasm
