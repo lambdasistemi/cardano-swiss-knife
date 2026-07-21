@@ -64,13 +64,13 @@ Tasks: T754, T755, T756, T757, T758, T759, T760
 
 ## Orchestrator-owned finalization
 
-- [ ] T761 Review the full behavior diff and source boundary, mark T754-T760 in
+- [X] T761 Review the full behavior diff and source boundary, mark T754-T760 in
   the accepted commit, independently run `./gate.sh`, audit commit/task linkage,
   update the draft PR with exact proof, and push the implementation SHA.
-- [ ] T762 Verify fresh GitHub Actions green on the implementation SHA, then
+- [X] T762 Verify fresh GitHub Actions green on the implementation SHA, then
   stamp T761-T762 while dropping `gate.sh` in
   `chore: drop gate.sh (ready for review)`, mark the PR ready, and push.
-- [ ] T763 Verify fresh GitHub Actions green on the final sentinel SHA, report
+- [X] T763 Verify fresh GitHub Actions green on the final sentinel SHA, report
   `COMPLETE` with the PR URL to the epic owner, and do not merge.
 
 ## Dependencies and execution order
