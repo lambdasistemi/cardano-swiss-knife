@@ -52,6 +52,14 @@ after(async () => {
 const source = (provider, network, credential = "provider-secret") => ({
   txHash: "a".repeat(64), provider, network, credential,
 });
+const completedEntry = {
+  entryId: "entry-1",
+  unsignedTxCborHex: "00",
+  requiredSigners: [],
+  collectedWitnesses: [],
+  invalidAfterSlot: 100,
+  status: "open",
+};
 
 test("routes hash loading for all transaction operations through the selected shared provider network", async () => {
   const results = await runForeignProgram(`
@@ -85,6 +93,65 @@ test("routes hash loading for all transaction operations through the selected sh
   assert.ok(results.calls.some(({ url }) => url === "https://api.koios.rest/api/v1/tx_cbor"));
   assert.ok(results.calls.some(({ url }) => url === "https://preprod.koios.rest/api/v1/tx_cbor"));
   assert.ok(results.calls.some(({ url }) => url === "https://preview.koios.rest/api/v1/tx_cbor"));
+});
+
+test("submits completed JSON entries through the packed shared provider using binary bodies and normalised receipts", async () => {
+  const result = await runForeignProgram(`
+    const calls = [];
+    globalThis.fetch = async (url, options) => {
+      calls.push({ url, method: options.method, body: options.body, bytes: Array.from(options.body ?? []) });
+      return { status: 200, text: async () => JSON.stringify("${"b".repeat(64)}") };
+    };
+    const api = await import(${JSON.stringify(packageName)});
+    const base = ${JSON.stringify(completedEntry)};
+    const inputs = [
+      { entry: base, signedTxCborHex: "deadbeef", currentSlot: 10, provider: "blockfrost", network: "mainnet", credential: "provider-secret" },
+      { entry: base, signedTxCborHex: "deadbeef", currentSlot: 10, provider: "koios", network: "preview" },
+    ];
+    const receipts = [];
+    for (const input of inputs) receipts.push(await api.submitTransactionEntry(input));
+    const rejected = await api.submitTransactionEntry({ ...inputs[1], entry: { ...base, requiredSigners: ["missing"] } });
+    const expired = await api.submitTransactionEntry({ ...inputs[1], currentSlot: 100, entry: { ...base, invalidAfterSlot: 100 } });
+    const submitted = await api.submitTransactionEntry({ ...inputs[1], entry: { ...base, status: "submitted" } });
+    const malformed = await api.submitTransactionEntry({ entry: base, signedTxCborHex: "deadbeef", currentSlot: "10", provider: "other", network: "other" });
+    console.log(JSON.stringify({ hasExport: typeof api.submitTransactionEntry === "function", calls, receipts, rejected, expired, submitted, malformed }));
+  `);
+
+  assert.equal(result.hasExport, true);
+  assert.equal(result.receipts.length, 2);
+  for (const [index, receipt] of result.receipts.entries()) {
+    assert.equal(receipt.ok, true, JSON.stringify(receipt));
+    assert.equal(receipt.value.txId, "b".repeat(64));
+    assert.equal(receipt.value.provider, index === 0 ? "blockfrost" : "koios");
+    assert.equal(receipt.value.network, index === 0 ? "mainnet" : "preview");
+    assert.equal(receipt.value.entry.status, "submitted");
+  }
+  assert.equal(result.calls.length, 2, "an incomplete entry must be rejected before fetch");
+  assert.equal(result.calls[0].url.endsWith("/tx/submit"), true);
+  assert.equal(result.calls[1].url.endsWith("/submittx"), true);
+  for (const call of result.calls) {
+    assert.equal(call.method, "POST");
+    assert.deepEqual(call.bytes, [0xde, 0xad, 0xbe, 0xef]);
+  }
+  assert.equal(result.rejected.ok, false);
+  assert.equal(result.rejected.error.code, "DOMAIN_ERROR");
+  for (const resultValue of [result.expired, result.submitted, result.malformed]) {
+    assert.equal(resultValue.ok, false, JSON.stringify(resultValue));
+    assert.equal(resultValue.error.code, "DOMAIN_ERROR");
+  }
+});
+
+test("returns coded redacted provider submission failures from the packed API", async () => {
+  const secret = "never-render-this-submission-secret";
+  const result = await runForeignProgram(`
+    globalThis.fetch = async () => ({ status: 401, text: async () => ${JSON.stringify(secret)} });
+    const api = await import(${JSON.stringify(packageName)});
+    console.log(JSON.stringify(await api.submitTransactionEntry(${JSON.stringify({ entry: completedEntry, signedTxCborHex: "deadbeef", currentSlot: 10, provider: "blockfrost", network: "mainnet", credential: secret })})));
+  `);
+
+  assert.equal(result.ok, false);
+  assert.equal(result.error.code, "PROVIDER_AUTHENTICATION");
+  assert.doesNotMatch(result.error.message, new RegExp(secret));
 });
 
 for (const [category, failure] of Object.entries(failures)) {

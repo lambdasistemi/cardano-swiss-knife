@@ -70,6 +70,40 @@ export type ShelleyNetwork = "mainnet" | "preprod" | "preview" | number;
 export type ProviderName = "blockfrost" | "koios";
 /** A network supported by remote transaction-data providers. */
 export type ProviderNetwork = "mainnet" | "preprod" | "preview";
+/** A witness collected for a transaction entry. */
+export interface CollectedWitness {
+  /** Identifier of the signer that supplied the witness. */
+  signerId: string;
+  /** Witness CBOR encoded as hexadecimal. */
+  witnessCborHex: string;
+}
+/** JSON-compatible lifecycle status of a transaction entry. */
+export type TransactionEntryStatus = "open" | "complete" | "expired" | "submitted";
+/** A transaction entry collected by the host before explicit provider submission. */
+export interface TransactionEntry {
+  entryId: string;
+  unsignedTxCborHex: string;
+  requiredSigners: string[];
+  collectedWitnesses: CollectedWitness[];
+  invalidAfterSlot: number;
+  status: TransactionEntryStatus;
+}
+/** Input for explicitly submitting a completed transaction entry. */
+export interface TransactionEntrySubmissionInput {
+  entry: TransactionEntry;
+  signedTxCborHex: string;
+  currentSlot: number;
+  provider: ProviderName;
+  network: ProviderNetwork;
+  credential?: string;
+}
+/** Receipt returned after the shared provider accepts a completed entry. */
+export interface TransactionEntrySubmissionReceipt {
+  txId: string;
+  provider: ProviderName;
+  network: ProviderNetwork;
+  entry: TransactionEntry & { status: "submitted" };
+}
 /** Encoding used for a signed or verified payload. */
 export type PayloadMode = "text" | "hex";
 
@@ -319,6 +353,8 @@ export declare const prepareTransactionWitness: (input: PrepareTransactionWitnes
 export declare const normaliseTransactionWitness: (input: WitnessInput) => Promise<CskResult<NormalisedTransactionWitness>>;
 /** Attaches a witness to a transaction. */
 export declare const attachTransactionWitness: (input: TransactionInput, witness: WitnessInput, options?: WitnessAttachmentOptions) => Promise<CskResult<AttachedTransactionWitness>>;
+/** Explicitly submits a completed entry through the selected provider. */
+export declare const submitTransactionEntry: (input: TransactionEntrySubmissionInput) => Promise<CskResult<TransactionEntrySubmissionReceipt>>;
 /** Inspects the structure and contents of a transaction. */
 export declare const inspectTransaction: (input: TransactionInput, options?: TransactionOperationOptions) => Promise<CskResult<TransactionOperationOutput>>;
 /** Browses a transaction through its linked book data. */
