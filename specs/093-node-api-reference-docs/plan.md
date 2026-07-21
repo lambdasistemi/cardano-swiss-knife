@@ -32,6 +32,7 @@ Owned files:
 - `scripts/check-node-api-exports.mjs`
 - `package.json`
 - `package-lock.json`
+- `flake.nix` (Q-002-authorized single export: `packages.node-api-docs = purescript.node-api-docs`)
 - `nix/purescript.nix`
 - `nix/checks/node-api.nix`
 
@@ -75,11 +76,11 @@ Owned files:
 - `.github/workflows/ci.yml`
 - `.github/workflows/pages.yml`
 
-Proof: TypeDoc generation into a clean ignored tree, `git status` confirms no generated Markdown is tracked, strict MkDocs succeeds, `nix run .#ci-node-api` succeeds, then `./gate.sh`.
+Proof: `nix build .#node-api-docs` generates an `index.md`-rooted artifact, local workflow copies it into a clean ignored tree, `git status` confirms no generated Markdown is tracked, strict MkDocs succeeds, `nix run .#ci-node-api` succeeds, then `./gate.sh`.
 
 ## Sequencing and concurrency
 
-Slices execute S1 → S2 → S3. S2 depends on S1's public-name/type inventory; S3 depends on both the typed facade and source documentation. Q-001 is resolved: csk-92 owns `node/test/api-properties.test.mjs`, and this ticket links but never edits it. Any need to restructure `node/src/index.js` is a parent-bound scope change.
+Slices execute S1 → S2 → S3. S2 depends on S1's public-name/type inventory; S3 depends on both the typed facade and source documentation. Q-001 is resolved: csk-92 owns `node/test/api-properties.test.mjs`, and this ticket links but never edits it. Q-002 authorizes `flake.nix` only for the portable `node-api-docs` package export. Any further file widening or need to restructure `node/src/index.js` is a parent-bound scope change.
 
 ## Final verification
 
