@@ -20,15 +20,15 @@ interoperable witnesses while seeing exact completeness.
 
 ## Slice 1 — IndexedDB EntryStore contract (driver+navigator)
 
-- [ ] T764 [US1] Add RED contract tests for database/store upgrade creation,
+- [X] T764 [US1] Add RED contract tests for database/store upgrade creation,
   put, overwrite, lookup, missing lookup, deterministic list, and reopen.
-- [ ] T765 [US1] Add RED failure tests for request/transaction errors and
+- [X] T765 [US1] Add RED failure tests for request/transaction errors and
   malformed or unknown-status persisted records.
-- [ ] T766 [US1] Implement the versioned IndexedDB object store keyed by
+- [X] T766 [US1] Implement the versioned IndexedDB object store keyed by
   `entryId`, with explicit request and transaction completion/error handling.
-- [ ] T767 [US1] Implement explicit #75 `TxEntry` encode/decode and export a
+- [X] T767 [US1] Implement explicit #75 `TxEntry` encode/decode and export a
   concrete `EntryStore Aff` without changing the domain or dependencies.
-- [ ] T768 Obtain navigator RED/GREEN approval, run the focused Node contract
+- [X] T768 Obtain navigator RED/GREEN approval, run the focused Node contract
   plus `./gate.sh`, and commit once with `Tasks: T764, T765, T766, T767, T768`.
 
 **Owned files**:
