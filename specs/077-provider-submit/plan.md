@@ -158,24 +158,30 @@ intercept `fetch`; the shared PureScript module must construct every request.
 
 ## Slice 3 — Confirmable workbench action after #76
 
-This slice starts only after #76 publishes a committed workbench release point.
-The ticket orchestrator re-reads that diff and replaces the provisional owned
-file list below with the exact #76 paths before dispatch. The action uses #76's
-active entry and store, the existing transaction-ledger assembly adapter, and
-the shared provider operation; it does not create parallel workbench state.
+This slice starts from #76's merged workbench at `origin/main` `02adeb3` (the
+accepted PR head was `f5cb320`). The action extends #76's selected entry and
+injected `EntryStore`; it does not create parallel workbench state. `Main`
+injects provider/network labels plus a submit closure that captures the
+existing credential path. `Workbench` fetches the authoritative current slot
+through #76's capability before eligibility and again at confirmation, folds
+the selected entry's stored witnesses through the ledger engine in
+`TxSigning`, and persists only the receipt's returned `Submitted` entry.
 
-### Provisional owned area (must be made exact after #76 release)
+### Exact owned files after #76 merge
 
 ```text
-docs/inspector/src/<#76 workbench module>.purs
+docs/inspector/src/Workbench.purs
+docs/inspector/src/TxSigning.purs
 docs/inspector/src/Provider.purs
-docs/inspector/tests/<#76 workbench spec>.spec.mjs
-docs/inspector/dist/styles.css       (only if #76 locates action styling here)
+docs/inspector/src/Main.purs
+docs/inspector/dist/styles.css
+tests/transactions.spec.ts
 ```
 
-If #76 has not produced an integration point, the slice is parked with
-`NOTE PARKED` while the already-independent slices continue. Guessing paths or
-creating a competing entry/store UI is forbidden.
+`Provider.purs` may only convert the browser provider/network types, delegate
+to `Cardano.Provider.submitTxEntry`, and render its already-redacted error.
+`TxSigning.purs` may only compose existing ledger-engine witness attachment;
+host-side CBOR parsing or assembly remains forbidden.
 
 ### TDD and proof
 

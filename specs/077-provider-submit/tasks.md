@@ -129,9 +129,19 @@ other browser state model.
   extended `./gate.sh`, and commit exactly once with
   `Tasks: T787, T788, T789, T790, T791, T792`.
 
-**Owned files**: provisional until T787; exact paths must be written here and
-into both worker briefs after #76 publishes its release point. No driver may be
-dispatched against wildcard or guessed ownership.
+**Owned files** (frozen after #76 merged to `origin/main` `02adeb3`; accepted
+PR head `f5cb320`):
+
+- `docs/inspector/src/Workbench.purs`
+- `docs/inspector/src/TxSigning.purs`
+- `docs/inspector/src/Provider.purs`
+- `docs/inspector/src/Main.purs`
+- `docs/inspector/dist/styles.css`
+- `tests/transactions.spec.ts`
+
+The slice extends #76's selected-entry/store/current-slot seam. It may not add
+another entry list, persistence owner, provider policy implementation, or
+host-side CBOR/ledger logic.
 
 **Commit contract**:
 
