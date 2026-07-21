@@ -977,3 +977,198 @@ test("workbench persistently collects vault and pasted transaction witnesses", a
   await expect.poll(() => collectedWitnessesFor(firstEntryId)).toEqual(rawWitnessSnapshot);
   await expect.poll(() => collectedWitnessesFor(siblingEntryId)).toEqual(siblingWitnessSnapshot);
 });
+
+test("workbench confirms and persists submission only after provider acceptance", async ({ page }) => {
+  const credential = "eyJhbGciOiJub25lIn0.koios-browser-secret-must-not-render.sig";
+  const receiptTxId = "a".repeat(64);
+  let submissionRequests: Array<{ method: string; headers: Record<string, string>; body: Buffer | null }> = [];
+  let submissionAttempt = 0;
+  let authorizedTipRequests = 0;
+  let anonymousReloadTipRequests = 0;
+
+  await page.addInitScript(() => {
+    window.localStorage.setItem("provider", "Koios");
+    window.localStorage.setItem("network", "preprod");
+  });
+  await page.route("**/tip", async (route) => {
+    const authorization = route.request().headers()["authorization"];
+    if (authorization) {
+      expect(authorization).toBe(`Bearer ${credential}`);
+      authorizedTipRequests += 1;
+    } else {
+      anonymousReloadTipRequests += 1;
+    }
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify([{ abs_slot: "42", epoch_no: "1" }]),
+    });
+  });
+  await page.route("**/cli_protocol_params", async (route) => {
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify([{}]) });
+  });
+  await page.route("**/submittx", async (route) => {
+    const request = route.request();
+    expect(request.headers()["authorization"]).toBe(`Bearer ${credential}`);
+    submissionRequests.push({ method: request.method(), headers: request.headers(), body: request.postDataBuffer() });
+    submissionAttempt += 1;
+    if (submissionAttempt === 1) {
+      await route.fulfill({
+        status: 503,
+        contentType: "application/json",
+        body: JSON.stringify({ error: `planned provider failure for ${credential}` }),
+      });
+    } else {
+      await route.fulfill({ contentType: "application/json", body: JSON.stringify(receiptTxId) });
+    }
+  });
+
+  const decode = async (cbor: string) => {
+    await page.getByRole("tab", { name: "Paste CBOR" }).click();
+    await page.getByPlaceholder("Paste Conway transaction CBOR hex").fill(cbor);
+    await page.getByRole("button", { name: "Decode", exact: true }).click();
+    await expect(page.getByText("Transaction ID", { exact: true })).toBeVisible({ timeout: 20_000 });
+  };
+
+  const detachedWitnessFromStandaloneSigning = async (signingKey: string) => {
+    const signing = page.getByRole("region", { name: "Sign transaction body" });
+    const showKey = signing.getByRole("button", { name: "Show signing key" });
+    if ((await showKey.count()) > 0) await showKey.click();
+    await signing.getByLabel("Transaction signing key").fill(signingKey);
+    await signing.getByRole("button", { name: "Create signed transaction" }).click();
+    const witnessCard = signing
+      .locator(".signing-output-card")
+      .filter({ has: page.getByText("Detached vkey witness CBOR", { exact: true }) });
+    await expect(witnessCard).toBeVisible({ timeout: 20_000 });
+    const witness = (await witnessCard.locator(".signing-output-value").textContent())?.trim();
+    if (!witness) throw new Error("Standalone signing did not render a detached witness.");
+    return witness;
+  };
+
+  const entryFor = (entryId: string) =>
+    page.evaluate(async (id) => {
+      const database = await new Promise<IDBDatabase>((resolve, reject) => {
+        const request = window.indexedDB.open("cardano-swiss-knife.entry-store", 1);
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => resolve(request.result);
+      });
+      try {
+        return await new Promise<unknown>((resolve, reject) => {
+          const transaction = database.transaction("entries", "readonly");
+          const request = transaction.objectStore("entries").get(id);
+          request.onerror = () => reject(request.error);
+          request.onsuccess = () => resolve(request.result);
+        });
+      } finally {
+        database.close();
+      }
+    }, entryId);
+
+  const putExpiredEntry = (entryId: string) =>
+    page.evaluate(async ({ id, unsignedTxCborHex, signerId }) => {
+      const database = await new Promise<IDBDatabase>((resolve, reject) => {
+        const request = window.indexedDB.open("cardano-swiss-knife.entry-store", 1);
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => resolve(request.result);
+      });
+      try {
+        await new Promise<void>((resolve, reject) => {
+          const transaction = database.transaction("entries", "readwrite");
+          transaction.onerror = () => reject(transaction.error);
+          transaction.oncomplete = () => resolve();
+          transaction.objectStore("entries").put({
+            entryId: id,
+            unsignedTxCborHex,
+            requiredSigners: [signerId],
+            collectedWitnesses: [],
+            invalidAfterSlot: 42,
+            status: "Open",
+          });
+        });
+      } finally {
+        database.close();
+      }
+    }, { id: entryId, unsignedTxCborHex: twoSignerTxCbor, signerId: witnessFixture.requiredSignerHash });
+
+  await page.goto("/settings");
+  await page.getByLabel("Koios bearer token").fill(credential);
+  await page.getByLabel("Koios bearer token").press("Tab");
+  const initialAuthorizedTipBaseline = authorizedTipRequests;
+  await page.getByRole("navigation", { name: "Primary" }).getByRole("link", { name: "Workbench" }).click();
+  await decode(twoSignerTxCbor);
+  const firstWitness = await detachedWitnessFromStandaloneSigning(witnessFixture.signingKey);
+  const secondWitness = await detachedWitnessFromStandaloneSigning(witnessFixture.nonTargetSigningKey);
+  const entryId = (await page.locator(".loaded-context-hash code").textContent())?.trim();
+  if (!entryId) throw new Error("Workbench transaction did not render an id.");
+
+  const workbench = page.getByRole("region", { name: "Transaction workbench" });
+  await workbench.getByRole("button", { name: "Add current transaction" }).click();
+  const entries = workbench.getByRole("list", { name: "Saved transactions" });
+  const entryRow = entries.getByRole("listitem").filter({ hasText: entryId });
+  const submit = workbench.getByRole("button", { name: "Submit transaction" });
+  await expect(entryRow).toContainText("Incomplete");
+  await expect(submit).toBeDisabled();
+  expect(submissionRequests).toEqual([]);
+  expect(authorizedTipRequests).toBe(initialAuthorizedTipBaseline + 2);
+
+  const firstOnDemandTipBaseline = authorizedTipRequests;
+  await workbench.getByLabel("Pasted detached witness").fill(firstWitness);
+  await workbench.getByRole("button", { name: "Attach pasted witness" }).click();
+  await expect(entryRow).toContainText("1/2");
+  expect(authorizedTipRequests).toBe(firstOnDemandTipBaseline + 1);
+  await workbench.getByLabel("Pasted detached witness").fill(secondWitness);
+  await workbench.getByRole("button", { name: "Attach pasted witness" }).click();
+  await expect(entryRow).toContainText("Complete");
+
+  await putExpiredEntry("expired-at-current-slot");
+  await page.reload();
+  await page.getByRole("navigation", { name: "Primary" }).getByRole("link", { name: "Settings" }).click();
+  await page.getByLabel("Koios bearer token").fill(credential);
+  await page.getByLabel("Koios bearer token").press("Tab");
+  const reconfiguredTipBaseline = authorizedTipRequests;
+  await page.getByRole("navigation", { name: "Primary" }).getByRole("link", { name: "Workbench" }).click();
+  await expect.poll(() => authorizedTipRequests).toBeGreaterThan(reconfiguredTipBaseline);
+  await entries.getByRole("button", { name: "Select expired-at-current-slot" }).click();
+  await expect(entries.getByRole("listitem").filter({ hasText: "expired-at-current-slot" })).toContainText("Expired");
+  await expect(submit).toBeDisabled();
+  expect(anonymousReloadTipRequests).toBeGreaterThan(0);
+  expect(submissionRequests).toEqual([]);
+
+  await entries.getByRole("button", { name: `Select ${entryId}` }).click();
+  await expect(submit).toBeEnabled();
+  const completeSnapshot = await entryFor(entryId);
+  await submit.click();
+  const confirmation = page.getByRole("dialog", { name: "Confirm transaction submission" });
+  await expect(confirmation).toContainText("Koios");
+  await expect(confirmation).toContainText("preprod");
+  await confirmation.getByRole("button", { name: "Cancel" }).click();
+  expect(submissionRequests).toEqual([]);
+  await expect.poll(() => entryFor(entryId)).toEqual(completeSnapshot);
+
+  await submit.click();
+  await confirmation.getByRole("button", { name: "Confirm submission" }).click();
+  await expect(workbench.getByRole("alert")).toContainText("planned provider failure");
+  await expect(workbench.getByRole("alert")).not.toContainText(credential);
+  expect(submissionRequests).toHaveLength(1);
+  expect(submissionRequests[0].method).toBe("POST");
+  expect(submissionRequests[0].headers["content-type"]).toBe("application/cbor");
+  expect(submissionRequests[0].body).toBeTruthy();
+  expect(submissionRequests[0].body!.length).toBeGreaterThan(0);
+  expect(submissionRequests[0].body!.toString("hex")).not.toBe(twoSignerTxCbor);
+  await expect.poll(() => entryFor(entryId)).toEqual(completeSnapshot);
+  await expect(submit).toBeEnabled();
+
+  await submit.click();
+  await confirmation.getByRole("button", { name: "Confirm submission" }).click();
+  await expect(workbench).toContainText(receiptTxId);
+  await expect(entryRow).toContainText("Submitted");
+  expect(submissionRequests).toHaveLength(2);
+  await expect(submit).toBeDisabled();
+  const submittedSnapshot = JSON.parse(JSON.stringify(completeSnapshot));
+  submittedSnapshot.status = "Submitted";
+  await expect.poll(() => entryFor(entryId)).toEqual(submittedSnapshot);
+
+  await page.reload();
+  await entries.getByRole("button", { name: `Select ${entryId}` }).click();
+  await expect(entries.getByRole("listitem").filter({ hasText: entryId })).toContainText("Submitted");
+  await expect(submit).toBeDisabled();
+});

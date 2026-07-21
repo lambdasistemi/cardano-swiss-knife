@@ -7,7 +7,7 @@ module Workbench
 
 import Prelude
 
-import Cardano.Transaction.Entry (EntryStatus(..), TxEntry, collectWitness, deriveCompleteness)
+import Cardano.Transaction.Entry (EntryStatus(..), TxEntry, collectWitness, deriveCompleteness, deriveStatus, refreshStatus)
 import Cardano.Transaction.Entry.Ports (EntryStore)
 import Cardano.Transaction.Witness as Witness
 import Data.Array as Array
@@ -35,6 +35,7 @@ type Input =
   , candidateMessage :: Maybe String
   , vaultKeys :: Array VaultKey
   , fetchCurrentSlot :: Aff (Either String Int)
+  , submission :: { providerLabel :: String, networkLabel :: String, submit :: Int -> String -> TxEntry -> Aff (Either String { txId :: String, entry :: TxEntry }) }
   }
 
 data Output = EntrySelected TxEntry
@@ -53,6 +54,10 @@ type State =
   , vaultKeys :: Array VaultKey
   , selectedVaultKeyId :: Maybe String
   , fetchCurrentSlot :: Aff (Either String Int)
+  , submission :: { providerLabel :: String, networkLabel :: String, submit :: Int -> String -> TxEntry -> Aff (Either String { txId :: String, entry :: TxEntry }) }
+  , currentSlot :: Maybe Int
+  , confirmationOpen :: Boolean
+  , receiptTxId :: Maybe String
   , pastedWitness :: String
   , replaceCollectedWitness :: Boolean
   , witnessOutput :: Maybe WitnessOutput
@@ -70,6 +75,9 @@ data Action
   | SetPastedWitness String
   | ToggleReplaceCollectedWitness
   | AttachPastedWitness
+  | BeginSubmit
+  | CancelSubmit
+  | ConfirmSubmit
 
 component
   :: forall q m
@@ -86,6 +94,10 @@ component =
         , vaultKeys: input.vaultKeys
         , selectedVaultKeyId: Nothing
         , fetchCurrentSlot: input.fetchCurrentSlot
+        , submission: input.submission
+        , currentSlot: Nothing
+        , confirmationOpen: false
+        , receiptTxId: Nothing
         , pastedWitness: ""
         , replaceCollectedWitness: false
         , witnessOutput: Nothing
@@ -203,6 +215,22 @@ renderSelected state entry =
             ]
             [ HH.text "Attach pasted witness" ]
         , renderWitnessOutput state.witnessOutput
+        , HH.button
+            [ HP.disabled (state.running || not (submissionEligible state entry))
+            , HH.attr (HH.AttrName "type") "button"
+            , HE.onClick (\_ -> BeginSubmit)
+            ]
+            [ HH.text "Submit transaction" ]
+        , if state.confirmationOpen then
+            HH.div [ HH.attr (HH.AttrName "role") "dialog", HH.attr (HH.AttrName "aria-label") "Confirm transaction submission", HP.classes [ HH.ClassName "workbench-confirmation" ] ]
+              [ HH.p_ [ HH.text ("Submit this transaction through " <> state.submission.providerLabel <> " on " <> state.submission.networkLabel <> "?") ]
+              , HH.button [ HH.attr (HH.AttrName "type") "button", HE.onClick (\_ -> CancelSubmit) ] [ HH.text "Cancel" ]
+              , HH.button [ HH.attr (HH.AttrName "type") "button", HE.onClick (\_ -> ConfirmSubmit) ] [ HH.text "Confirm submission" ]
+              ]
+          else HH.text ""
+        , case state.receiptTxId of
+            Nothing -> HH.text ""
+            Just txId -> HH.p_ [ HH.text ("Submitted transaction: " <> txId) ]
         , case state.errorMessage of
             Nothing -> HH.text ""
             Just errorMessage -> HH.p [ HH.attr (HH.AttrName "role") "alert", HP.classes [ HH.ClassName "tool-error" ] ] [ HH.text errorMessage ]
@@ -271,6 +299,11 @@ selectedVaultKey state = do
   keyId <- state.selectedVaultKeyId
   Array.find (\key -> key.id == keyId) state.vaultKeys
 
+submissionEligible :: State -> TxEntry -> Boolean
+submissionEligible state entry = case state.currentSlot of
+  Nothing -> false
+  Just currentSlot -> deriveStatus currentSlot entry == Complete
+
 updateEntry :: TxEntry -> Array TxEntry -> Array TxEntry
 updateEntry replacement = map (\entry -> if entry.entryId == replacement.entryId then replacement else entry)
 
@@ -302,7 +335,9 @@ withCurrentSlot state continue = do
   currentSlot <- H.liftAff state.fetchCurrentSlot
   case currentSlot of
     Left err -> H.modify_ _ { running = false, errorMessage = Just err }
-    Right slot -> continue slot
+    Right slot -> do
+      H.modify_ _ { currentSlot = Just slot }
+      continue slot
 
 handleAction
   :: forall m
@@ -313,11 +348,20 @@ handleAction = case _ of
   Initialize -> do
     state <- H.get
     entries <- H.liftAff state.store.listEntries
-    let selected = Array.head entries
-    H.modify_ _ { entries = entries, selectedId = map _.entryId selected }
-    case selected of
-      Nothing -> pure unit
-      Just entry -> H.raise (EntrySelected entry)
+    if Array.null entries then H.modify_ _ { entries = entries }
+    else do
+      currentSlot <- H.liftAff state.fetchCurrentSlot
+      let refreshed = case currentSlot of
+            Left _ -> entries
+            Right slot -> map (refreshStatus slot) entries
+          slotValue = case currentSlot of
+            Left _ -> Nothing
+            Right slot -> Just slot
+          selected = Array.head refreshed
+      H.modify_ _ { entries = refreshed, selectedId = map _.entryId selected, currentSlot = slotValue }
+      case selected of
+        Nothing -> pure unit
+        Just entry -> H.raise (EntrySelected entry)
   Receive input ->
     H.modify_ _
       { store = input.store
@@ -325,6 +369,7 @@ handleAction = case _ of
       , candidateMessage = input.candidateMessage
       , vaultKeys = input.vaultKeys
       , fetchCurrentSlot = input.fetchCurrentSlot
+      , submission = input.submission
       }
   AddCurrent -> do
     state <- H.get
@@ -332,14 +377,14 @@ handleAction = case _ of
       Nothing -> pure unit
       Just entry -> do
         H.liftAff (state.store.putEntry entry)
-        H.modify_ _ { entries = replaceEntry entry state.entries, selectedId = Just entry.entryId, errorMessage = Nothing }
+        H.modify_ _ { entries = replaceEntry entry state.entries, selectedId = Just entry.entryId, errorMessage = Nothing, confirmationOpen = false, receiptTxId = Nothing }
         H.raise (EntrySelected entry)
   SelectEntry entryId -> do
     state <- H.get
     case Array.find (\entry -> entry.entryId == entryId) state.entries of
       Nothing -> pure unit
       Just entry -> do
-        H.modify_ _ { selectedId = Just entry.entryId, witnessOutput = Nothing, errorMessage = Nothing }
+        H.modify_ _ { selectedId = Just entry.entryId, witnessOutput = Nothing, errorMessage = Nothing, confirmationOpen = false, receiptTxId = Nothing }
         H.raise (EntrySelected entry)
   SelectVaultKey keyId -> H.modify_ _ { selectedVaultKeyId = Just keyId, errorMessage = Nothing }
   SetPastedWitness value -> H.modify_ _ { pastedWitness = value, errorMessage = Nothing }
@@ -389,6 +434,39 @@ handleAction = case _ of
                   entry of
                   Left err -> H.modify_ _ { running = false, errorMessage = Just err }
                   Right updated -> persistMutation state updated output
+  BeginSubmit -> do
+    state <- H.get
+    case selectedEntry state of
+      Nothing -> pure unit
+      Just entry -> do
+        H.modify_ _ { running = true, errorMessage = Nothing }
+        withCurrentSlot state \currentSlot ->
+          if deriveStatus currentSlot entry /= Complete then
+            H.modify_ _ { running = false, currentSlot = Just currentSlot, entries = updateEntry (refreshStatus currentSlot entry) state.entries, errorMessage = Just "Transaction entry is not eligible for submission." }
+          else H.modify_ _ { running = false, currentSlot = Just currentSlot, confirmationOpen = true }
+  CancelSubmit -> H.modify_ _ { confirmationOpen = false, errorMessage = Nothing }
+  ConfirmSubmit -> do
+    state <- H.get
+    case selectedEntry state of
+      Nothing -> H.modify_ _ { confirmationOpen = false }
+      Just entry -> do
+        H.modify_ _ { running = true, errorMessage = Nothing }
+        withCurrentSlot state \currentSlot ->
+          if deriveStatus currentSlot entry /= Complete then
+            H.modify_ _ { running = false, confirmationOpen = false, currentSlot = Just currentSlot, entries = updateEntry (refreshStatus currentSlot entry) state.entries, errorMessage = Just "Transaction entry is not eligible for submission." }
+          else do
+            assembled <- H.liftAff (assembleEntry entry)
+            case assembled of
+              Left err -> H.modify_ _ { running = false, confirmationOpen = false, errorMessage = Just err }
+              Right signedTxCborHex -> do
+                submitted <- H.liftAff (state.submission.submit currentSlot signedTxCborHex entry)
+                case submitted of
+                  Left err -> H.modify_ _ { running = false, confirmationOpen = false, errorMessage = Just err }
+                  Right receipt -> do
+                    persisted <- H.liftAff (attempt (state.store.putEntry receipt.entry))
+                    case persisted of
+                      Left err -> H.modify_ _ { running = false, confirmationOpen = false, errorMessage = Just (message err) }
+                      Right _ -> H.modify_ _ { entries = updateEntry receipt.entry state.entries, currentSlot = Just currentSlot, confirmationOpen = false, receiptTxId = Just receipt.txId, running = false }
 
 encodeOutput :: String -> Either String WitnessOutput
 encodeOutput rawCborHex = do
