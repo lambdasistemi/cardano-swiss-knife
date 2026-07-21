@@ -18,10 +18,10 @@
 
 **Goal**: Every runtime export explains its input, non-throwing result, error codes, and usage at the point maintainers edit it.
 
-- [ ] T006-S2 Add the ESLint JSDoc rule first and capture RED across the currently undocumented public entrypoint.
-- [ ] T007-S2 Add params, return union, error taxonomy, and short `@example` JSDoc to every public `node/src/index.js` export and the defining `CskError` class without restructuring runtime code.
-- [ ] T008-S2 Wire `eslint-plugin-jsdoc` through the reproducible tooling closure and `ci-node-api`, with required-tag linting scoped only to the true package surface.
-- [ ] T009-S2 Prove lint GREEN, prove the runtime export set is unchanged, run `./gate.sh`, and commit `docs(node): document every public export` with `Tasks: T006, T007, T008, T009`.
+- [X] T006-S2 Add the ESLint JSDoc rule first and capture RED across the currently undocumented public entrypoint.
+- [X] T007-S2 Add params, return union, error taxonomy, and short `@example` JSDoc to every public `node/src/index.js` export and the defining `CskError` class without restructuring runtime code.
+- [X] T008-S2 Wire `eslint-plugin-jsdoc` through the reproducible tooling closure and `ci-node-api`, with required-tag linting scoped only to the true package surface.
+- [X] T009-S2 Prove lint GREEN, prove the runtime export set is unchanged, run `./gate.sh`, and commit `docs(node): document every public export` with `Tasks: T006, T007, T008, T009`.
 
 ## Slice 3 — Generate and publish the MkDocs API reference
 

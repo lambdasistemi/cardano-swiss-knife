@@ -46,6 +46,8 @@ let
     type = packageJson.type;
     dependencies = {
       typescript = packageJson.devDependencies.typescript;
+      eslint = packageJson.devDependencies.eslint;
+      eslint-plugin-jsdoc = packageJson.devDependencies.eslint-plugin-jsdoc;
     };
   };
   documentationToolPackageLock = packageLock // {
@@ -54,6 +56,8 @@ let
         name = packageLock.packages."".name;
         dependencies = {
           typescript = packageLock.packages."".devDependencies.typescript;
+          eslint = packageLock.packages."".devDependencies.eslint;
+          eslint-plugin-jsdoc = packageLock.packages."".devDependencies.eslint-plugin-jsdoc;
         };
       };
     };

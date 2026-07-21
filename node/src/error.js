@@ -1,3 +1,12 @@
+/**
+ * Error used by internal adapters before public operations resolve it as a
+ * `{ ok: false, error: { code, message } }` `CskResult`, rather than throw.
+ * @param {import("./index.js").CskErrorCode} code Stable error taxonomy code.
+ * @param {string} message Human-readable explanation.
+ * @param {unknown} [cause] Optional underlying failure.
+ * @example
+ * const error = new CskError("DOMAIN_ERROR", "A network is required.");
+ */
 export class CskError extends Error {
   constructor(code, message, cause) {
     super(message, cause === undefined ? undefined : { cause });
