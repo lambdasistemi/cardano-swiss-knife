@@ -8,11 +8,11 @@
 
 **Goal**: Ship an editor-visible declaration contract whose value exports cannot drift from the installed runtime.
 
-- [ ] T001-S1 Add RED unit cases for both export-drift directions plus packed-artifact assertions for the advertised `.d.ts` and exact runtime/declaration value-export parity.
-- [ ] T002-S1 Define the public inputs, `CskResult<T>`, complete `CskErrorCode` taxonomy, operation outputs, and all 25 package value exports (24 functions plus `CskError`) in `node/src/index.d.ts` without unqualified `any`.
-- [ ] T003-S1 Publish `node/dist/index.d.ts` through package metadata and both npm/Nix build paths.
-- [ ] T004-S1 Add the TypeScript-AST bidirectional export drift checker and reproducible isolated documentation-tool dependency closure.
-- [ ] T005-S1 Run the focused drift/package proof and `./gate.sh`; commit `feat(node): publish typed API facade` with `Tasks: T001, T002, T003, T004, T005`.
+- [X] T001-S1 Add RED unit cases for both export-drift directions plus packed-artifact assertions for the advertised `.d.ts` and exact runtime/declaration value-export parity.
+- [X] T002-S1 Define the public inputs, `CskResult<T>`, complete `CskErrorCode` taxonomy, operation outputs, and all 25 package value exports (24 functions plus `CskError`) in `node/src/index.d.ts` without unqualified `any`.
+- [X] T003-S1 Publish `node/dist/index.d.ts` through package metadata and both npm/Nix build paths.
+- [X] T004-S1 Add the TypeScript-AST bidirectional export drift checker and reproducible isolated documentation-tool dependency closure.
+- [X] T005-S1 Run the focused drift/package proof and `./gate.sh`; commit `feat(node): publish typed API facade` with `Tasks: T001, T002, T003, T004, T005`.
 
 ## Slice 2 — Make public source documentation mandatory
 

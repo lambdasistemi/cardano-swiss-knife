@@ -40,6 +40,25 @@ let
     };
   };
 
+  documentationToolPackage = {
+    name = packageJson.name;
+    private = true;
+    type = packageJson.type;
+    dependencies = {
+      typescript = packageJson.devDependencies.typescript;
+    };
+  };
+  documentationToolPackageLock = packageLock // {
+    packages = packageLock.packages // {
+      "" = {
+        name = packageLock.packages."".name;
+        dependencies = {
+          typescript = packageLock.packages."".devDependencies.typescript;
+        };
+      };
+    };
+  };
+
   nodeModules = pkgs.importNpmLock.buildNodeModules {
     inherit nodejs;
     npmRoot = repoRoot;
@@ -56,6 +75,13 @@ let
     derivationArgs = {
       PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "1";
     };
+  };
+
+  documentationToolNodeModules = pkgs.importNpmLock.buildNodeModules {
+    inherit nodejs;
+    npmRoot = repoRoot;
+    package = documentationToolPackage;
+    packageLock = documentationToolPackageLock;
   };
 
   commonArgs = {
@@ -93,7 +119,7 @@ let
     });
 in
 {
-  inherit nodeModules playwrightNodeModules nodejs mkWorkspaceDerivation;
+  inherit nodeModules playwrightNodeModules documentationToolNodeModules nodejs mkWorkspaceDerivation;
 
   lib-build = mkWorkspaceDerivation {
     name = "cardano-addresses-lib-build";
@@ -131,6 +157,7 @@ in
       cd node-api-build
       mkdir -p node/dist
       esbuild node/src/index.js --bundle --platform=node --format=esm --outfile=node/dist/index.js
+      cp node/src/index.d.ts node/dist/index.d.ts
       esbuild cli/csk.mjs --bundle --platform=node --format=esm --outfile=node/dist/csk.mjs
       cp ${wasmBinary}/cardano-addresses.wasm node/dist/cardano-addresses.wasm
       cp ${txInspectorWasmBinary}/wasm-tx-inspector.wasm node/dist/wasm-tx-inspector.wasm
