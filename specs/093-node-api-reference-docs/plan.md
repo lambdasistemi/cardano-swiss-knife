@@ -59,7 +59,7 @@ Proof: captured RED lint, focused GREEN lint, unchanged runtime export set, then
 
 RED first: add the API nav target and generation check so strict docs/TypeDoc fails while no generator output exists.
 
-GREEN: add TypeDoc Markdown configuration and dependencies, ignore generated output, generate before all local/CI/preview/Pages docs builds, explicitly invoke the expanded `ci-node-api` GitHub check, and include the parent-confirmed #92 property-suite link in generated reference content.
+GREEN: add TypeDoc Markdown configuration and dependencies, ignore generated output, generate before all local/CI/preview/Pages docs builds, explicitly invoke the expanded `ci-node-api` GitHub check, and link generated reference content to #92's canonical `node/test/api-properties.test.mjs` source.
 
 Owned files:
 
@@ -79,7 +79,7 @@ Proof: TypeDoc generation into a clean ignored tree, `git status` confirms no ge
 
 ## Sequencing and concurrency
 
-Slices execute S1 → S2 → S3. S2 depends on S1's public-name/type inventory; S3 depends on both the typed facade and source documentation. Q-001 must be answered before S3. The csk-92 lane owns property-test files under `node/test/`; this ticket does not edit or reorder its work. Any need to restructure `node/src/index.js` is a parent-bound scope change.
+Slices execute S1 → S2 → S3. S2 depends on S1's public-name/type inventory; S3 depends on both the typed facade and source documentation. Q-001 is resolved: csk-92 owns `node/test/api-properties.test.mjs`, and this ticket links but never edits it. Any need to restructure `node/src/index.js` is a parent-bound scope change.
 
 ## Final verification
 
