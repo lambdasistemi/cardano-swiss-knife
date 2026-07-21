@@ -31,13 +31,13 @@
 
 ## Slice 4 — CLI commands and installed cross-host proof
 
-- [ ] T021-S4 Add RED CLI/package tests for `tx witness plan|attach`, `tx validate`, and `tx evaluate-scripts`, including exclusive transaction/witness sources, human/JSON results, and typed exits.
-- [ ] T022-S4 Add RED vault/descriptor tests for compatible signing entry kinds, inherited passphrase FD/no-echo intake, and absence of key/passphrase sentinels from argv, environment, output, errors, and temporary files.
-- [ ] T023-S4 Implement the four command routes as thin Node API calls, including detached/signed TextEnvelope files and explicit `--replace-existing`, while preserving all existing CLI families.
-- [ ] T024-S4 Extend foreign-CWD installed-package smoke across CLI and Node, compare committed cross-host fixtures, and prove packaged ledger discovery with no separate/fallback Plutus artifact.
-- [ ] T025-S4 Extend the architecture boundary proof so provider HTTP/context, ledger validation, script evaluation, witness mutation, CBOR, and crypto fallback cannot appear in host code.
-- [ ] T026-S4 Run `nix run .#ci-node-api`, `nix run .#ci-node-package`, the packaged `csk` command smoke, and `./gate.sh`.
-- [ ] T027-S4 Commit exactly `feat(cli): expose witness and ledger commands` with `Tasks: T021, T022, T023, T024, T025, T026, T027`.
+- [X] T021-S4 Add RED CLI/package tests for `tx witness plan|attach`, `tx validate`, and `tx evaluate-scripts`, including exclusive transaction/witness sources, human/JSON results, and typed exits.
+- [X] T022-S4 Add RED vault/descriptor tests for compatible signing entry kinds, inherited passphrase FD/no-echo intake, and absence of key/passphrase sentinels from argv, environment, output, errors, and temporary files.
+- [X] T023-S4 Implement the four command routes as thin Node API calls, including detached/signed TextEnvelope files and explicit `--replace-existing`, while preserving all existing CLI families.
+- [X] T024-S4 Extend foreign-CWD installed-package smoke across CLI and Node, compare committed cross-host fixtures, and prove packaged ledger discovery with no separate/fallback Plutus artifact.
+- [X] T025-S4 Extend the architecture boundary proof so provider HTTP/context, ledger validation, script evaluation, witness mutation, CBOR, and crypto fallback cannot appear in host code.
+- [X] T026-S4 Run `nix run .#ci-node-api`, `nix run .#ci-node-package`, the packaged `csk` command smoke, and `./gate.sh`.
+- [X] T027-S4 Commit exactly `feat(cli): expose witness and ledger commands` with `Tasks: T021, T022, T023, T024, T025, T026, T027`.
 
 ## Orchestrator-owned finalization
 

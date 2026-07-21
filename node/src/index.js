@@ -167,6 +167,11 @@ export const prepareTransactionWitness = (input) => operation(async () => {
   return { ...witness, textEnvelope: JSON.parse(fromEither(TransactionWitness.encodeWitnessTextEnvelope(witness.vkeyWitnessCborHex))) };
 });
 
+export const normaliseTransactionWitness = (input) => operation(async () => {
+  const cborHex = witnessInput(input);
+  return { cborHex, textEnvelope: JSON.parse(fromEither(TransactionWitness.encodeWitnessTextEnvelope(cborHex))) };
+});
+
 const attachmentOperationOptions = async (input, txCbor, options) => {
   if (!Object.hasOwn(input, "txHash")) return options;
   const selectedProvider = provider(input.provider);

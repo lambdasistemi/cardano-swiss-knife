@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { open, readFile } from "node:fs/promises";
+import { open, readFile, writeFile } from "node:fs/promises";
 import { spawn, spawnSync } from "node:child_process";
 import { createReadStream } from "node:fs";
 import { createVaultFile, listVaultFile, migrateVaultFile } from "./vault-host.mjs";
@@ -11,7 +11,7 @@ import * as script from "../node/src/commands/script.js";
 import * as payload from "../node/src/commands/payload.js";
 import * as tx from "../node/src/commands/tx.js";
 const usage = "Usage: csk vault <create|list|migrate> [options]\n\ncsk vault create --out PATH [--passphrase-fd FD] [--force]\ncsk vault list --vault PATH [--passphrase-fd FD] [--json]\ncsk vault migrate --input PATH --out PATH [--input-passphrase-fd FD] [--passphrase-fd FD] [--force]\n";
-const txUsage = "Usage: csk tx <inspect|browse|identify|intent> (--cbor-hex HEX | --tx-file PATH | --tx-hash HASH --provider blockfrost|koios --network mainnet|preprod|preview) [--vault PATH --vault-entry ID [--passphrase-fd FD]] [--book PATH ...] [--path JSON-PATH] [--output json]\n";
+const txUsage = "Usage: csk tx <inspect|browse|identify|intent|validate|evaluate-scripts> (--cbor-hex HEX | --tx-file PATH | --tx-hash HASH --provider blockfrost|koios --network mainnet|preprod|preview) [--vault PATH --vault-entry ID [--passphrase-fd FD]] [--book PATH ...] [--path JSON-PATH] [--output json]\n\ncsk tx witness plan <transaction-source> [provider options] [--output json]\ncsk tx witness attach <transaction-source> (--witness-file PATH | --vault PATH --vault-entry ID [--passphrase-fd FD]) [--replace-existing] [--tx-out PATH] [--witness-out PATH] [--output json]\n";
 const rootUsage = "Usage: csk <address|mnemonic|key|script|payload|tx|vault> ...\n\ncsk address inspect --address ADDRESS\ncsk mnemonic generate|validate\ncsk key derive|address|restore\ncsk script inspect|author|template\ncsk payload sign|verify\n" + txUsage + "\n" + usage;
 const bad = () => { throw Error("Vault arguments are invalid."); };
 const parse = (args) => { if (args.includes("--help") || args.includes("-h")) return { help: true }; const [group, command, ...rest] = args; const allowed = { create: ["--out", "--passphrase-fd", "--force"], list: ["--vault", "--passphrase-fd", "--json"], migrate: ["--input", "--out", "--input-passphrase-fd", "--passphrase-fd", "--force"] }; if (group !== "vault" || !allowed[command]) bad(); const o = { command }; for (let i = 0; i < rest.length; i += 1) { const key = rest[i]; if (!allowed[command].includes(key) || o[key.slice(2)] !== undefined) bad(); if (["--force", "--json"].includes(key)) o[key.slice(2)] = true; else if (rest[i + 1] && !rest[i + 1].startsWith("--")) o[key.slice(2)] = rest[++i]; else bad(); } if ((command === "create" && !o.out) || (command === "list" && !o.vault) || (command === "migrate" && (!o.input || !o.out)) || [o["passphrase-fd"], o["input-passphrase-fd"]].filter(Boolean).some((fd) => !/^\d+$/.test(fd))) bad(); return o; };
@@ -49,21 +49,74 @@ const render = (result, json) => { const envelope = { version: 1, ...result }; i
 const offline = async (args) => { const [family, command, subcommand, ...tail] = args; const hasSubcommand = family === "key" && ["address", "restore"].includes(command); const o = options(hasSubcommand ? tail : [subcommand, ...tail].filter((x) => x !== undefined)); const json = o.output === "json"; delete o.output; if (o.mnemonic || o["signing-key"]) offlineUsage(); let result; if (family === "address" && command === "inspect") result = await address.inspect({ address: o.address }); else if (family === "mnemonic" && command === "generate") result = await mnemonic.generate({ wordCount: o["word-count"] }); else if (family === "mnemonic" && command === "validate") result = await mnemonic.validate({ mnemonic: await secret(o, "mnemonic") }); else if (family === "key" && command === "derive") result = await key.derive({ mnemonic: await secret(o, "mnemonic"), accountIndex: o["account-index"], role: o.role, addressIndex: o["address-index"] }); else if (family === "key" && command === "address" && subcommand === "shelley") result = await key.shelley({ network: o.network, paymentXpub: o["payment-xpub"], stakeXpub: o["stake-xpub"] }); else if (family === "key" && command === "address" && subcommand === "icarus") result = await key.icarus({ network: o.network, addressXpub: o["address-xpub"] }); else if (family === "key" && command === "address" && subcommand === "byron") result = await key.byron({ network: o.network, addressXpub: o["address-xpub"], rootXpub: o["root-xpub"], derivationPath: o["derivation-path"] }); else if (family === "key" && command === "restore" && subcommand === "icarus") result = await key.restoreIcarus({ mnemonic: await secret(o, "mnemonic"), network: o.network, accountIndex: o["account-index"], role: o.role, addressIndex: o["address-index"] }); else if (family === "key" && command === "restore" && subcommand === "byron") result = await key.restoreByron({ mnemonic: await secret(o, "mnemonic"), network: o.network, accountIndex: o["account-index"], addressIndex: o["address-index"] }); else if (family === "script" && command === "inspect") result = await script.inspect({ cborHex: o["cbor-hex"] }); else if (family === "script" && command === "author") result = await script.author({ json: o.json }); else if (family === "script" && command === "template") result = await script.template({ json: o.json }); else if (family === "payload" && command === "sign") result = await payload.sign({ signingKey: await secret(o, "signing-key"), payloadMode: o["payload-mode"], payloadInput: o["payload-input"] }); else if (family === "payload" && command === "verify") result = await payload.verify({ payloadMode: o["payload-mode"], payloadInput: o["payload-input"], verificationKey: o["verification-key"], signature: o.signature }); else offlineUsage(); process.exitCode = render(result, json); };
 const txFailure = (code, message, exit = exitFor(code)) => Object.assign(Error(message), { code, exit });
 const transaction = async (args) => {
-  const [family, command, ...rest] = args;
-  if (family !== "tx" || !["inspect", "browse", "identify", "intent"].includes(command)) offlineUsage();
+  const [family, firstCommand, ...tail] = args;
+  let command = firstCommand; let rest = tail; let attach = false;
+  if (command === "evaluate-scripts") command = "evaluateScripts";
+  if (command === "witness") {
+    const [subcommand, ...witnessRest] = rest;
+    if (subcommand === "plan") command = "witnessPlan";
+    else if (subcommand === "attach") { command = "attachWitness"; attach = true; }
+    else offlineUsage();
+    rest = witnessRest;
+  }
+  if (family !== "tx" || !["inspect", "browse", "identify", "intent", "witnessPlan", "validate", "evaluateScripts", "attachWitness"].includes(command)) offlineUsage();
   if (rest.includes("--help") || rest.includes("-h")) { process.stdout.write(txUsage); return; }
-  const values = { book: [] }; const allowed = new Set(["--cbor-hex", "--tx-file", "--tx-hash", "--provider", "--network", "--vault", "--vault-entry", "--passphrase-fd", "--book", "--path", "--output"]);
-  for (let i = 0; i < rest.length; i += 1) { const flag = rest[i]; const key = flag.slice(2); if (!allowed.has(flag) || !rest[i + 1] || rest[i + 1].startsWith("--") || (key !== "book" && values[key] !== undefined)) offlineUsage(); const value = rest[++i]; key === "book" ? values.book.push(value) : values[key] = value; }
+  const values = { book: [] }; const allowed = new Set(["--cbor-hex", "--tx-file", "--tx-hash", "--provider", "--network", "--vault", "--vault-entry", "--passphrase-fd", "--book", "--path", "--output", "--witness-file", "--replace-existing", "--tx-out", "--witness-out"]);
+  for (let i = 0; i < rest.length; i += 1) { const flag = rest[i]; const key = flag.slice(2); if (!allowed.has(flag) || (key !== "book" && values[key] !== undefined)) offlineUsage(); if (flag === "--replace-existing") { if (!attach) offlineUsage(); values[key] = true; continue; } if (!rest[i + 1] || rest[i + 1].startsWith("--")) offlineUsage(); const value = rest[++i]; key === "book" ? values.book.push(value) : values[key] = value; }
   if (values.output && values.output !== "json") offlineUsage();
   const sources = [values["cbor-hex"], values["tx-file"], values["tx-hash"]].filter((value) => value !== undefined);
   if (sources.length !== 1 || (command === "browse") !== (values.path !== undefined)) offlineUsage();
   const hash = values["tx-hash"] !== undefined;
   if (hash !== (values.provider !== undefined && values.network !== undefined) || (hash && !["blockfrost", "koios"].includes(values.provider)) || (hash && !["mainnet", "preprod", "preview"].includes(values.network))) offlineUsage();
-  if ((!hash && (values.vault || values["vault-entry"] || values["passphrase-fd"])) || (values.vault !== undefined) !== (values["vault-entry"] !== undefined) || (values["passphrase-fd"] && !/^\d+$/.test(values["passphrase-fd"]))) offlineUsage();
+  if ((values.vault !== undefined) !== (values["vault-entry"] !== undefined) || (values["passphrase-fd"] && (!values.vault || !/^\d+$/.test(values["passphrase-fd"])))) offlineUsage();
+  if (attach) {
+    if (hash && values.vault && !values["witness-file"]) offlineUsage();
+    const witnessSources = Number(values["witness-file"] !== undefined) + Number(!hash && values.vault !== undefined);
+    if (witnessSources !== 1 || values.book.length !== 0 || values.path !== undefined) offlineUsage();
+  } else if ((!hash && (values.vault || values["vault-entry"] || values["passphrase-fd"])) || values["witness-file"] || values["replace-existing"] || values["tx-out"] || values["witness-out"]) offlineUsage();
   let input;
   try { if (values["cbor-hex"] !== undefined) input = { cborHex: values["cbor-hex"] }; else if (values["tx-file"] !== undefined) { const contents = (await readFile(values["tx-file"], "utf8")).trim(); input = contents.startsWith("{") ? { textEnvelope: JSON.parse(contents) } : { cborHex: contents }; } else { let credential; if (values.provider === "blockfrost") { if (!values.vault) throw secretFailure(); credential = await secret(values, "blockfrost-project-id"); } else if (values.vault) credential = await secret(values, "koios-bearer-token"); input = { txHash: values["tx-hash"], provider: values.provider, network: values.network, ...(credential ? { credential } : {}) }; } } catch (error) { if (error.exit) throw error; throw txFailure("DOMAIN_ERROR", "Transaction input is invalid."); }
   let books; try { books = await Promise.all(values.book.map((path) => readFile(path, "utf8"))); } catch { throw txFailure("BOOK_IMPORT", "Transaction book input is invalid."); }
   let path; try { path = values.path === undefined ? undefined : JSON.parse(values.path); } catch { offlineUsage(); }
+  if (attach) {
+    let witness; let witnessEnvelope;
+    try {
+      if (values["witness-file"]) {
+        const contents = (await readFile(values["witness-file"], "utf8")).trim();
+        witness = contents.startsWith("{") ? { textEnvelope: JSON.parse(contents) } : { cborHex: contents };
+        const normalised = await tx.normaliseWitness(witness);
+        if (!normalised.ok) { process.exitCode = render(normalised, values.output === "json"); return; }
+        witness = { textEnvelope: normalised.value.textEnvelope };
+        witnessEnvelope = normalised.value.textEnvelope;
+      } else {
+        const plan = await tx.witnessPlan(input);
+        if (!plan.ok) { process.exitCode = render(plan, values.output === "json"); return; }
+        let bodyHashHex = plan.value?.result?.witness_plan?.body_hash ?? plan.value?.witness_plan?.body_hash;
+        if (typeof bodyHashHex !== "string") {
+          const identified = await tx.identify(input);
+          if (!identified.ok) { process.exitCode = render(identified, values.output === "json"); return; }
+          bodyHashHex = identified.value?.result?.identification?.body_hash ?? identified.value?.identification?.body_hash;
+        }
+        if (typeof bodyHashHex !== "string") throw txFailure("ENGINE_PROTOCOL", "The ledger-inspector witness plan response omitted its body hash.");
+        const prepared = await tx.prepareWitness({ bodyHashHex, signingKeyBech32: await secret(values, "signing-key") });
+        if (!prepared.ok) { process.exitCode = render(prepared, values.output === "json"); return; }
+        witness = { textEnvelope: prepared.value.textEnvelope };
+        witnessEnvelope = prepared.value.textEnvelope;
+      }
+    } catch (error) { if (error.exit) throw error; throw txFailure("WITNESS_INPUT", "Detached witness input is invalid."); }
+    const result = await tx.attachWitness(input, witness, { replaceExisting: values["replace-existing"] === true });
+    if (result.ok) {
+      try {
+        if (values["tx-out"]) await writeFile(values["tx-out"], `${JSON.stringify(result.value.textEnvelope)}\n`, { mode: 0o600 });
+        if (values["witness-out"]) {
+          if (!witnessEnvelope) throw txFailure("WITNESS_INPUT", "A detached witness TextEnvelope is required for --witness-out.");
+          await writeFile(values["witness-out"], `${JSON.stringify(witnessEnvelope)}\n`, { mode: 0o600 });
+        }
+      } catch (error) { if (error.exit) throw error; throw txFailure("DOMAIN_ERROR", "Transaction output could not be written."); }
+    }
+    process.exitCode = render(result, values.output === "json");
+    return;
+  }
   const result = await tx[command](input, { books, ...(path === undefined ? {} : { path }) });
   process.exitCode = render(result, values.output === "json");
 };
