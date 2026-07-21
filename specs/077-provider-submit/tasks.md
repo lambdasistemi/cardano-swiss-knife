@@ -157,14 +157,14 @@ Tasks: T787, T788, T789, T790, T791, T792
 
 ## Orchestrator-owned finalization
 
-- [ ] T793 Review and stamp each behavior slice in its own accepted commit,
+- [X] T793 Review and stamp each behavior slice in its own accepted commit,
   independently run the evolving `./gate.sh`, push each frozen slice, and
   verify fresh remote CI before advancing dependent work.
-- [ ] T794 Run and record the safe real-provider invalid-CBOR rejection smoke,
+- [X] T794 Run and record the safe real-provider invalid-CBOR rejection smoke,
   complete the PR body/final audit, verify every implementation task is
   checked, then stamp T793-T794 while dropping `gate.sh` in
   `chore: drop gate.sh (ready for review)` and mark the PR ready.
-- [ ] T795 Verify fresh GitHub Actions green on the final sentinel SHA, report
+- [X] T795 Verify fresh GitHub Actions green on the final sentinel SHA, report
   `COMPLETE` with the PR URL to the epic owner, and do not merge.
 
 ## Dependencies and execution order
