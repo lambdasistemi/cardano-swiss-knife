@@ -3,6 +3,7 @@ module Main (main) where
 import Prelude
 
 import Cardano.BookableIdentifier (isBookableIdentifierKind)
+import Cardano.Provider as SharedProvider
 import Cardano.Transaction.Entry (EntryStatus(..), TxEntry)
 import Cardano.Transaction.Ledger as Ledger
 import Cardano.Transaction.Witness as Witness
@@ -637,16 +638,16 @@ inspectorComponent initial =
                 renderLoadedInspectorHeader state
               else
                 renderLoadForm state
-            , renderWorkbench state
-            , if showLoadedHeader then
-                renderBooksPanel state true
-              else
-                HH.text ""
             , HH.div
                 [ classNames [ "workspace-main" ] ]
                 [ renderResult state
                 , renderTxSigning state
                 ]
+            , renderWorkbench state
+            , if showLoadedHeader then
+                renderBooksPanel state true
+              else
+                HH.text ""
             ]
         ]
 
@@ -658,6 +659,11 @@ inspectorComponent initial =
       { store: EntryStore.entryStore
       , candidate: state.workbenchCandidate
       , candidateMessage: state.workbenchCandidateMessage
+      , vaultKeys:
+          map
+            (\entry -> { id: entry.id, label: entry.label, value: entry.value })
+            (vaultEntriesForKinds signingAcceptedKinds state.vaultEntries)
+      , fetchCurrentSlot: currentSlotFor state
       }
       WorkbenchOutput
 
@@ -6342,6 +6348,23 @@ inspectorComponent initial =
   providerSecret state = case state.provider of
     Blockfrost -> String.trim state.blockfrostKey
     Koios -> String.trim state.koiosBearer
+
+  currentSlotFor state =
+    TxSigning.fetchCurrentSlot
+      ( SharedProvider.fetchValidationContext
+          (sharedProvider state.provider)
+          (sharedNetwork state.network)
+          (providerSecret state)
+      )
+
+  sharedProvider = case _ of
+    Blockfrost -> SharedProvider.Blockfrost
+    Koios -> SharedProvider.Koios
+
+  sharedNetwork = case _ of
+    Mainnet -> SharedProvider.Mainnet
+    Preprod -> SharedProvider.Preprod
+    Preview -> SharedProvider.Preview
 
   vaultEntryLabel custom fallback =
     let normalized = String.trim custom

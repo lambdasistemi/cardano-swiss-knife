@@ -260,6 +260,27 @@ button:disabled {
   overflow-wrap: anywhere;
 }
 
+.workbench-selected,
+.workbench-selected section,
+.workbench-witness-output,
+.workbench-vault-keys {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.workbench-entry-count {
+  font-variant-numeric: tabular-nums;
+  margin-left: var(--space-2);
+}
+
+.workbench-witness-output textarea,
+.workbench-selected textarea {
+  box-sizing: border-box;
+  min-height: 5rem;
+  resize: vertical;
+  width: 100%;
+}
+
 code,
 pre,
 kbd,
