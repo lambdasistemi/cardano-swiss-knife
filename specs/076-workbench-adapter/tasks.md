@@ -124,10 +124,10 @@ Tasks: T775, T776, T777, T778, T779, T780, T781
 
 ## Orchestrator-owned finalization
 
-- [ ] T782 Review and stamp every behavior slice, independently run
+- [X] T782 Review and stamp every behavior slice, independently run
   `./gate.sh`, audit source boundaries and commit/task linkage, update PR #97,
   push accepted SHAs, and publish the frozen Workbench integration seam to #77.
-- [ ] T783 Verify fresh GitHub Actions green on the final implementation SHA,
+- [X] T783 Verify fresh GitHub Actions green on the final implementation SHA,
   then stamp T782-T783 while dropping `gate.sh` in
   `chore: drop gate.sh (ready for review)`, mark PR #97 ready, and push.
 - [ ] T784 Verify fresh GitHub Actions green on the sentinel SHA, report
