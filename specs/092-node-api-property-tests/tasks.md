@@ -32,7 +32,7 @@
 
 ## Orchestrator-owned finalization
 
-- [ ] T022 Audit the static contract inventory against all 25 package exports and confirm no csk-93-owned `node/src/` file changed.
-- [ ] T023 Run final `./gate.sh`, commit-message/task audit, update PR #95 with exact local proof and the explicit #77 gap, then push the implementation SHA.
-- [ ] T024 Wait for fresh GitHub Actions green on the implementation SHA; only then drop `gate.sh`, mark PR #95 ready, and push the final sentinel SHA.
-- [ ] T025 Verify fresh GitHub Actions green on the final SHA, report `COMPLETE` to the epic owner, and do not merge.
+- [X] T022 Audit the static contract inventory against all 25 package exports and confirm no csk-93-owned `node/src/` file changed.
+- [X] T023 Run final `./gate.sh`, commit-message/task audit, update PR #95 with exact local proof and the explicit #77 gap, then push the implementation SHA.
+- [X] T024 Wait for fresh GitHub Actions green on the implementation SHA; only then drop `gate.sh`, mark PR #95 ready, and push the final sentinel SHA.
+- [X] T025 Verify fresh GitHub Actions green on the final SHA, report `COMPLETE` to the epic owner, and do not merge.
