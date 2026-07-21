@@ -2,13 +2,13 @@
 
 ## Slice 1 — Shared read-only operations and Node API
 
-- [ ] T001-S1 Add RED shared/Node tests for witness planning, all validation verdicts, script success/failure/incomplete/not-applicable results, and per-redeemer execution-unit/failure preservation.
-- [ ] T002-S1 Prove transaction slots reject `TxWitness ConwayEra`, malformed input and engine failures remain typed, and no host fallback result appears.
-- [ ] T003-S1 Define the shared ledger operation/context contract and extend the packaged Node runner allowlist for `tx.witness.plan`, `tx.validate`, and `tx.evaluate.scripts`.
-- [ ] T004-S1 Reuse `Cardano.Provider` for hash-source producer/context resolution while raw/TextEnvelope sources remain explicit and truthfully incomplete without context.
-- [ ] T005-S1 Export Node result-envelope functions for witness planning, validation, and script evaluation with engine-owned result payloads intact.
-- [ ] T006-S1 Run `nix run .#ci-test`, `nix run .#ci-node-api`, and `./gate.sh`.
-- [ ] T007-S1 Commit exactly `feat(transaction): expose shared ledger operations` with `Tasks: T001, T002, T003, T004, T005, T006, T007`.
+- [X] T001-S1 Add RED shared/Node tests for witness planning, all validation verdicts, script success/failure/incomplete/not-applicable results, and per-redeemer execution-unit/failure preservation.
+- [X] T002-S1 Prove transaction slots reject `TxWitness ConwayEra`, malformed input and engine failures remain typed, and no host fallback result appears.
+- [X] T003-S1 Define the shared ledger operation/context contract and extend the packaged Node runner allowlist for `tx.witness.plan`, `tx.validate`, and `tx.evaluate.scripts`.
+- [X] T004-S1 Reuse `Cardano.Provider` for hash-source producer/context resolution while raw/TextEnvelope sources remain explicit and truthfully incomplete without context.
+- [X] T005-S1 Export Node result-envelope functions for witness planning, validation, and script evaluation with engine-owned result payloads intact.
+- [X] T006-S1 Run `nix run .#ci-test`, `nix run .#ci-node-api`, and `./gate.sh`.
+- [X] T007-S1 Commit exactly `feat(transaction): expose shared ledger operations` with `Tasks: T001, T002, T003, T004, T005, T006, T007`.
 
 ## Slice 2 — Shared safe witness preparation and attachment
 

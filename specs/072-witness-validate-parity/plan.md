@@ -113,6 +113,7 @@ through the Node API.
 - `node/src/transaction-engine.js`
 - `node/src/index.js`
 - `node/src/commands/tx.js`
+- `node/test/transaction-provider.test.mjs`
 - `node/test/transaction-ledger.test.mjs`
 - `node/test/fixtures/transaction-ledger.json`
 - `test/src/Test/TransactionLedger.purs`
