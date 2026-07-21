@@ -1,16 +1,24 @@
 module Cardano.Provider
   ( Provider(..)
   , Network(..)
+  , HttpBody
   , HttpRequest
   , HttpResponse
   , Transport
   , ProviderError(..)
+  , SubmissionError(..)
+  , SubmissionReceipt
   , ValidationContext
   , providerName
   , networkName
   , needsKey
   , providerErrorCategory
   , renderProviderError
+  , submissionErrorCategory
+  , renderSubmissionError
+  , cborHexBodyByteValues
+  , submitTxEntry
+  , submitTxEntryWith
   , fetchTxCbor
   , fetchTxCborWith
   , fetchTxCborForNode
@@ -24,6 +32,7 @@ module Cardano.Provider
 
 import Prelude
 
+import Cardano.Transaction.Entry as Entry
 import Control.Promise (Promise, fromAff, toAffE)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
@@ -40,10 +49,13 @@ data Network = Mainnet | Preprod | Preview
 
 derive instance eqNetwork :: Eq Network
 
-type HttpRequest = { url :: String, method :: String, headers :: Array { name :: String, value :: String }, body :: Maybe String }
+type HttpBody = { encoding :: String, value :: String }
+
+type HttpRequest = { url :: String, method :: String, headers :: Array { name :: String, value :: String }, body :: Maybe HttpBody }
 type HttpResponse = { status :: Int, body :: String }
 type Transport = HttpRequest -> Aff (Either String HttpResponse)
 type ValidationContext = { network :: String, slot :: String, epoch :: String, protocolParameters :: String, source :: String }
+type SubmissionReceipt = { txId :: String, provider :: Provider, network :: Network, entry :: Entry.TxEntry }
 
 data ProviderError
   = AuthenticationError Provider String Int String
@@ -51,6 +63,12 @@ data ProviderError
   | ServerError Provider String Int String
   | TransportError Provider String String
   | DecodeError Provider String (Maybe Int) String
+
+data SubmissionError
+  = EntrySubmissionError Entry.EntryStatus
+  | InvalidCborHex
+  | ProviderSubmissionError ProviderError
+  | InvalidProviderReceipt Provider String
 
 providerName :: Provider -> String
 providerName = case _ of
@@ -86,6 +104,26 @@ renderProviderError = case _ of
     Just code -> renderHttp provider operation code detail
     Nothing -> providerName provider <> " " <> operation <> ": " <> detail
 
+submissionErrorCategory :: SubmissionError -> String
+submissionErrorCategory = case _ of
+  EntrySubmissionError Entry.Open -> "entry-incomplete"
+  EntrySubmissionError Entry.Expired -> "entry-expired"
+  EntrySubmissionError Entry.Submitted -> "entry-submitted"
+  EntrySubmissionError Entry.Complete -> "entry-incomplete"
+  InvalidCborHex -> "invalid-cbor-hex"
+  ProviderSubmissionError err -> "provider-" <> providerErrorCategory err
+  InvalidProviderReceipt _ _ -> "invalid-provider-receipt"
+
+renderSubmissionError :: SubmissionError -> String
+renderSubmissionError = case _ of
+  EntrySubmissionError Entry.Open -> "Transaction entry is incomplete."
+  EntrySubmissionError Entry.Expired -> "Transaction entry is expired."
+  EntrySubmissionError Entry.Submitted -> "Transaction entry has already been submitted."
+  EntrySubmissionError Entry.Complete -> "Transaction entry is not eligible for submission."
+  InvalidCborHex -> "Signed transaction CBOR must be even-length hexadecimal."
+  ProviderSubmissionError err -> renderProviderError err
+  InvalidProviderReceipt provider detail -> providerName provider <> " transaction submit receipt: " <> detail
+
 renderHttp :: Provider -> String -> Int -> String -> String
 renderHttp provider operation status detail = providerName provider <> " " <> operation <> " " <> show status <> ": " <> detail
 
@@ -108,6 +146,32 @@ fetchTxCborWith transport provider network credential txHash = do
         decoded = decodeTxCbor body.body
       in
         if decoded.ok then Right decoded.value else Left (DecodeError provider "tx cbor" (Just body.status) decoded.error)
+
+submitTxEntry :: Provider -> Network -> String -> Int -> String -> Entry.TxEntry -> Aff (Either SubmissionError SubmissionReceipt)
+submitTxEntry = submitTxEntryWith standardTransport
+
+submitTxEntryWith :: Transport -> Provider -> Network -> String -> Int -> String -> Entry.TxEntry -> Aff (Either SubmissionError SubmissionReceipt)
+submitTxEntryWith transport provider network credential currentSlot signedCborHex entry =
+  case Entry.deriveStatus currentSlot entry of
+    Entry.Complete
+      | not (isValidCborHex signedCborHex) -> pure (Left InvalidCborHex)
+      | otherwise -> do
+          response <- runRequest transport provider "transaction submit" credential (submissionRequest provider network credential signedCborHex)
+          pure case response of
+            Left err -> Left (ProviderSubmissionError (redactProviderError credential err))
+            Right successResponse ->
+              let
+                decoded = decodeSubmissionReceipt successResponse.body
+              in
+                if decoded.ok then
+                  Right
+                    { txId: decoded.txId
+                    , provider
+                    , network
+                    , entry: entry { status = Entry.Submitted }
+                    }
+                else Left (InvalidProviderReceipt provider decoded.error)
+    status -> pure (Left (EntrySubmissionError status))
 
 fetchTxCborForNode :: Provider -> Network -> String -> String -> Aff String
 fetchTxCborForNode provider network credential txHash = do
@@ -196,7 +260,12 @@ runRequest transport provider operation credential request
 txRequest :: Provider -> Network -> String -> String -> HttpRequest
 txRequest provider network credential txHash = case provider of
   Blockfrost -> { url: blockfrostBase network <> "/txs/" <> txHash <> "/cbor", method: "GET", headers: [ { name: "project_id", value: credential } ], body: Nothing }
-  Koios -> { url: koiosBase network <> "/tx_cbor", method: "POST", headers: koiosHeaders credential, body: Just ("{\"_tx_hashes\":[\"" <> txHash <> "\"]}") }
+  Koios -> { url: koiosBase network <> "/tx_cbor", method: "POST", headers: koiosHeaders credential, body: Just { encoding: "text", value: "{\"_tx_hashes\":[\"" <> txHash <> "\"]}" } }
+
+submissionRequest :: Provider -> Network -> String -> String -> HttpRequest
+submissionRequest provider network credential signedCborHex = case provider of
+  Blockfrost -> { url: blockfrostBase network <> "/tx/submit", method: "POST", headers: [ { name: "project_id", value: credential }, { name: "Content-Type", value: "application/cbor" } ], body: Just { encoding: "cbor-hex", value: signedCborHex } }
+  Koios -> { url: koiosBase network <> "/submittx", method: "POST", headers: koiosCborHeaders credential, body: Just { encoding: "cbor-hex", value: signedCborHex } }
 
 contextFirstRequest :: Provider -> Network -> String -> HttpRequest
 contextFirstRequest provider network credential = case provider of
@@ -221,9 +290,15 @@ koiosBase = case _ of
   Preview -> "https://preview.koios.rest/api/v1"
 
 koiosHeaders :: String -> Array { name :: String, value :: String }
-koiosHeaders credential =
-  if credential == "" then [ { name: "Content-Type", value: "application/json" } ]
-  else [ { name: "Content-Type", value: "application/json" }, { name: "Authorization", value: "Bearer " <> credential } ]
+koiosHeaders = koiosHeadersFor "application/json"
+
+koiosCborHeaders :: String -> Array { name :: String, value :: String }
+koiosCborHeaders = koiosHeadersFor "application/cbor"
+
+koiosHeadersFor :: String -> String -> Array { name :: String, value :: String }
+koiosHeadersFor contentType credential =
+  if credential == "" then [ { name: "Content-Type", value: contentType } ]
+  else [ { name: "Content-Type", value: contentType }, { name: "Authorization", value: "Bearer " <> credential } ]
 
 resolutionProvider :: Provider -> String
 resolutionProvider = case _ of
@@ -248,6 +323,14 @@ redactCredential credential detail
   | credential == "" = detail
   | otherwise = String.replaceAll (String.Pattern credential) (String.Replacement "[redacted]") detail
 
+redactProviderError :: String -> ProviderError -> ProviderError
+redactProviderError credential = case _ of
+  AuthenticationError provider operation status detail -> AuthenticationError provider operation status (redactCredential credential detail)
+  RateLimitError provider operation status detail -> RateLimitError provider operation status (redactCredential credential detail)
+  ServerError provider operation status detail -> ServerError provider operation status (redactCredential credential detail)
+  TransportError provider operation detail -> TransportError provider operation (redactCredential credential detail)
+  DecodeError provider operation status detail -> DecodeError provider operation status (redactCredential credential detail)
+
 throwProviderError :: String -> ProviderError -> Aff String
 throwProviderError credential err =
   throwError (error ("[" <> providerNodeErrorCode err <> "] " <> redactCredential credential (renderProviderError err)))
@@ -258,7 +341,10 @@ unwrap = case _ of
   Right value -> pure value
 
 foreign import fetchHttpResponse :: HttpRequest -> Effect (Promise HttpResponse)
+foreign import isValidCborHex :: String -> Boolean
+foreign import cborHexBodyByteValues :: HttpBody -> Array Int
 foreign import decodeTxCbor :: String -> { ok :: Boolean, value :: String, error :: String }
+foreign import decodeSubmissionReceipt :: String -> { ok :: Boolean, txId :: String, error :: String }
 foreign import decodeValidationContext :: String -> String -> String -> String -> { ok :: Boolean, network :: String, slot :: String, epoch :: String, protocolParameters :: String, source :: String, error :: String }
 foreign import encodeValidationContext :: ValidationContext -> String
 foreign import resolveProducerTxContextImpl :: String -> String -> String -> (String -> Effect (Promise String)) -> Effect (Promise String) -> Boolean -> Boolean -> Effect (Promise String)

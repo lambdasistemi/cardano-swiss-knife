@@ -3,6 +3,7 @@ module Test.Provider (runProviderContractTests) where
 import Prelude
 
 import Cardano.Provider as Provider
+import Cardano.Transaction.Entry as Entry
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Data.String as String
@@ -11,6 +12,7 @@ import Data.Traversable (traverse_)
 import Effect.Aff (Aff)
 import Effect.Class (liftEffect)
 import Effect.Exception (throw)
+import Effect.Ref as Ref
 
 runProviderContractTests :: Aff Unit
 runProviderContractTests = do
@@ -20,7 +22,7 @@ runProviderContractTests = do
     "{\"cbor\":\"deadbeef\"}"
   assertTxSuccess Provider.Koios Provider.Preprod ""
     "https://preprod.koios.rest/api/v1/tx_cbor"
-    { method: "POST", headers: [ { name: "Content-Type", value: "application/json" } ], body: Just "{\"_tx_hashes\":[\"tx-hash\"]}" }
+    { method: "POST", headers: [ { name: "Content-Type", value: "application/json" } ], body: Just { encoding: "text", value: "{\"_tx_hashes\":[\"tx-hash\"]}" } }
     "[{\"cbor\":\"deadbeef\"}]"
   assertContextSuccess Provider.Blockfrost Provider.Preprod "blockfrost-key" "testnet"
   assertContextSuccess Provider.Koios Provider.Preview "koios-token" "testnet"
@@ -30,6 +32,154 @@ runProviderContractTests = do
   assertFailures Provider.Blockfrost Provider.Mainnet "blockfrost-key"
   assertFailures Provider.Koios Provider.Mainnet ""
   assertProducerContextOutcomes
+  assertSubmitRoutes
+  assertSubmitRejectsIneligibleEntries
+  assertSubmitRejectsMalformedInputAndReceipts
+
+submissionId :: String
+submissionId = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
+completeEntry :: Entry.TxEntry
+completeEntry =
+  { entryId: "entry-1"
+  , unsignedTxCborHex: "deadbeef"
+  , requiredSigners: [ "alice", "bob" ]
+  , collectedWitnesses:
+      [ { signerId: "alice", witnessCborHex: "a1" }
+      , { signerId: "bob", witnessCborHex: "b2" }
+      ]
+  , invalidAfterSlot: 100
+  , status: Entry.Open
+  }
+
+assertSubmitRoutes :: Aff Unit
+assertSubmitRoutes = do
+  if Provider.cborHexBodyByteValues { encoding: "cbor-hex", value: "deadbeef" } == [ 222, 173, 190, 239 ] then pure unit
+  else fail "submission CBOR hex did not decode to the expected bytes"
+  assertSubmitSuccess Provider.Blockfrost Provider.Mainnet "blockfrost-key"
+    "https://cardano-mainnet.blockfrost.io/api/v0/tx/submit"
+    [ { name: "project_id", value: "blockfrost-key" }, { name: "Content-Type", value: "application/cbor" } ]
+    200
+  assertSubmitSuccess Provider.Blockfrost Provider.Preprod "blockfrost-key"
+    "https://cardano-preprod.blockfrost.io/api/v0/tx/submit"
+    [ { name: "project_id", value: "blockfrost-key" }, { name: "Content-Type", value: "application/cbor" } ]
+    200
+  assertSubmitSuccess Provider.Blockfrost Provider.Preview "blockfrost-key"
+    "https://cardano-preview.blockfrost.io/api/v0/tx/submit"
+    [ { name: "project_id", value: "blockfrost-key" }, { name: "Content-Type", value: "application/cbor" } ]
+    200
+  assertSubmitSuccess Provider.Koios Provider.Mainnet "koios-token"
+    "https://api.koios.rest/api/v1/submittx"
+    [ { name: "Content-Type", value: "application/cbor" }, { name: "Authorization", value: "Bearer koios-token" } ]
+    202
+  assertSubmitSuccess Provider.Koios Provider.Preprod ""
+    "https://preprod.koios.rest/api/v1/submittx"
+    [ { name: "Content-Type", value: "application/cbor" } ]
+    202
+  assertSubmitSuccess Provider.Koios Provider.Preview "koios-token"
+    "https://preview.koios.rest/api/v1/submittx"
+    [ { name: "Content-Type", value: "application/cbor" }, { name: "Authorization", value: "Bearer koios-token" } ]
+    202
+
+assertSubmitSuccess
+  :: Provider.Provider
+  -> Provider.Network
+  -> String
+  -> String
+  -> Array { name :: String, value :: String }
+  -> Int
+  -> Aff Unit
+assertSubmitSuccess provider network credential expectedUrl expectedHeaders responseStatus = do
+  result <- Provider.submitTxEntryWith
+    (singleResponse expectedUrl { method: "POST", headers: expectedHeaders, body: Just { encoding: "cbor-hex", value: "deadbeef" } } (status responseStatus ("\"" <> submissionId <> "\"")))
+    provider
+    network
+    credential
+    10
+    "deadbeef"
+    completeEntry
+  case result of
+    Right receipt
+      | receipt.txId == submissionId
+          && receipt.provider == provider
+          && receipt.network == network
+          && receipt.entry == (completeEntry { status = Entry.Submitted }) -> pure unit
+    Right _ -> fail (Provider.providerName provider <> " submit receipt decoded unexpectedly")
+    Left err -> fail (Provider.renderSubmissionError err)
+
+assertSubmitRejectsIneligibleEntries :: Aff Unit
+assertSubmitRejectsIneligibleEntries = do
+  assertSubmitRejectedBeforeTransport "incomplete" "entry-incomplete" (completeEntry { collectedWitnesses = [ { signerId: "alice", witnessCborHex: "a1" } ] }) 10
+  assertSubmitRejectedBeforeTransport "expired" "entry-expired" completeEntry 100
+  assertSubmitRejectedBeforeTransport "submitted" "entry-submitted" (completeEntry { status = Entry.Submitted }) 10
+
+assertSubmitRejectedBeforeTransport :: String -> String -> Entry.TxEntry -> Int -> Aff Unit
+assertSubmitRejectedBeforeTransport label expectedCategory entry currentSlot = do
+  calls <- liftEffect (Ref.new 0)
+  result <- Provider.submitTxEntryWith
+    (countingTransport calls)
+    Provider.Blockfrost
+    Provider.Mainnet
+    "blockfrost-key"
+    currentSlot
+    "deadbeef"
+    entry
+  callCount <- liftEffect (Ref.read calls)
+  case result of
+    Left err
+      | Provider.submissionErrorCategory err == expectedCategory
+          && callCount == 0 -> pure unit
+    Left err -> fail (label <> " entry returned " <> Provider.submissionErrorCategory err <> " or invoked transport " <> show callCount <> " times")
+    Right _ -> fail (label <> " entry submitted unexpectedly")
+
+assertSubmitRejectsMalformedInputAndReceipts :: Aff Unit
+assertSubmitRejectsMalformedInputAndReceipts = do
+  assertSubmitInvalidCborRejectedBeforeTransport "invalid hex" "abc"
+  assertSubmitInvalidCborRejectedBeforeTransport "empty CBOR" ""
+  assertSubmitFailure "rejection" "provider-decode" "deadbeef" (status 400 "rejected blockfrost-key") "blockfrost-key"
+  assertSubmitFailure "malformed json" "invalid-provider-receipt" "deadbeef" (success "not-json") "blockfrost-key"
+  assertSubmitFailure "invalid id" "invalid-provider-receipt" "deadbeef" (success "\"not-a-transaction-id\"") "blockfrost-key"
+
+assertSubmitInvalidCborRejectedBeforeTransport :: String -> String -> Aff Unit
+assertSubmitInvalidCborRejectedBeforeTransport label signedCborHex = do
+  calls <- liftEffect (Ref.new 0)
+  result <- Provider.submitTxEntryWith
+    (countingTransport calls)
+    Provider.Blockfrost
+    Provider.Mainnet
+    "blockfrost-key"
+    10
+    signedCborHex
+    completeEntry
+  callCount <- liftEffect (Ref.read calls)
+  case result of
+    Left err
+      | Provider.submissionErrorCategory err == "invalid-cbor-hex"
+          && callCount == 0 -> pure unit
+    Left err -> fail (label <> " returned " <> Provider.submissionErrorCategory err <> " or invoked transport " <> show callCount <> " times")
+    Right _ -> fail (label <> " submit unexpectedly succeeded")
+
+countingTransport :: Ref.Ref Int -> Provider.Transport
+countingTransport calls _ = do
+  liftEffect (Ref.modify_ (_ + 1) calls)
+  pure (Left "transport invoked")
+
+assertSubmitFailure :: String -> String -> String -> Either String Provider.HttpResponse -> String -> Aff Unit
+assertSubmitFailure label expectedCategory signedCborHex response credential = do
+  result <- Provider.submitTxEntryWith
+    (\_ -> pure response)
+    Provider.Blockfrost
+    Provider.Mainnet
+    credential
+    10
+    signedCborHex
+    completeEntry
+  case result of
+    Left err
+      | Provider.submissionErrorCategory err == expectedCategory
+          && not (StringCodeUnits.contains (String.Pattern credential) (Provider.renderSubmissionError err)) -> pure unit
+    Left err -> fail (label <> " submit error returned " <> Provider.submissionErrorCategory err <> " instead of " <> expectedCategory <> " or leaked credential")
+    Right _ -> fail (label <> " submit unexpectedly succeeded")
 
 assertProducerContextOutcomes :: Aff Unit
 assertProducerContextOutcomes = do
@@ -89,7 +239,7 @@ assertTxSuccess
   -> Provider.Network
   -> String
   -> String
-  -> { method :: String, headers :: Array { name :: String, value :: String }, body :: Maybe String }
+  -> { method :: String, headers :: Array { name :: String, value :: String }, body :: Maybe Provider.HttpBody }
   -> String
   -> Aff Unit
 assertTxSuccess provider network credential expectedUrl expectedRequest responseBody = do
@@ -154,7 +304,7 @@ assertFailure provider network credential label response expectedCategory = do
 
 singleResponse
   :: String
-  -> { method :: String, headers :: Array { name :: String, value :: String }, body :: Maybe String }
+  -> { method :: String, headers :: Array { name :: String, value :: String }, body :: Maybe Provider.HttpBody }
   -> Either String Provider.HttpResponse
   -> Provider.Transport
 singleResponse expectedUrl expected response request

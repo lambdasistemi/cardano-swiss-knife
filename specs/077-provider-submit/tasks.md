@@ -24,21 +24,21 @@ explicit workbench adapters.
 **Goal**: Deliver provider-neutral binary submission, completed-entry gating,
 and typed receipts/errors solely in the canonical shared provider module.
 
-- [ ] T774 [US1] Add RED tests for exact Blockfrost submit endpoint, method,
+- [X] T774 [US1] Add RED tests for exact Blockfrost submit endpoint, method,
   project-id/content-type headers, signed-CBOR body, HTTP 200 receipt, and all
   network bases.
-- [ ] T775 [US1] Add RED tests for exact Koios `/submittx`, existing optional
+- [X] T775 [US1] Add RED tests for exact Koios `/submittx`, existing optional
   bearer policy, CBOR content type/body, HTTP 202 receipt, and all networks.
-- [ ] T776 [US1] Add RED tests proving #75-derived incomplete, expired, and
+- [X] T776 [US1] Add RED tests proving #75-derived incomplete, expired, and
   submitted states return deterministic errors with zero transport calls.
-- [ ] T777 [US1] Add RED tests for malformed CBOR hex, provider rejection,
+- [X] T777 [US1] Add RED tests for malformed CBOR hex, provider rejection,
   malformed JSON, invalid transaction id, and credential redaction.
-- [ ] T778 [US1] Implement the production/injectable submit functions,
+- [X] T778 [US1] Implement the production/injectable submit functions,
   provider request mapping, binary fetch body, typed errors, and receipt with
   submitted entry by consuming existing provider and TxEntry policy.
-- [ ] T779 [US1] Prove no endpoint/auth duplication, no manifest/engine/domain
+- [X] T779 [US1] Prove no endpoint/auth duplication, no manifest/engine/domain
   expansion, and no host-side CBOR or ledger semantic fallback.
-- [ ] T780 Obtain navigator RED/GREEN approval, run the focused shared test and
+- [X] T780 Obtain navigator RED/GREEN approval, run the focused shared test and
   `./gate.sh`, and commit exactly once with
   `Tasks: T774, T775, T776, T777, T778, T779, T780`.
 
