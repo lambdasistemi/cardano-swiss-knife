@@ -14,6 +14,6 @@ pkgs.runCommand "cardano-swiss-knife-node-api-check" {
   cp ${repoRoot}/docs/inspector/tests/fixtures/treasury-reorganize-unsigned-tx.hex work/fixtures/conway-mainnet-tx.hex
   cd work
   bash ${repoRoot}/scripts/check-architecture-boundary.sh ${repoRoot}
-  CSK_PACKAGE_TARBALL="$(echo ${nodePackage}/*.tgz)" node --test node/test/api.test.mjs node/test/cli.test.mjs node/test/transaction-api.test.mjs node/test/transaction-provider.test.mjs node/test/transaction-books.test.mjs node/test/transaction-ledger.test.mjs
+  CSK_PACKAGE_TARBALL="$(echo ${nodePackage}/*.tgz)" node --test node/test/api.test.mjs node/test/cli.test.mjs node/test/transaction-api.test.mjs node/test/transaction-provider.test.mjs node/test/transaction-books.test.mjs node/test/transaction-ledger.test.mjs node/test/transaction-witness.test.mjs
   mkdir -p $out
 ''

@@ -143,6 +143,7 @@ through Node.
 - `docs/inspector/src/TxSigning.purs`
 - `docs/inspector/src/TxSigning.js`
 - `docs/inspector/src/Main.purs`
+- `node/src/transaction-engine.js` (authorized by parent A-003; allowlist only)
 - `node/src/index.js`
 - `node/test/transaction-witness.test.mjs`
 - `node/test/fixtures/transaction-witnesses.json`

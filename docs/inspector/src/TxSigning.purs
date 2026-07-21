@@ -7,25 +7,14 @@ module TxSigning
 
 import Prelude
 
-import Cardano.Address.Bech32 as Bech32
-import Cardano.Address.Hash as Hash
-import Cardano.Address.Hex as Hex
-import Cardano.Address.Signing as Signing
-import Cardano.Bytes (byteLength)
+import Cardano.Transaction.Witness as Witness
 import Data.Array as Array
-import Data.ArrayBuffer.Types (Uint8Array)
 import Data.Either (Either(..))
 import Data.String (joinWith)
 import Effect.Aff (Aff)
 import FFI.Inspector as Inspector
 
-type DetachedWitness =
-  { bodyHashHex :: String
-  , verificationKeyBech32 :: String
-  , signerHashHex :: String
-  , signatureHex :: String
-  , vkeyWitnessCborHex :: String
-  }
+type DetachedWitness = Witness.DetachedWitness
 
 type WitnessMaterial =
   { bodyHashHex :: String
@@ -52,47 +41,13 @@ type WitnessAttachment =
   , warnings :: Array String
   }
 
-foreign import xpubPublicKeyBytesImpl :: Uint8Array -> Uint8Array
-
-foreign import vkeyWitnessCborHexImpl :: Uint8Array -> Uint8Array -> String
-
 foreign import operationWitnessAttachmentImpl :: String -> WitnessAttachment
 
 prepareWitness :: String -> String -> Aff (Either String DetachedWitness)
-prepareWitness bodyHashHex signingKeyBech32 = do
-  result <- Signing.signPayload Signing.PayloadHex bodyHashHex signingKeyBech32
-  case result of
-    Left err ->
-      pure (Left err)
-    Right signed ->
-      case Bech32.decode signed.verificationKeyBech32 of
-        Left err ->
-          pure (Left err)
-        Right decoded ->
-          if byteLength decoded.bytes /= 64 then
-            pure (Left "Expected an extended verification key with 64 bytes.")
-          else
-            let
-              publicKeyBytes = xpubPublicKeyBytesImpl decoded.bytes
-              signerHashHex = Hash.hashCredentialHex publicKeyBytes
-              vkeyWitnessCborHex = vkeyWitnessCborHexImpl publicKeyBytes
-            in
-              case Hex.fromHex signed.signatureHex of
-                Left err ->
-                  pure (Left err)
-                Right signatureBytes ->
-                  pure
-                    ( Right
-                        { bodyHashHex
-                        , verificationKeyBech32: signed.verificationKeyBech32
-                        , signerHashHex
-                        , signatureHex: signed.signatureHex
-                        , vkeyWitnessCborHex: vkeyWitnessCborHex signatureBytes
-                        }
-                    )
+prepareWitness = Witness.prepareWitness
 
-attachWitness :: String -> DetachedWitness -> Aff (Either String WitnessMaterial)
-attachWitness txCborHex detached = do
+attachWitness :: String -> DetachedWitness -> String -> Aff (Either String WitnessMaterial)
+attachWitness txCborHex detached expectedAction = do
   attachResult <- Inspector.runLedgerOperation
     txCborHex
     "tx.witness.attach"
@@ -127,6 +82,8 @@ attachWitness txCborHex detached = do
           Left "Failed to patch transaction CBOR: Ledger witness attachment did not return signed transaction CBOR."
       | attachment.witnessPatchAction == "" ->
           Left "Failed to patch transaction CBOR: Ledger witness attachment did not report patch action."
+      | attachment.witnessPatchAction /= expectedAction ->
+          Left "Failed to patch transaction CBOR: Ledger witness attachment action did not match the signer safety policy."
       | otherwise ->
           Right
             { bodyHashHex: detached.bodyHashHex
