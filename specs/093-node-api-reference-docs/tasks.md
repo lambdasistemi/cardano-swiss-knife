@@ -39,6 +39,6 @@ Audit all task/commit links, rerun the final gate, update PR #94 to the delivere
 
 ## Dependencies and forbidden scope
 
-- Slices run strictly S1 → S2 → S3; Q-001 blocks S3 only.
+- Slices run strictly S1 → S2 → S3; Q-001 is resolved with `node/test/api-properties.test.mjs` as the canonical cross-link target.
 - Workers must not edit `specs/093-node-api-reference-docs/`, `gate.sh`, PR metadata, `node/test/` property files owned by csk-92, or any sibling worktree.
 - Reordering exports, changing runtime behavior, or restructuring `node/src/index.js` requires a parent Q-file before work continues.

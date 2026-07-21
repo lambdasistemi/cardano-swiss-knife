@@ -29,7 +29,7 @@ As a consumer of `@lambdasistemi/cardano-swiss-knife`, I can discover the comple
 - **FR-007**: TypeDoc Markdown generation is deterministic from checked-in sources and never requires committed generated output.
 - **FR-008**: The existing `ci-node-api` check runs facade drift, JSDoc lint, and TypeDoc generation in addition to existing Node tests; GitHub Actions invokes this merge-blocking check explicitly.
 - **FR-009**: Every existing docs build path generates API Markdown before `mkdocs build --strict`: the main CI build, PR preview, Pages publication, and the local `just build-docs` workflow.
-- **FR-010**: The reference docs link to #92's repository-relative property-suite source path once the epic owner confirms it through Q-001.
+- **FR-010**: The reference docs link to #92's canonical repository-relative property-suite source at `node/test/api-properties.test.mjs`, as authorized through Q-001.
 
 ## Non-goals
 
@@ -50,4 +50,4 @@ As a consumer of `@lambdasistemi/cardano-swiss-knife`, I can discover the comple
 
 - The public package surface is `node/src/index.js` plus the re-exported `CskError` definition; exports used only by sibling implementation modules or CLI adapters remain internal.
 - The existing all-PR workflow is stricter than a path-filtered job and satisfies the requirement that Node-source changes always build docs.
-- The exact #92 property-suite link target is parent-bound in Q-001 and must be resolved before Slice 3.
+- Q-001 resolved the #92 property-suite link target as `node/test/api-properties.test.mjs`; the epic owner has directed csk-92 to converge on that filename.
