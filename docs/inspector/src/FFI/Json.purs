@@ -14,6 +14,8 @@ module FFI.Json
   , MintRow
   , OutputRow
   , RdfGraph
+  , ScriptEvaluation
+  , ScriptRedeemer
   , Validation
   , WitnessPlan
   , WitnessPlanRow
@@ -27,6 +29,7 @@ module FFI.Json
   , operationValidation
   , operationWitnessPlan
   , operationRdfGraph
+  , operationScriptEvaluation
   , operationArgsMerged
   , providerResolutionErrorArgs
   , operationArgsWithPath
@@ -54,6 +57,7 @@ foreign import operationIdentificationImpl :: String -> Identification
 foreign import operationValidationImpl :: String -> Validation
 foreign import operationWitnessPlanImpl :: String -> WitnessPlan
 foreign import operationRdfGraphImpl :: String -> RdfGraph
+foreign import operationScriptEvaluationImpl :: String -> ScriptEvaluation
 foreign import operationArgsMergedImpl :: String -> String -> String
 foreign import providerResolutionErrorArgsImpl :: String -> String -> String
 foreign import operationArgsWithPathImpl :: String -> String -> String
@@ -215,6 +219,26 @@ type Validation =
   , sections :: Array WitnessPlanSection
   }
 
+type ScriptRedeemer =
+  { purpose :: String
+  , index :: String
+  , status :: String
+  , declaredExUnits :: String
+  , evaluatedExUnits :: String
+  , failureCode :: String
+  , failureMessage :: String
+  , missingContext :: Array String
+  }
+
+type ScriptEvaluation =
+  { valid :: Boolean
+  , title :: String
+  , subtitle :: String
+  , status :: String
+  , redeemers :: Array ScriptRedeemer
+  , missingContext :: Array String
+  }
+
 type RdfGraph =
   { valid :: Boolean
   , format :: String
@@ -249,6 +273,9 @@ operationWitnessPlan = operationWitnessPlanImpl
 
 operationRdfGraph :: String -> RdfGraph
 operationRdfGraph = operationRdfGraphImpl
+
+operationScriptEvaluation :: String -> ScriptEvaluation
+operationScriptEvaluation = operationScriptEvaluationImpl
 
 operationArgsMerged :: String -> String -> String
 operationArgsMerged = operationArgsMergedImpl

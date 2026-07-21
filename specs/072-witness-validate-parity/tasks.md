@@ -22,12 +22,12 @@
 
 ## Slice 3 — WebUI validation and script-evaluation parity
 
-- [ ] T015-S3 Add RED browser fixtures for `valid | invalid | incomplete | rejected`, script success/failure/incomplete/not-applicable, per-redeemer units/failures, and engine load/protocol failure.
-- [ ] T016-S3 Route WebUI witness plan, validation, script evaluation, and attachment through the shared transaction capability rather than operation-specific host policy.
-- [ ] T017-S3 Render truthful validation and per-redeemer script-evaluation states while preserving missing-context and typed failure distinctions.
-- [ ] T018-S3 Preserve the portable-vault/in-memory signing lifecycle and prove insertion, replacement refusal, and explicit replacement behavior in the browser journey.
-- [ ] T019-S3 Run `nix build .#tx-inspector-ui --no-link`, `nix run .#ci-inspector-playwright`, and `./gate.sh`.
-- [ ] T020-S3 Commit exactly `feat(inspector): render shared ledger operations` with `Tasks: T015, T016, T017, T018, T019, T020`.
+- [X] T015-S3 Add RED browser fixtures for `valid | invalid | incomplete | rejected`, script success/failure/incomplete/not-applicable, per-redeemer units/failures, and engine load/protocol failure.
+- [X] T016-S3 Route WebUI witness plan, validation, script evaluation, and attachment through the shared transaction capability rather than operation-specific host policy.
+- [X] T017-S3 Render truthful validation and per-redeemer script-evaluation states while preserving missing-context and typed failure distinctions.
+- [X] T018-S3 Preserve the portable-vault/in-memory signing lifecycle and prove insertion, replacement refusal, and explicit replacement behavior in the browser journey.
+- [X] T019-S3 Run `nix build .#tx-inspector-ui --no-link`, `nix run .#ci-inspector-playwright`, and `./gate.sh`.
+- [X] T020-S3 Commit exactly `feat(inspector): render shared ledger operations` with `Tasks: T015, T016, T017, T018, T019, T020`.
 
 ## Slice 4 — CLI commands and installed cross-host proof
 

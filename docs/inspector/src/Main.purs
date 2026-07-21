@@ -3,6 +3,7 @@ module Main (main) where
 import Prelude
 
 import Cardano.BookableIdentifier (isBookableIdentifierKind)
+import Cardano.Transaction.Ledger as Ledger
 import Cardano.Transaction.Witness as Witness
 import Cardano.Offline.Key as Bootstrap
 import Cardano.Offline.Key as Derivation
@@ -31,7 +32,7 @@ import FFI.Blockfrost (Network(..), networkName)
 import FFI.BookStore as BookStore
 import FFI.Clipboard (copy) as Clipboard
 import FFI.Inspector (InspectorResult, runLedgerOperation)
-import FFI.Json (Browser, Identification, IntentSummary, MetadataValue(..), RdfGraph, Validation, WitnessPlan, inspect, operationArgsMerged, operationArgsWithPath, operationBrowser, operationIdentification, operationInspection, operationIntentSummary, operationRdfGraph, operationValidation, operationWitnessPlan, pretty, providerResolutionErrorArgs) as Json
+import FFI.Json (Browser, Identification, IntentSummary, MetadataValue(..), RdfGraph, ScriptEvaluation, Validation, WitnessPlan, inspect, operationArgsMerged, operationArgsWithPath, operationBrowser, operationIdentification, operationInspection, operationIntentSummary, operationRdfGraph, operationScriptEvaluation, operationValidation, operationWitnessPlan, pretty, providerResolutionErrorArgs) as Json
 import FFI.OverlayBook as OverlayBook
 import FFI.RdfShapes as RdfShapes
 import FFI.Storage as Storage
@@ -198,7 +199,11 @@ type State =
   , showTxSigningKey :: Boolean
   , txSigningRunning :: Boolean
   , txSigningResult :: Maybe (Either String TxSigning.WitnessMaterial)
+  , replaceExistingWitness :: Boolean
   , validation :: Maybe Json.Validation
+  , validationError :: Maybe String
+  , scriptEvaluation :: Maybe Json.ScriptEvaluation
+  , scriptEvaluationError :: Maybe String
   , rdf :: Maybe Json.RdfGraph
   , sparqlLens :: Maybe SparqlLens
   , resolvedLabelsLens :: Maybe ResolvedLabelsLens
@@ -453,6 +458,7 @@ data Action
   | PopVaultEntryInProvider String
   | SetTxSigningKey String
   | ToggleTxSigningKey
+  | ToggleReplaceExistingWitness
   | RunTxSign
   | DeleteVaultEntry String
   | Navigate Route MouseEvent
@@ -486,7 +492,11 @@ inspectorComponent initial =
         , showTxSigningKey: false
         , txSigningRunning: false
         , txSigningResult: Nothing
+        , replaceExistingWitness: false
         , validation: Nothing
+        , validationError: Nothing
+        , scriptEvaluation: Nothing
+        , scriptEvaluationError: Nothing
         , rdf: Nothing
         , sparqlLens: Nothing
         , resolvedLabelsLens: Nothing
@@ -3423,6 +3433,15 @@ inspectorComponent initial =
       , HH.div [ classNames [ "key-actions" ] ]
           [ keyButton false (if state.showTxSigningKey then "Hide signing key" else "Show signing key") ToggleTxSigningKey ]
       , HH.label [ classNames [ "key-field" ] ]
+          [ HH.input
+              [ HP.type_ HP.InputCheckbox
+              , HP.checked state.replaceExistingWitness
+              , HH.attr (HH.AttrName "aria-label") "Replace existing witness"
+              , HE.onClick (\_ -> ToggleReplaceExistingWitness)
+              ]
+          , HH.span [ classNames [ "field-label" ] ] [ HH.text "Replace existing witness" ]
+          ]
+      , HH.label [ classNames [ "key-field" ] ]
           [ HH.span [ classNames [ "field-label" ] ] [ HH.text "Transaction signing key" ]
           , HH.input
               [ HP.type_ (if state.showTxSigningKey then HP.InputText else HP.InputPassword)
@@ -3464,7 +3483,9 @@ inspectorComponent initial =
           Just (Right result) ->
             HH.div [ classNames [ "tx-signing-result" ] ]
               [ HH.div [ classNames [ "signer-match-status" ] ]
-                  [ HH.text "Matches a missing required signer" ]
+                  [ HH.text
+                      (if result.witnessPatchAction == "replaced" then "Replaced existing witness" else "Matches a missing required signer")
+                  ]
               , HH.div [ classNames [ "signing-output-grid" ] ]
                   [ renderSigningOutput "Body hash" result.bodyHashHex
                   , renderSigningOutput "Verification key" result.verificationKeyBech32
@@ -3566,11 +3587,19 @@ inspectorComponent initial =
       Nothing -> []
 
   renderValidationMaybe state =
-    case state.validation of
-      Just validation ->
-        if validation.valid then [ renderValidation state validation ]
-        else []
-      Nothing -> []
+    case state.validationError of
+      Just err ->
+        [ HH.div
+            [ classNames [ "ledger-validation-error", "witness-warnings" ]
+            , HH.attr (HH.AttrName "role") "alert"
+            ]
+            [ HH.strong_ [ HH.text "Ledger validation failed" ], HH.p_ [ HH.text err ] ]
+        , renderScriptEvaluation state
+        ]
+      Nothing ->
+        case state.validation of
+          Just validation | validation.valid -> [ renderValidation state validation, renderScriptEvaluation state ]
+          _ -> []
 
   renderRdfMaybe state exitOk =
     case state.rdf of
@@ -3896,9 +3925,12 @@ inspectorComponent initial =
         else if conforms then ValidationPass
         else ValidationFail
       title =
-        if not validation.complete then "Validation incomplete"
-        else if conforms then "Validation passed"
-        else "Validation needs attention"
+        case validation.status of
+          "incomplete" -> "Validation incomplete"
+          "invalid" -> "Validation invalid"
+          "rejected" -> "Validation rejected"
+          "valid" -> if conforms then "Validation passed" else "Validation needs attention"
+          _ -> "Ledger validation " <> validation.status
       detail = validationTallyText counts
     in
       HH.div
@@ -3906,15 +3938,77 @@ inspectorComponent initial =
             [ "validation-verdict-banner"
             , "validation-verdict-banner--" <> validationToneClass tone
             ]
+        , HH.attr (HH.AttrName "data-ledger-validation-status") validation.status
         ]
         [ HH.element (HH.ElemName "md-icon")
             [ classNames [ "validation-verdict-icon" ] ]
             [ HH.text (validationToneIcon tone) ]
         , HH.div_
             [ HH.strong_ [ HH.text title ]
+            , HH.span [ classNames [ "ledger-validation-status" ] ] [ HH.text validation.status ]
             , HH.p_ [ HH.text detail ]
             ]
         ]
+
+  renderScriptEvaluation state =
+    case state.scriptEvaluationError of
+      Just err ->
+        HH.div
+          [ classNames [ "script-evaluation-error", "witness-warnings" ]
+          , HH.attr (HH.AttrName "role") "alert"
+          ]
+          [ HH.strong_ [ HH.text "Script evaluation failed" ]
+          , HH.p_ [ HH.text err ]
+          ]
+      Nothing ->
+        case state.scriptEvaluation of
+          Nothing -> HH.text ""
+          Just evaluation ->
+            HH.div
+              [ classNames [ "identity-panel", "script-evaluation-panel" ]
+              , HH.attr (HH.AttrName "data-script-evaluation-status") evaluation.status
+              ]
+              [ HH.div [ classNames [ "identity-heading" ] ]
+                  [ HH.div_
+                      [ HH.h3_ [ HH.text evaluation.title ]
+                      , HH.p_ [ HH.text evaluation.subtitle ]
+                      ]
+                  , HH.span [ classNames [ "li-chip", "script-evaluation-status" ] ] [ HH.text evaluation.status ]
+                  ]
+              , if evaluation.status == "not_applicable" then
+                  HH.p_ [ HH.text "No scripts apply to this transaction." ]
+                else HH.text ""
+              , HH.div_ (map renderScriptRedeemer evaluation.redeemers)
+              , renderScriptEvaluationMissingContext evaluation.missingContext
+              ]
+
+  renderScriptRedeemer redeemer =
+    HH.div [ classNames [ "identity-row", "script-redeemer-row" ] ]
+      ( [ HH.div [ classNames [ "validation-row-body" ] ]
+            [ HH.strong_ [ HH.text ("purpose " <> redeemer.purpose) ]
+            , HH.p_ [ HH.text ("index " <> redeemer.index <> " / status " <> redeemer.status) ]
+            ]
+        ]
+          <> renderScriptEvaluationDetail "declared" redeemer.declaredExUnits
+          <> renderScriptEvaluationDetail "evaluated" redeemer.evaluatedExUnits
+          <> renderScriptEvaluationDetail "failure" (scriptRedeemerFailure redeemer)
+          <> Array.concatMap (renderScriptEvaluationDetail "missing context") redeemer.missingContext
+      )
+
+  scriptRedeemerFailure redeemer =
+    if redeemer.failureCode == "" then redeemer.failureMessage
+    else if redeemer.failureMessage == "" then redeemer.failureCode
+    else redeemer.failureCode <> " / " <> redeemer.failureMessage
+
+  renderScriptEvaluationDetail label value =
+    if value == "" then []
+    else [ HH.p_ [ HH.text (label <> " " <> value) ] ]
+
+  renderScriptEvaluationMissingContext missingContext =
+    if Array.null missingContext then HH.text ""
+    else
+      HH.div [ classNames [ "witness-warnings" ] ]
+        (Array.cons (HH.strong_ [ HH.text "Missing script-evaluation context" ]) (map (\detail -> HH.p_ [ HH.text detail ]) missingContext))
 
   renderValidationContextNotice contextErrors =
     if Array.null contextErrors then
@@ -5436,6 +5530,8 @@ inspectorComponent initial =
       H.modify_ _ { txSigningKeyInput = value, txSigningResult = Nothing }
     ToggleTxSigningKey ->
       H.modify_ \state -> state { showTxSigningKey = not state.showTxSigningKey }
+    ToggleReplaceExistingWitness ->
+      H.modify_ \state -> state { replaceExistingWitness = not state.replaceExistingWitness, txSigningResult = Nothing }
     RunTxSign -> do
       state <- H.get
       if state.running then
@@ -5469,7 +5565,7 @@ inspectorComponent initial =
                           Witness.attachmentSafety
                             (witnessPlanHasSigner "Missing declared signers" detached.signerHashHex witnessPlan)
                             (witnessPlanHasSigner "Present vkey witnesses" detached.signerHashHex witnessPlan)
-                            false
+                            state.replaceExistingWitness
                           of
                           Left err ->
                             H.modify_ _
@@ -5477,7 +5573,7 @@ inspectorComponent initial =
                               , txSigningResult = Just (Left err)
                               }
                           Right expectedAction -> do
-                            attached <- H.liftAff (TxSigning.attachWitness txCbor detached expectedAction)
+                            attached <- H.liftAff (TxSigning.attachWitness txCbor detached expectedAction state.replaceExistingWitness)
                             H.modify_ _ { txSigningRunning = false, txSigningResult = Just attached }
     SetAddressInput value ->
       H.modify_ _ { addressInput = value, addressResult = Nothing }
@@ -5827,7 +5923,11 @@ inspectorComponent initial =
           , witnessPlan = Nothing
           , txSigningRunning = false
           , txSigningResult = Nothing
+          , replaceExistingWitness = false
           , validation = Nothing
+          , validationError = Nothing
+          , scriptEvaluation = Nothing
+          , scriptEvaluationError = Nothing
           , rdf = Nothing
           , sparqlLens = Nothing
           , resolvedLabelsLens = Nothing
@@ -5897,8 +5997,9 @@ inspectorComponent initial =
             else pure "{}"
           identifyResult <- H.liftAff (runLedgerOperation h "tx.identify" inputContextArgs)
           intentResult <- H.liftAff (runLedgerOperation h "tx.intent" inputContextArgs)
-          witnessPlanResult <- H.liftAff (runLedgerOperation h "tx.witness.plan" inputContextArgs)
-          validationResult <- H.liftAff (runLedgerOperation h "tx.validate" inputContextArgs)
+          witnessPlanResult <- H.liftAff (runLedgerOperation h Ledger.planTransactionWitnessesOperation inputContextArgs)
+          validationResult <- H.liftAff (runLedgerOperation h Ledger.validateTransactionOperation inputContextArgs)
+          scriptEvaluationResult <- H.liftAff (runLedgerOperation h Ledger.evaluateTransactionScriptsOperation inputContextArgs)
           let rdfArgs = Json.operationArgsMerged inputContextArgs (selectedBlueprintArgs st)
           rdfResult <- H.liftAff (runLedgerOperation h "tx.rdf" rdfArgs)
           let
@@ -5908,6 +6009,7 @@ inspectorComponent initial =
             intent = Json.operationIntentSummary intentResult.stdout
             witnessPlan = Json.operationWitnessPlan witnessPlanResult.stdout
             validation = Json.operationValidation validationResult.stdout
+            scriptEvaluation = Json.operationScriptEvaluation scriptEvaluationResult.stdout
             rdf = Json.operationRdfGraph rdfResult.stdout
           lenses <-
             if operationResult.exitOk && rdfResult.exitOk && rdf.valid then
@@ -5939,6 +6041,23 @@ inspectorComponent initial =
                   else Nothing
               , validation =
                   if validationResult.exitOk && validation.valid then Just validation
+                  else Nothing
+              , validationError =
+                  if not validationResult.exitOk then
+                    Just
+                      (if validationResult.stderr == "" then "Ledger validation operation failed." else validationResult.stderr)
+                  else if not validation.valid then
+                    Just "Ledger validation response had an unsupported status."
+                  else Nothing
+              , scriptEvaluation =
+                  if scriptEvaluationResult.exitOk && scriptEvaluation.valid then Just scriptEvaluation
+                  else Nothing
+              , scriptEvaluationError =
+                  if not scriptEvaluationResult.exitOk then
+                    Just
+                      (if scriptEvaluationResult.stderr == "" then "Ledger script evaluation operation failed." else scriptEvaluationResult.stderr)
+                  else if not scriptEvaluation.valid then
+                    Just scriptEvaluation.subtitle
                   else Nothing
               , rdf =
                   if operationResult.exitOk && rdfResult.exitOk && rdf.valid then Just rdf
