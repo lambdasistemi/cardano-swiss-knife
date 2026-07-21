@@ -1,4 +1,4 @@
-import { attachTransactionWitness, browseTransaction, evaluateTransactionScripts, identifyTransaction, inspectTransaction, normaliseTransactionWitness, planTransactionWitnesses, prepareTransactionWitness, transactionIntent, validateTransaction } from "../index.js";
+import { attachTransactionWitness, browseTransaction, evaluateTransactionScripts, identifyTransaction, inspectTransaction, normaliseTransactionWitness, planTransactionWitnesses, prepareTransactionWitness, submitTransactionEntry, transactionIntent, validateTransaction } from "../index.js";
 
 export const inspect = (input, options) => inspectTransaction(input, options);
 export const browse = (input, options) => browseTransaction(input, options);
@@ -10,3 +10,4 @@ export const evaluateScripts = (input, options) => evaluateTransactionScripts(in
 export const prepareWitness = (input) => prepareTransactionWitness(input);
 export const normaliseWitness = (input) => normaliseTransactionWitness(input);
 export const attachWitness = (input, witness, options) => attachTransactionWitness(input, witness, options);
+export const submit = (input) => submitTransactionEntry(input);

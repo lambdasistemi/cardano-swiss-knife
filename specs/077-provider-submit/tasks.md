@@ -65,20 +65,20 @@ Tasks: T774, T775, T776, T777, T778, T779, T780
 **Goal**: Expose the shared operation through existing host contracts without
 duplicating provider policy or weakening secret handling.
 
-- [ ] T781 [US2] Add RED packed-Node tests/types for completed-entry input,
+- [X] T781 [US2] Add RED packed-Node tests/types for completed-entry input,
   both provider routes, receipt output, lifecycle pre-IO rejection, coded
   provider failures, and credential redaction.
-- [ ] T782 [US2] Add RED CLI tests for explicit confirmation/cancellation,
+- [X] T782 [US2] Add RED CLI tests for explicit confirmation/cancellation,
   entry and signed-transaction file parsing, provider/network selection,
   structured output, exit codes, and vault-backed Blockfrost credentials.
-- [ ] T783 [US2] Expose a typed `submitTransactionEntry` Node operation that
+- [X] T783 [US2] Expose a typed `submitTransactionEntry` Node operation that
   validates only host input shape and delegates policy to `Cardano.Provider`.
-- [ ] T784 [US2] Add `csk tx submit` through `node/src/commands/tx.js`, keeping
+- [X] T784 [US2] Add `csk tx submit` through `node/src/commands/tx.js`, keeping
   credentials out of arguments/output and keeping submission separate from
   attach.
-- [ ] T785 [US2] Update the public export/type inventories and package smoke
+- [X] T785 [US2] Update the public export/type inventories and package smoke
   only where required by the new supported operation.
-- [ ] T786 Obtain navigator RED/GREEN approval, run focused Node/CLI tests and
+- [X] T786 Obtain navigator RED/GREEN approval, run focused Node/CLI tests and
   the extended `./gate.sh`, and commit exactly once with
   `Tasks: T781, T782, T783, T784, T785, T786`.
 

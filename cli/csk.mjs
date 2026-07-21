@@ -11,7 +11,7 @@ import * as script from "../node/src/commands/script.js";
 import * as payload from "../node/src/commands/payload.js";
 import * as tx from "../node/src/commands/tx.js";
 const usage = "Usage: csk vault <create|list|migrate> [options]\n\ncsk vault create --out PATH [--passphrase-fd FD] [--force]\ncsk vault list --vault PATH [--passphrase-fd FD] [--json]\ncsk vault migrate --input PATH --out PATH [--input-passphrase-fd FD] [--passphrase-fd FD] [--force]\n";
-const txUsage = "Usage: csk tx <inspect|browse|identify|intent|validate|evaluate-scripts> (--cbor-hex HEX | --tx-file PATH | --tx-hash HASH --provider blockfrost|koios --network mainnet|preprod|preview) [--vault PATH --vault-entry ID [--passphrase-fd FD]] [--book PATH ...] [--path JSON-PATH] [--output json]\n\ncsk tx witness plan <transaction-source> [provider options] [--output json]\ncsk tx witness attach <transaction-source> (--witness-file PATH | --vault PATH --vault-entry ID [--passphrase-fd FD]) [--replace-existing] [--tx-out PATH] [--witness-out PATH] [--output json]\n";
+const txUsage = "Usage: csk tx <inspect|browse|identify|intent|validate|evaluate-scripts> (--cbor-hex HEX | --tx-file PATH | --tx-hash HASH --provider blockfrost|koios --network mainnet|preprod|preview) [--vault PATH --vault-entry ID [--passphrase-fd FD]] [--book PATH ...] [--path JSON-PATH] [--output json]\n\ncsk tx submit --entry-file PATH --tx-file PATH --current-slot INTEGER --provider blockfrost|koios --network mainnet|preprod|preview --confirm [--vault PATH --vault-entry ID [--passphrase-fd FD]] [--output json]\ncsk tx witness plan <transaction-source> [provider options] [--output json]\ncsk tx witness attach <transaction-source> (--witness-file PATH | --vault PATH --vault-entry ID [--passphrase-fd FD]) [--replace-existing] [--tx-out PATH] [--witness-out PATH] [--output json]\n";
 const rootUsage = "Usage: csk <address|mnemonic|key|script|payload|tx|vault> ...\n\ncsk address inspect --address ADDRESS\ncsk mnemonic generate|validate\ncsk key derive|address|restore\ncsk script inspect|author|template\ncsk payload sign|verify\n" + txUsage + "\n" + usage;
 const bad = () => { throw Error("Vault arguments are invalid."); };
 const parse = (args) => { if (args.includes("--help") || args.includes("-h")) return { help: true }; const [group, command, ...rest] = args; const allowed = { create: ["--out", "--passphrase-fd", "--force"], list: ["--vault", "--passphrase-fd", "--json"], migrate: ["--input", "--out", "--input-passphrase-fd", "--passphrase-fd", "--force"] }; if (group !== "vault" || !allowed[command]) bad(); const o = { command }; for (let i = 0; i < rest.length; i += 1) { const key = rest[i]; if (!allowed[command].includes(key) || o[key.slice(2)] !== undefined) bad(); if (["--force", "--json"].includes(key)) o[key.slice(2)] = true; else if (rest[i + 1] && !rest[i + 1].startsWith("--")) o[key.slice(2)] = rest[++i]; else bad(); } if ((command === "create" && !o.out) || (command === "list" && !o.vault) || (command === "migrate" && (!o.input || !o.out)) || [o["passphrase-fd"], o["input-passphrase-fd"]].filter(Boolean).some((fd) => !/^\d+$/.test(fd))) bad(); return o; };
@@ -48,8 +48,52 @@ const secret = async (o, kind) => { const forms = [o["secret-stdin"], o["secret-
 const render = (result, json) => { const envelope = { version: 1, ...result }; if (json) process.stdout.write(`${JSON.stringify(envelope)}\n`); else if (result.ok) process.stdout.write(`${typeof result.value === "string" ? result.value : JSON.stringify(result.value)}\n`); else process.stderr.write(`${result.error.message}\n`); return result.ok ? 0 : exitFor(result.error.code); };
 const offline = async (args) => { const [family, command, subcommand, ...tail] = args; const hasSubcommand = family === "key" && ["address", "restore"].includes(command); const o = options(hasSubcommand ? tail : [subcommand, ...tail].filter((x) => x !== undefined)); const json = o.output === "json"; delete o.output; if (o.mnemonic || o["signing-key"]) offlineUsage(); let result; if (family === "address" && command === "inspect") result = await address.inspect({ address: o.address }); else if (family === "mnemonic" && command === "generate") result = await mnemonic.generate({ wordCount: o["word-count"] }); else if (family === "mnemonic" && command === "validate") result = await mnemonic.validate({ mnemonic: await secret(o, "mnemonic") }); else if (family === "key" && command === "derive") result = await key.derive({ mnemonic: await secret(o, "mnemonic"), accountIndex: o["account-index"], role: o.role, addressIndex: o["address-index"] }); else if (family === "key" && command === "address" && subcommand === "shelley") result = await key.shelley({ network: o.network, paymentXpub: o["payment-xpub"], stakeXpub: o["stake-xpub"] }); else if (family === "key" && command === "address" && subcommand === "icarus") result = await key.icarus({ network: o.network, addressXpub: o["address-xpub"] }); else if (family === "key" && command === "address" && subcommand === "byron") result = await key.byron({ network: o.network, addressXpub: o["address-xpub"], rootXpub: o["root-xpub"], derivationPath: o["derivation-path"] }); else if (family === "key" && command === "restore" && subcommand === "icarus") result = await key.restoreIcarus({ mnemonic: await secret(o, "mnemonic"), network: o.network, accountIndex: o["account-index"], role: o.role, addressIndex: o["address-index"] }); else if (family === "key" && command === "restore" && subcommand === "byron") result = await key.restoreByron({ mnemonic: await secret(o, "mnemonic"), network: o.network, accountIndex: o["account-index"], addressIndex: o["address-index"] }); else if (family === "script" && command === "inspect") result = await script.inspect({ cborHex: o["cbor-hex"] }); else if (family === "script" && command === "author") result = await script.author({ json: o.json }); else if (family === "script" && command === "template") result = await script.template({ json: o.json }); else if (family === "payload" && command === "sign") result = await payload.sign({ signingKey: await secret(o, "signing-key"), payloadMode: o["payload-mode"], payloadInput: o["payload-input"] }); else if (family === "payload" && command === "verify") result = await payload.verify({ payloadMode: o["payload-mode"], payloadInput: o["payload-input"], verificationKey: o["verification-key"], signature: o.signature }); else offlineUsage(); process.exitCode = render(result, json); };
 const txFailure = (code, message, exit = exitFor(code)) => Object.assign(Error(message), { code, exit });
+const submitTransaction = async (args) => {
+  if (args.includes("--help") || args.includes("-h")) { process.stdout.write(txUsage); return; }
+  const values = {};
+  const allowed = new Set(["--entry-file", "--tx-file", "--current-slot", "--provider", "--network", "--confirm", "--vault", "--vault-entry", "--passphrase-fd", "--output"]);
+  for (let index = 0; index < args.length; index += 1) {
+    const flag = args[index]; const key = flag.slice(2);
+    if (!allowed.has(flag) || values[key] !== undefined) offlineUsage();
+    if (flag === "--confirm") { values.confirm = true; continue; }
+    const value = args[++index];
+    if (value === undefined || value.startsWith("--")) offlineUsage();
+    values[key] = value;
+  }
+  if (!values["entry-file"] || !values["tx-file"] || !values["current-slot"] || !values.provider || !values.network
+    || values.output && values.output !== "json"
+    || !Number.isSafeInteger(Number(values["current-slot"]))
+    || !["blockfrost", "koios"].includes(values.provider)
+    || !["mainnet", "preprod", "preview"].includes(values.network)
+    || (values.vault !== undefined) !== (values["vault-entry"] !== undefined)
+    || (values["passphrase-fd"] && (!values.vault || !/^\d+$/.test(values["passphrase-fd"])))) offlineUsage();
+  if (!values.confirm) throw txFailure("DOMAIN_ERROR", "Transaction submission was cancelled.");
+  let entry; let signedTxCborHex;
+  try {
+    entry = JSON.parse(await readFile(values["entry-file"], "utf8"));
+    const transactionFile = (await readFile(values["tx-file"], "utf8")).trim();
+    signedTxCborHex = transactionFile.startsWith("{") ? JSON.parse(transactionFile).cborHex : transactionFile;
+  } catch {
+    throw txFailure("DOMAIN_ERROR", "Transaction submission input is invalid.");
+  }
+  let credential;
+  if (values.provider === "blockfrost") {
+    if (!values.vault) throw secretFailure();
+    credential = await secret(values, "blockfrost-project-id");
+  } else if (values.vault) credential = await secret(values, "koios-bearer-token");
+  const result = await tx.submit({
+    entry,
+    signedTxCborHex,
+    currentSlot: Number(values["current-slot"]),
+    provider: values.provider,
+    network: values.network,
+    ...(credential ? { credential } : {}),
+  });
+  process.exitCode = render(result, values.output === "json");
+};
 const transaction = async (args) => {
   const [family, firstCommand, ...tail] = args;
+  if (family === "tx" && firstCommand === "submit") return submitTransaction(tail);
   let command = firstCommand; let rest = tail; let attach = false;
   if (command === "evaluate-scripts") command = "evaluateScripts";
   if (command === "witness") {

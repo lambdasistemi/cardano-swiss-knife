@@ -64,3 +64,16 @@ test("the packed package advertises and contains its declaration facade", async 
   assert.equal(packageJson.exports?.["."]?.types, "./node/dist/index.d.ts");
   await access(join(extracted, "node", "dist", "index.d.ts"));
 });
+
+test("the packed declaration facade exposes typed completed-entry submission", async () => {
+  assert.ok(tarball, "CSK_PACKAGE_TARBALL must name the packed npm artifact");
+  const directory = await mkdtemp(join(tmpdir(), "csk-node-api-submit-types-"));
+  temporaryDirectories.push(directory);
+  const unpack = await run("tar", ["-xzf", tarball, "-C", directory]);
+  assert.equal(unpack.code, 0, unpack.stderr);
+
+  const facade = await readFile(join(directory, "package", "node", "dist", "index.d.ts"), "utf8");
+  for (const declaration of ["CollectedWitness", "TransactionEntry", "TransactionEntrySubmissionInput", "TransactionEntrySubmissionReceipt", "submitTransactionEntry"]) {
+    assert.match(facade, new RegExp(`\\b${declaration}\\b`));
+  }
+});

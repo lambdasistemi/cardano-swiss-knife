@@ -6,6 +6,7 @@ import * as Script from "../../output/Cardano.Offline.Script/index.js";
 import * as Transaction from "../../output/Cardano.Transaction/index.js";
 import * as TransactionLedger from "../../output/Cardano.Transaction.Ledger/index.js";
 import * as TransactionWitness from "../../output/Cardano.Transaction.Witness/index.js";
+import * as TransactionEntry from "../../output/Cardano.Transaction.Entry/index.js";
 import * as Provider from "../../output/Cardano.Provider/index.js";
 import * as Aff from "../../output/Effect.Aff/index.js";
 import * as Either from "../../output/Data.Either/index.js";
@@ -311,6 +312,64 @@ export const analyzeScriptTemplateJson = (input) => operation(async () => fromEi
 
 const provider = (value) => ({ blockfrost: Provider.Blockfrost.value, koios: Provider.Koios.value })[value];
 const providerNetwork = (value) => ({ mainnet: Provider.Mainnet.value, preprod: Provider.Preprod.value, preview: Provider.Preview.value })[value];
+const entryStatus = (value) => ({ open: TransactionEntry.Open.value, complete: TransactionEntry.Complete.value, expired: TransactionEntry.Expired.value, submitted: TransactionEntry.Submitted.value })[value];
+const providerSubmissionCode = (category) => ({
+  "provider-authentication": "PROVIDER_AUTHENTICATION",
+  "provider-rate-limit": "PROVIDER_RATE_LIMIT",
+  "provider-server": "PROVIDER_SERVER",
+  "provider-transport": "PROVIDER_TRANSPORT",
+  "provider-decode": "PROVIDER_DECODE",
+})[category];
+
+const transactionEntry = (value) => {
+  if (!value || typeof value !== "object" || Array.isArray(value)
+    || typeof value.entryId !== "string"
+    || typeof value.unsignedTxCborHex !== "string"
+    || !Array.isArray(value.requiredSigners) || value.requiredSigners.some((signer) => typeof signer !== "string")
+    || !Array.isArray(value.collectedWitnesses) || value.collectedWitnesses.some((witness) => !witness || typeof witness !== "object" || Array.isArray(witness) || typeof witness.signerId !== "string" || typeof witness.witnessCborHex !== "string")
+    || !Number.isInteger(value.invalidAfterSlot)
+    || !entryStatus(value.status)) {
+    throw new CskError("DOMAIN_ERROR", "Transaction entry must contain JSON-compatible identifiers, witnesses, integer invalidAfterSlot, and an open, complete, expired, or submitted status.");
+  }
+  return { ...value, status: entryStatus(value.status) };
+};
+
+const submissionFailure = (value) => {
+  const category = Provider.submissionErrorCategory(value);
+  throw new CskError(providerSubmissionCode(category) ?? "DOMAIN_ERROR", Provider.renderSubmissionError(value));
+};
+
+/**
+ * Submits a completed transaction entry through the selected shared provider.
+ * Resolves rather than throws to a `{ ok: true, value }` / `{ ok: false,
+ * error }` `CskResult`; lifecycle and provider failures preserve the shared
+ * provider taxonomy.
+ * @param {import("./index.js").TransactionEntrySubmissionInput} input Entry, signed transaction CBOR, slot, provider, network, and optional credential.
+ * @returns {Promise<CskResult<import("./index.js").TransactionEntrySubmissionReceipt>>} The submitted entry receipt or a coded failure.
+ * @example
+ * const result = await submitTransactionEntry({ entry, signedTxCborHex, currentSlot, provider: "koios", network: "preview" });
+ */
+export const submitTransactionEntry = (input) => operation(async () => {
+  if (!input || typeof input !== "object" || Array.isArray(input)
+    || typeof input.signedTxCborHex !== "string"
+    || !Number.isInteger(input.currentSlot)
+    || !provider(input.provider)
+    || !providerNetwork(input.network)
+    || (input.credential != null && typeof input.credential !== "string")) {
+    throw new CskError("DOMAIN_ERROR", "Submission requires entry, signedTxCborHex, integer currentSlot, provider, network, and an optional string credential.");
+  }
+  const entry = transactionEntry(input.entry);
+  const result = await awaitAff(Provider.submitTxEntry(provider(input.provider))(providerNetwork(input.network))(input.credential ?? "")(input.currentSlot)(input.signedTxCborHex)(entry));
+  if (result instanceof Either.Left) submissionFailure(result.value0);
+  if (!(result instanceof Either.Right)) throw new CskError("ENGINE_PROTOCOL", "PureScript returned a malformed transaction submission result.");
+  const receipt = result.value0;
+  return {
+    txId: receipt.txId,
+    provider: input.provider,
+    network: input.network,
+    entry: { ...input.entry, status: "submitted" },
+  };
+});
 
 const transactionInput = async (input) => {
   if (!input || typeof input !== "object" || Array.isArray(input)) {

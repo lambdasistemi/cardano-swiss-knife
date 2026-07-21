@@ -244,6 +244,82 @@ test("selects only matching transaction vault entry kinds and never exposes prov
   }
 });
 
+test("submits only after explicit confirmation and rejects incomplete entries before provider IO", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "csk-cli-submit-"));
+  const entryFile = join(dir, "entry.json");
+  const incompleteEntryFile = join(dir, "incomplete-entry.json");
+  const txFile = join(dir, "signed-tx.cbor");
+  const envelopeFile = join(dir, "signed-tx.json");
+  const vault = join(dir, "credentials.age");
+  const capture = join(dir, "fetch-calls.json");
+  const guard = join(dir, "fetch-guard.mjs");
+  const entry = { entryId: "entry-1", unsignedTxCborHex: "00", requiredSigners: [], collectedWitnesses: [], invalidAfterSlot: 100, status: "open" };
+  try {
+    await Promise.all([
+      writeFile(entryFile, JSON.stringify(entry)),
+      writeFile(incompleteEntryFile, JSON.stringify({ ...entry, requiredSigners: ["missing"] })),
+      writeFile(txFile, "deadbeef\n"),
+      writeFile(envelopeFile, JSON.stringify({ type: "Tx ConwayEra", description: "Ledger Cddl Format", cborHex: "deadbeef" })),
+      writeFile(vault, await encryptVault("submit vault passphrase", { cardanoSwissKnifeVault: { version: 1, entries: [
+        { id: "blockfrost", kind: "blockfrost-project-id", label: "blockfrost", value: "blockfrost-submit-secret", createdAt: "2026-07-21T00:00:00.000Z" },
+        { id: "koios", kind: "koios-bearer-token", label: "koios", value: "koios-submit-secret", createdAt: "2026-07-21T00:00:00.000Z" },
+      ] } })),
+      writeFile(guard, `import { writeFileSync } from "node:fs"; const calls = []; globalThis.fetch = async (url, options) => { calls.push({ url, method: options.method, headers: options.headers, binary: options.body instanceof Uint8Array, bytes: Array.from(options.body ?? []) }); return { status: 200, text: async () => JSON.stringify("${"c".repeat(64)}") }; }; process.on("exit", () => writeFileSync(process.env.CSK_FETCH_CAPTURE, JSON.stringify({ calls, argv: process.argv, env: process.env })));`),
+    ]);
+    const guarded = { NODE_OPTIONS: `--import ${new URL(`file://${guard}`).href}`, CSK_FETCH_CAPTURE: capture };
+    const args = ["tx", "submit", "--entry-file", entryFile, "--tx-file", txFile, "--current-slot", "10", "--provider", "koios", "--network", "preview"];
+    const cancelled = await json(args, "", undefined, guarded);
+    assert.equal(cancelled.code, 3);
+    assert.equal(JSON.parse(cancelled.stdout).error.code, "DOMAIN_ERROR");
+    assert.deepEqual(JSON.parse(await readFile(capture, "utf8")).calls, []);
+    const incomplete = await json(["tx", "submit", "--entry-file", incompleteEntryFile, ...args.slice(4), "--confirm"], "", undefined, guarded);
+    assert.equal(incomplete.code, 3);
+    assert.equal(JSON.parse(incomplete.stdout).error.code, "DOMAIN_ERROR");
+    assert.deepEqual(JSON.parse(await readFile(capture, "utf8")).calls, []);
+    const submitted = await json([...args, "--confirm"], "", undefined, guarded);
+    assert.equal(submitted.code, 0, submitted.stderr);
+    assert.equal(JSON.parse(submitted.stdout).value.entry.status, "submitted");
+    assert.deepEqual(JSON.parse(await readFile(capture, "utf8")).calls.map(({ method, binary, bytes }) => ({ method, binary, bytes })), [{ method: "POST", binary: true, bytes: [0xde, 0xad, 0xbe, 0xef] }]);
+    const fromEnvelope = await json(["tx", "submit", "--entry-file", entryFile, "--tx-file", envelopeFile, "--current-slot", "10", "--provider", "koios", "--network", "preview", "--confirm"], "", undefined, guarded);
+    assert.equal(fromEnvelope.code, 0, fromEnvelope.stderr);
+    const blockfrost = await json(["tx", "submit", "--entry-file", entryFile, "--tx-file", txFile, "--current-slot", "10", "--provider", "blockfrost", "--network", "mainnet", "--vault", vault, "--vault-entry", "blockfrost", "--passphrase-fd", "3", "--confirm"], "", "submit vault passphrase\n", guarded);
+    const blockfrostCapture = JSON.parse(await readFile(capture, "utf8"));
+    const koios = await json(["tx", "submit", "--entry-file", entryFile, "--tx-file", txFile, "--current-slot", "10", "--provider", "koios", "--network", "mainnet", "--vault", vault, "--vault-entry", "koios", "--passphrase-fd", "3", "--confirm"], "", "submit vault passphrase\n", guarded);
+    for (const result of [blockfrost, koios]) assert.equal(result.code, 0, result.stderr);
+    for (const value of ["blockfrost-submit-secret", "koios-submit-secret", "submit vault passphrase"]) assert.doesNotMatch(`${blockfrost.stdout}${blockfrost.stderr}${koios.stdout}${koios.stderr}`, new RegExp(value));
+    const captured = JSON.parse(await readFile(capture, "utf8"));
+    assert.equal(captured.calls[0].url.endsWith("/submittx"), true);
+    assert.equal(captured.calls[0].headers.Authorization, "Bearer koios-submit-secret");
+    const blockfrostCall = blockfrostCapture.calls[0];
+    assert.equal(blockfrostCall.url.endsWith("/tx/submit"), true);
+    assert.equal(blockfrostCall.headers.project_id, "blockfrost-submit-secret");
+    for (const value of ["blockfrost-submit-secret", "koios-submit-secret", "submit vault passphrase"]) {
+      assert.doesNotMatch(JSON.stringify({ argv: captured.argv, env: captured.env, blockfrostArgv: blockfrostCapture.argv, blockfrostEnv: blockfrostCapture.env }), new RegExp(value));
+    }
+    for (const malformed of [
+      { index: 7, value: "not-an-integer" },
+      { index: 9, value: "other" },
+      { index: 11, value: "other" },
+    ]) {
+      const invalidArgs = [...args];
+      invalidArgs[malformed.index] = malformed.value;
+      const invalid = await json([...invalidArgs, "--confirm"], "", undefined, guarded);
+      assert.equal(invalid.code, 2);
+      assert.equal(JSON.parse(invalid.stdout).error.code, "USAGE");
+    }
+    await writeFile(guard, `import { writeFileSync } from "node:fs"; const calls = []; globalThis.fetch = async (url, options) => { calls.push({ url, headers: options.headers }); return { status: 401, text: async () => "blockfrost-submit-secret" }; }; process.on("exit", () => writeFileSync(process.env.CSK_FETCH_CAPTURE, JSON.stringify({ calls, argv: process.argv, env: process.env })));`);
+    const rejected = await json(["tx", "submit", "--entry-file", entryFile, "--tx-file", txFile, "--current-slot", "10", "--provider", "blockfrost", "--network", "mainnet", "--vault", vault, "--vault-entry", "blockfrost", "--passphrase-fd", "3", "--confirm"], "", "submit vault passphrase\n", guarded);
+    assert.equal(rejected.code, 6);
+    assert.equal(JSON.parse(rejected.stdout).error.code, "PROVIDER_AUTHENTICATION");
+    assert.doesNotMatch(`${rejected.stdout}${rejected.stderr}`, /blockfrost-submit-secret|submit vault passphrase/);
+    const rejectedCapture = JSON.parse(await readFile(capture, "utf8"));
+    assert.equal(rejectedCapture.calls[0].headers.project_id, "blockfrost-submit-secret");
+    for (const value of ["blockfrost-submit-secret", "submit vault passphrase"]) assert.doesNotMatch(JSON.stringify({ argv: rejectedCapture.argv, env: rejectedCapture.env }), new RegExp(value));
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("routes witness planning, attachment, validation, and script evaluation through the shared transaction API", async () => {
   const dir = await mkdtemp(join(tmpdir(), "csk-cli-ledger-"));
   const txFile = join(dir, "transaction.cbor");
