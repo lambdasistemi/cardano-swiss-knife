@@ -12,13 +12,13 @@
 
 ## Slice 2 — Transaction, provider, and book contracts
 
-- [ ] T008-S2 Extend canonical `node/test/api-properties.test.mjs` with commented RED→GREEN properties for `inspectTransaction`, `browseTransaction`, `identifyTransaction`, and `transactionIntent`.
-- [ ] T009-S2 Prove raw/TextEnvelope parity, exclusive malformed-source errors, browse-path invariants, and offline no-network behavior.
-- [ ] T010-S2 Cover every provider/network mapping plus exact redacted authentication, rate-limit, server, transport, and decode failures through shared provider code.
-- [ ] T011-S2 Cover ordered book import/resolution and applicable ledger/RDF missing, incompatible, execution, and malformed-protocol failures without fallback semantics.
-- [ ] T012-S2 Keep the canonical property path wired into `ci-node-api` while retaining every prior property and example test.
-- [ ] T013-S2 Run `nix run .#ci-node-api` and `./gate.sh`.
-- [ ] T014-S2 Commit exactly `test(node): specify transaction API properties` with `Tasks: T008, T009, T010, T011, T012, T013, T014`.
+- [X] T008-S2 Extend canonical `node/test/api-properties.test.mjs` with commented RED→GREEN properties for `inspectTransaction`, `browseTransaction`, `identifyTransaction`, and `transactionIntent`.
+- [X] T009-S2 Prove raw/TextEnvelope parity, exclusive malformed-source errors, browse-path invariants, and offline no-network behavior.
+- [X] T010-S2 Cover every provider/network mapping plus exact redacted authentication, rate-limit, server, transport, and decode failures through shared provider code.
+- [X] T011-S2 Cover ordered book import/resolution and applicable ledger/RDF missing, incompatible, execution, and malformed-protocol failures without fallback semantics.
+- [X] T012-S2 Keep the canonical property path wired into `ci-node-api` while retaining every prior property and example test.
+- [X] T013-S2 Run `nix run .#ci-node-api` and `./gate.sh`.
+- [X] T014-S2 Commit exactly `test(node): specify transaction API properties` with `Tasks: T008, T009, T010, T011, T012, T013, T014`.
 
 ## Slice 3 — Witness and ledger truth contracts
 
