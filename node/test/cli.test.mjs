@@ -15,6 +15,7 @@ const byron = vectors.bootstrapVectors.find((vector) => vector.style === "Byron"
 const signing = vectors.signingVectors[0];
 const transactionCbor = (await readFile(new URL("../../fixtures/conway-mainnet-tx.hex", import.meta.url), "utf8")).trim();
 const textEnvelope = JSON.stringify({ type: "Tx ConwayEra", description: "Ledger Cddl Format", cborHex: transactionCbor });
+const witnessFixture = JSON.parse(await readFile(new URL("./fixtures/transaction-witnesses.json", import.meta.url), "utf8"));
 const runRaw = (args, input = "", inheritedFd, env) => new Promise((resolve) => {
   const child = spawn(process.execPath, [cli.pathname, ...args], { env: { ...process.env, ...env }, stdio: inheritedFd === undefined ? ["pipe", "pipe", "pipe"] : ["pipe", "pipe", "pipe", "pipe"] });
   let stdout = ""; let stderr = "";
@@ -35,6 +36,30 @@ const exclusive = (operation) => {
 };
 const run = (args, input = "", inheritedFd, env) => exclusive(() => runRaw(args, input, inheritedFd, env));
 const json = (args, input = "", inheritedFd, env) => run([...args, "--output", "json"], input, inheritedFd, env);
+const hexToBytes = (hex) => Uint8Array.from(hex.match(/../g).map((chunk) => Number.parseInt(chunk, 16)));
+const hex = (bytes) => Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+const skipCbor = (bytes, start) => {
+  const additional = bytes[start] & 0x1f; const major = bytes[start] >> 5;
+  const length = additional < 24 ? additional : additional === 24 ? bytes[start + 1] : additional === 25 ? (bytes[start + 1] << 8) | bytes[start + 2] : additional === 26 ? bytes[start + 1] * 0x1000000 + (bytes[start + 2] << 16) + (bytes[start + 3] << 8) + bytes[start + 4] : additional === 27 ? Number(bytes.slice(start + 1, start + 9).reduce((value, byte) => (value << 8n) | BigInt(byte), 0n)) : additional === 31 ? null : (() => { throw Error("fixture CBOR is unsupported"); })();
+  const body = start + (additional < 24 ? 1 : additional === 24 ? 2 : additional === 25 ? 3 : additional === 26 ? 5 : additional === 27 ? 9 : 1);
+  if (major === 0 || major === 1 || major === 7) return body;
+  if (major === 2 || major === 3) { if (length !== null) return body + length; let offset = body; while (bytes[offset] !== 0xff) offset = skipCbor(bytes, offset); return offset + 1; }
+  if (major === 6) return skipCbor(bytes, body);
+  let offset = body; const items = major === 5 && length !== null ? length * 2 : length;
+  if (items === null) { while (bytes[offset] !== 0xff) offset = skipCbor(bytes, offset); return offset + 1; }
+  for (let index = 0; index < items; index += 1) offset = skipCbor(bytes, offset); return offset;
+};
+const withoutRequiredSigner = (transaction) => {
+  const bytes = hexToBytes(transaction); const entries = bytes[1] & 0x1f; let offset = 2;
+  for (let index = 0; index < entries; index += 1) { const keyOffset = offset; const key = bytes[keyOffset]; offset = skipCbor(bytes, keyOffset); const valueEnd = skipCbor(bytes, offset); if (key === 14) { const patched = new Uint8Array(bytes.length - (valueEnd - keyOffset)); patched.set(bytes.slice(0, keyOffset)); patched[1] -= 1; patched.set(bytes.slice(valueEnd), keyOffset); return hex(patched); } offset = valueEnd; }
+  return transaction;
+};
+const withRequiredSigner = (transaction, signerHash) => {
+  const bytes = hexToBytes(withoutRequiredSigner(transaction)); const entries = bytes[1] & 0x1f; let offset = 2;
+  for (let index = 0; index < entries; index += 1) { offset = skipCbor(bytes, skipCbor(bytes, offset)); }
+  const required = Uint8Array.from([0x0e, 0x81, 0x58, 0x1c, ...hexToBytes(signerHash)]);
+  const patched = new Uint8Array(bytes.length + required.length); patched.set(bytes.slice(0, offset)); patched[1] += 1; patched.set(required, offset); patched.set(bytes.slice(offset), offset + required.length); return hex(patched);
+};
 
 test("routes all fourteen offline inventory mappings and renders stable human and JSON results", async () => {
   const commands = [
@@ -214,6 +239,105 @@ test("selects only matching transaction vault entry kinds and never exposes prov
     for (const result of [wrong, blockfrost, koios, anonymous, { stdout: child, stderr: "" }]) assert.doesNotMatch(`${result.stdout}${result.stderr}`, new RegExp(`${blockfrostSecret}|${koiosSecret}|${passphrase}`));
     const leaked = (await Promise.all((await readdir(dir)).map((entry) => readFile(join(dir, entry), "utf8").catch(() => "")))).join("");
     assert.doesNotMatch(leaked, new RegExp(`${blockfrostSecret}|${koiosSecret}|${passphrase}`));
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("routes witness planning, attachment, validation, and script evaluation through the shared transaction API", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "csk-cli-ledger-"));
+  const txFile = join(dir, "transaction.cbor");
+  const envelopeFile = join(dir, "transaction.json");
+  const vault = join(dir, "signing.age");
+  const txOut = join(dir, "signed.json");
+  const witnessOut = join(dir, "witness.json");
+  const rawWitness = join(dir, "witness.cbor");
+  const rawWitnessOut = join(dir, "witness-from-raw.json");
+  const passphrase = "S4_PASSPHRASE_SENTINEL_MUST_NOT_ESCAPE";
+  const secret = witnessFixture.secretSentinel;
+  try {
+    const requiredTransaction = withRequiredSigner(transactionCbor, witnessFixture.requiredSignerHash);
+    const api = await import(new URL("../dist/index.js", import.meta.url));
+    const identified = await api.identifyTransaction({ cborHex: requiredTransaction });
+    const prepared = await api.prepareTransactionWitness({ bodyHashHex: identified.value.result.identification.body_hash, signingKeyBech32: witnessFixture.signingKey });
+    const detached = join(dir, "detached.json");
+    await Promise.all([
+      writeFile(txFile, `${requiredTransaction}\n`),
+      writeFile(envelopeFile, textEnvelope),
+      writeFile(detached, JSON.stringify(prepared.value.textEnvelope)),
+      writeFile(rawWitness, `${prepared.value.vkeyWitnessCborHex}\n`),
+      writeFile(vault, await encryptVault(passphrase, { cardanoSwissKnifeVault: { version: 1, entries: [
+        { id: "signing", kind: "signing-key", label: "signing", value: witnessFixture.signingKey, createdAt: "2026-07-21T00:00:00.000Z" },
+        { id: "wrong", kind: "mnemonic", label: "wrong", value: secret, createdAt: "2026-07-21T00:00:00.000Z" },
+        { id: "blockfrost", kind: "blockfrost-project-id", label: "blockfrost", value: "S4_BLOCKFROST_SENTINEL", createdAt: "2026-07-21T00:00:00.000Z" },
+      ] } })),
+    ]);
+
+    for (const [command, field] of [["witness", "witness_plan"], ["validate", "validation"], ["evaluate-scripts", "script_evaluation"]]) {
+      const args = command === "witness" ? ["tx", "witness", "plan", "--tx-file", txFile] : ["tx", command, "--tx-file", txFile];
+      const human = await run(args);
+      const machine = await json(args);
+      assert.equal(human.code, 0, `${args.join(" ")}: ${human.stderr}`);
+      assert.equal(machine.code, 0, `${args.join(" ")} --output json: ${machine.stderr}`);
+      assert.match(human.stdout, /\S/);
+      assert.deepEqual(JSON.parse(human.stdout), JSON.parse(machine.stdout).value);
+      assert.equal(JSON.parse(machine.stdout).value.result[field] !== undefined, true);
+    }
+
+    const fromEnvelope = await json(["tx", "witness", "plan", "--tx-file", envelopeFile]);
+    const fromRaw = await json(["tx", "witness", "plan", "--cbor-hex", transactionCbor]);
+    assert.equal(fromEnvelope.code, 0, fromEnvelope.stderr);
+    assert.deepEqual(JSON.parse(fromEnvelope.stdout), JSON.parse(fromRaw.stdout));
+
+    const attached = await json(["tx", "witness", "attach", "--tx-file", txFile, "--witness-file", detached, "--tx-out", txOut, "--witness-out", witnessOut]);
+    assert.equal(attached.code, 0, `${attached.stderr}${attached.stdout}`);
+    assert.equal(JSON.parse(attached.stdout).value.textEnvelope.type, "Tx ConwayEra");
+    assert.equal(JSON.parse(await readFile(txOut, "utf8")).type, "Tx ConwayEra");
+    assert.equal(JSON.parse(await readFile(witnessOut, "utf8")).type, "TxWitness ConwayEra");
+
+    const attachedRaw = await json(["tx", "witness", "attach", "--tx-file", txFile, "--witness-file", rawWitness, "--witness-out", rawWitnessOut]);
+    assert.equal(attachedRaw.code, 0, `${attachedRaw.stderr}${attachedRaw.stdout}`);
+    assert.equal(JSON.parse(await readFile(rawWitnessOut, "utf8")).type, "TxWitness ConwayEra");
+
+    const replacementRefused = await json(["tx", "witness", "attach", "--tx-file", txOut, "--vault", vault, "--vault-entry", "signing", "--passphrase-fd", "3"], "", `${passphrase}\n`);
+    assert.notEqual(replacementRefused.code, 0);
+    assert.equal(JSON.parse(replacementRefused.stdout).error.code, "WITNESS_REPLACEMENT_FORBIDDEN", replacementRefused.stdout);
+    const replaced = await json(["tx", "witness", "attach", "--tx-file", txOut, "--vault", vault, "--vault-entry", "signing", "--passphrase-fd", "3", "--replace-existing"], "", `${passphrase}\n`);
+    assert.equal(replaced.code, 0, replaced.stderr);
+    assert.equal(JSON.parse(replaced.stdout).value.witnessPatchAction, "replaced");
+
+    const incompatible = await json(["tx", "witness", "attach", "--tx-file", txFile, "--vault", vault, "--vault-entry", "wrong", "--passphrase-fd", "3"], "", `${passphrase}\n`);
+    assert.equal(incompatible.code, 4);
+    assert.equal(JSON.parse(incompatible.stdout).error.code, "SECRET_SOURCE");
+    for (const result of [attached, replacementRefused, replaced, incompatible]) assert.doesNotMatch(`${result.stdout}${result.stderr}`, new RegExp(`${secret}|${passphrase}|${witnessFixture.signingKey}`));
+
+    const capture = join(dir, "child-process.json");
+    const guard = join(dir, "capture.mjs");
+    await writeFile(guard, `import { writeFile } from "node:fs/promises"; await writeFile(process.env.CSK_TEST_CAPTURE, JSON.stringify({ argv: process.argv, env: process.env })); globalThis.fetch = async () => ({ status: 401, text: async () => "denied" });`);
+    const guarded = { NODE_OPTIONS: `--import ${new URL(`file://${guard}`).href}`, CSK_TEST_CAPTURE: capture };
+    const guardedAttach = await json(["tx", "witness", "attach", "--tx-file", txFile, "--vault", vault, "--vault-entry", "signing", "--passphrase-fd", "3"], "", `${passphrase}\n`, guarded);
+    assert.equal(guardedAttach.code, 0, guardedAttach.stderr);
+    const captured = await readFile(capture, "utf8");
+    const temporaryContents = (await Promise.all((await readdir(dir)).map((entry) => readFile(join(dir, entry), "utf8").catch(() => "")))).join("");
+    for (const value of [secret, passphrase, witnessFixture.signingKey]) assert.doesNotMatch(`${captured}${temporaryContents}`, new RegExp(value));
+
+    const hashWithWitness = await json(["tx", "witness", "attach", "--tx-hash", "a".repeat(64), "--provider", "blockfrost", "--network", "mainnet", "--vault", vault, "--vault-entry", "blockfrost", "--passphrase-fd", "3", "--witness-file", detached], "", `${passphrase}\n`, guarded);
+    assert.equal(hashWithWitness.code, 6, `${hashWithWitness.stderr}${hashWithWitness.stdout}`);
+    assert.equal(JSON.parse(hashWithWitness.stdout).error.code, "PROVIDER_AUTHENTICATION");
+
+    for (const args of [
+      ...["witness", "validate", "evaluate-scripts"].map((command) => command === "witness"
+        ? ["tx", "witness", "plan", "--cbor-hex", transactionCbor, "--tx-hash", "a".repeat(64), "--provider", "koios", "--network", "mainnet"]
+        : ["tx", command, "--cbor-hex", transactionCbor, "--tx-hash", "a".repeat(64), "--provider", "koios", "--network", "mainnet"]),
+      ["tx", "witness", "attach", "--tx-file", txFile, "--witness-file", witnessOut, "--vault", vault, "--vault-entry", "signing"],
+      ["tx", "witness", "attach", "--tx-file", txFile],
+      ["tx", "witness", "attach", "--tx-file", txFile, "--witness-file", detached, "--passphrase-fd", "3"],
+      ["tx", "witness", "attach", "--tx-hash", "a".repeat(64), "--provider", "blockfrost", "--network", "mainnet", "--vault", vault, "--vault-entry", "signing"],
+    ]) {
+      const result = await json(args);
+      assert.equal(result.code, 2, `${args.join(" ")}: ${result.stderr}`);
+      assert.equal(JSON.parse(result.stdout).error.code, "USAGE");
+    }
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

@@ -12,10 +12,11 @@
   node-package = pkgs.runCommand "cardano-swiss-knife-node-package-check" {
     nativeBuildInputs = [ pkgs.nodejs_22 pkgs.bash ];
   } ''
-    mkdir -p work/node/test work/scripts work/test-vectors work/docs/inspector/tests/fixtures
+    mkdir -p work/node/test/fixtures work/scripts work/test-vectors work/docs/inspector/tests/fixtures
     cp -a ${packages.node-api}/. work/
     chmod -R u+w work
     cp -a ${repoRoot}/node/test/package-smoke.mjs work/node/test/
+    cp ${repoRoot}/node/test/fixtures/transaction-witnesses.json work/node/test/fixtures/
     cp -a ${repoRoot}/scripts/check-node-package.sh work/scripts/
     cp -a ${repoRoot}/test-vectors/vectors.json work/test-vectors/
     cp ${repoRoot}/docs/inspector/tests/fixtures/treasury-reorganize-unsigned-tx.hex work/docs/inspector/tests/fixtures/treasury-reorganize-unsigned-tx.hex

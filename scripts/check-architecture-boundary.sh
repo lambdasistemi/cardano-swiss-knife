@@ -95,9 +95,17 @@ check_host_ownership() {
   local root="$1"
   local host="$root/cli" node="$root/node/src"
   local provider='blockfrost[^" ]*api/v0|koios\.rest/api/v1|"project_id"|Authorization|_tx_hashes'
-  local semantics='cardano-serialization|cbor-x|\bcborg\b|@rdfjs|rdf-ext|\bn3\b|sparqljs|sparql-engine|shacl-engine|shacl-js|semantic-fallback'
+  local semantics='cardano-serialization|cbor-x|\bcborg\b|@rdfjs|rdf-ext|\bn3\b|sparqljs|sparql-engine|shacl-engine|shacl-js|semantic-fallback|\bplutus\b|blake2b|ed25519'
   if rg -n -i -e "$provider" "$host" "$node"; then fail "CLI/Node host must delegate provider endpoints, authentication, and decoders to Cardano.Provider"; fi
   if rg -n -i -e "$semantics" "$host" "$node"; then fail "CLI/Node host must not own Cardano/CBOR/RDF/SPARQL/SHACL semantics or fallbacks"; fi
+}
+
+check_transaction_host_delegation() {
+  local root="$1"
+  local host="$root/cli" commands="$root/node/src/commands"
+  if rg -n -e 'runTransactionOperation\(' -e 'wasm-tx-inspector' -e 'TransactionLedger\.' "$host" "$commands"; then
+    fail "CLI transaction routes must delegate through node/src/commands/tx.js and must not invoke ledger engines directly"
+  fi
 }
 
 check_documentation_anchors() {
@@ -122,6 +130,7 @@ check_tree() {
   check_compatibility_adapters "$1"
   check_semantic_dependencies "$1"
   check_host_ownership "$1"
+  check_transaction_host_delegation "$1"
   check_documentation_anchors "$1"
 }
 
@@ -130,7 +139,7 @@ run_negative_self_tests() {
   fixture_root="$(mktemp -d "${TMPDIR:-/tmp}/csk-architecture-boundary.XXXXXX")"
   trap 'rm -rf -- "$fixture_root"' RETURN
 
-  mkdir -p "$fixture_root/docs/architecture" "$fixture_root/docs/inspector" "$fixture_root/cli" "$fixture_root/node/src"
+  mkdir -p "$fixture_root/docs/architecture" "$fixture_root/docs/inspector" "$fixture_root/cli" "$fixture_root/node/src/commands"
   cp -R "$repo_root/lib" "$fixture_root/lib"
   cp -R "$repo_root/docs/inspector/src" "$fixture_root/docs/inspector/src"
   chmod -R u+w "$fixture_root/lib" "$fixture_root/docs/inspector/src"
@@ -189,6 +198,38 @@ run_negative_self_tests() {
     fail "negative fixture emitted the wrong host-semantics diagnostic: $duplicate_output"
   rm "$fixture_root/node/src/injected-rdf.mjs"
 
+  printf '%s\n' 'import "ed25519";' > "$fixture_root/cli/injected-crypto.mjs"
+  if duplicate_output="$(check_tree "$fixture_root" 2>&1)"; then
+    fail "negative fixture unexpectedly accepted host cryptographic fallback"
+  fi
+  [[ "$duplicate_output" == *'CLI/Node host must not own'* ]] ||
+    fail "negative fixture emitted the wrong host-crypto diagnostic: $duplicate_output"
+  rm "$fixture_root/cli/injected-crypto.mjs"
+
+  printf '%s\n' 'import "plutus-core";' > "$fixture_root/cli/injected-plutus.mjs"
+  if duplicate_output="$(check_tree "$fixture_root" 2>&1)"; then
+    fail "negative fixture unexpectedly accepted host Plutus fallback"
+  fi
+  [[ "$duplicate_output" == *'CLI/Node host must not own'* ]] ||
+    fail "negative fixture emitted the wrong host-Plutus diagnostic: $duplicate_output"
+  rm "$fixture_root/cli/injected-plutus.mjs"
+
+  printf '%s\n' 'import "blake2b";' > "$fixture_root/node/src/injected-blake2b.mjs"
+  if duplicate_output="$(check_tree "$fixture_root" 2>&1)"; then
+    fail "negative fixture unexpectedly accepted host blake2b fallback"
+  fi
+  [[ "$duplicate_output" == *'CLI/Node host must not own'* ]] ||
+    fail "negative fixture emitted the wrong host-blake2b diagnostic: $duplicate_output"
+  rm "$fixture_root/node/src/injected-blake2b.mjs"
+
+  printf '%s\n' 'runTransactionOperation("tx.validate", transaction, {});' > "$fixture_root/cli/injected-ledger-route.mjs"
+  if duplicate_output="$(check_tree "$fixture_root" 2>&1)"; then
+    fail "negative fixture unexpectedly accepted direct host ledger routing"
+  fi
+  [[ "$duplicate_output" == *'CLI transaction routes must delegate'* ]] ||
+    fail "negative fixture emitted the wrong direct-ledger-route diagnostic: $duplicate_output"
+  rm "$fixture_root/cli/injected-ledger-route.mjs"
+
   printf '%s\n' '    "cbor-x": "fixture-only"' >> "$fixture_root/package.json"
   if dependency_output="$(check_tree "$fixture_root" 2>&1)"; then
     fail "negative fixture unexpectedly accepted forbidden semantic dependency"
@@ -201,6 +242,10 @@ run_negative_self_tests() {
   echo "architecture boundary: negative fixture rejected host provider decoder/policy"
   echo "architecture boundary: negative fixture rejected host ledger/CBOR semantics"
   echo "architecture boundary: negative fixture rejected host RDF semantics"
+  echo "architecture boundary: negative fixture rejected host cryptographic fallback"
+  echo "architecture boundary: negative fixture rejected host Plutus fallback"
+  echo "architecture boundary: negative fixture rejected host blake2b fallback"
+  echo "architecture boundary: negative fixture rejected direct host ledger routing"
   echo "architecture boundary: negative fixture rejected forbidden semantic dependency"
 }
 
