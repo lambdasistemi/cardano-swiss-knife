@@ -18,6 +18,18 @@ if (!signingVector) {
   throw new Error("Missing signing fixture: message-sign-address-hex");
 }
 
+const unrelatedWitnessVector = vectors.signingVectors.find(
+  (candidate: { label: string }) => candidate.label === "message-sign-root-text",
+);
+
+if (!unrelatedWitnessVector) {
+  throw new Error("Missing unrelated witness fixture: message-sign-root-text");
+}
+
+// Predecoded once from unrelatedWitnessVector's extended verification key.
+const unrelatedWitnessPublicKeyHex =
+  "52c906b92c8f5713a52251ce20853bea07b6155b76bc6c755f8090574d4c9345";
+
 const baseTxCbor = fs
   .readFileSync(
     path.join(
@@ -33,6 +45,19 @@ const baseTxCbor = fs
 const addressSignerHash =
   "3207c32d806ec2cabc78ff7ed869bd3098b7db93c43cc8aa93ab59eb";
 
+const witnessFixture = JSON.parse(
+  fs.readFileSync(
+    path.join(
+      process.cwd(),
+      "node",
+      "test",
+      "fixtures",
+      "transaction-witnesses.json",
+    ),
+    "utf8",
+  ),
+);
+
 const BREAK = Symbol("break");
 
 const hexToBytes = (hex: string) => {
@@ -44,6 +69,18 @@ const hexToBytes = (hex: string) => {
   return Uint8Array.from(
     normalized.match(/../g)!.map((chunk) => Number.parseInt(chunk, 16)),
   );
+};
+
+const detachedWitnessFromVector = (publicKeyHex: string, signatureHex: string) => {
+  const publicKey = hexToBytes(publicKeyHex);
+  const signature = hexToBytes(signatureHex);
+  if (publicKey.length !== 32 || signature.length !== 64) {
+    throw new Error("Expected a public verification key and Ed25519 signature test vector.");
+  }
+  return Array.from(
+    Uint8Array.from([0x82, 0x58, 0x20, ...publicKey, 0x58, 0x40, ...signature]),
+    (byte) => byte.toString(16).padStart(2, "0"),
+  ).join("");
 };
 
 const readCborLength = (
@@ -167,6 +204,40 @@ const addRequiredSigner = (txHex: string, signerHashHex: string) => {
   return Array.from(patched, (byte) => byte.toString(16).padStart(2, "0")).join("");
 };
 
+const addAdditionalRequiredSigner = (txHex: string, signerHashHex: string) => {
+  const bytes = hexToBytes(txHex);
+  const bodyStart = 1;
+  const bodyHeader = bytes[bodyStart];
+  const bodyCount = bodyHeader & 0x1f;
+  let offset = bodyStart + 1;
+
+  for (let index = 0; index < bodyCount; index += 1) {
+    const keyOffset = offset;
+    const keyByte = bytes[keyOffset];
+    offset = skipCborItem(bytes, keyOffset);
+    const valueEnd = skipCborItem(bytes, offset);
+    if (keyByte === 14) {
+      if (bytes[offset] !== 0x81) {
+        throw new Error("Expected the fixture required-signer roster to have one signer.");
+      }
+      const additionalSigner = Uint8Array.from([
+        0x58,
+        0x1c,
+        ...hexToBytes(signerHashHex),
+      ]);
+      const patched = new Uint8Array(bytes.length + additionalSigner.length);
+      patched.set(bytes.slice(0, valueEnd), 0);
+      patched[offset] = 0x82;
+      patched.set(additionalSigner, valueEnd);
+      patched.set(bytes.slice(valueEnd), valueEnd + additionalSigner.length);
+      return Array.from(patched, (byte) => byte.toString(16).padStart(2, "0")).join("");
+    }
+    offset = valueEnd;
+  }
+
+  throw new Error("Expected the fixture transaction to declare required signers.");
+};
+
 const withInvalidHereafter = (txHex: string, slot: number) => {
   if (!Number.isInteger(slot) || slot < 0 || slot > 0xffffffff) {
     throw new Error(`Expected an unsigned 32-bit slot: ${slot}`);
@@ -264,6 +335,10 @@ const txCborWithoutExpiry = withoutInvalidHereafter(
 );
 const txCbor = withInvalidHereafter(txCborWithoutExpiry, 2_100_000_001);
 const secondTxCbor = withInvalidHereafter(txCborWithoutExpiry, 2_100_000_002);
+const twoSignerTxCbor = addAdditionalRequiredSigner(
+  txCbor,
+  witnessFixture.nonTargetSignerHash,
+);
 
 const readCbor = (bytes: Uint8Array) => {
   let offset = 0;
@@ -676,4 +751,229 @@ test("workbench persists finite-TTL transactions and selection drives the inspec
   await expect(workbench).toContainText(
     "A finite invalid_hereafter from the engine is required before saving.",
   );
+});
+
+test("workbench persistently collects vault and pasted transaction witnesses", async ({ page }) => {
+  let tipRequests = 0;
+  let protocolParameterRequests = 0;
+  let successfulContextRequests = 0;
+  let providerContextAvailable = false;
+  await page.addInitScript(() => window.localStorage.setItem("provider", "Koios"));
+  await page.route("**/tip", async (route) => {
+    tipRequests += 1;
+    if (!providerContextAvailable) {
+      await route.fulfill({
+        status: 503,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "planned validation-context failure" }),
+      });
+      return;
+    }
+    successfulContextRequests += 1;
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify([{ abs_slot: "42", epoch_no: "1" }]),
+    });
+  });
+  await page.route("**/cli_protocol_params", async (route) => {
+    protocolParameterRequests += 1;
+    if (!providerContextAvailable) {
+      await route.fulfill({
+        status: 503,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "planned protocol-parameter failure" }),
+      });
+      return;
+    }
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify([{}]) });
+  });
+
+  const decode = async (cbor: string) => {
+    await page.getByRole("tab", { name: "Paste CBOR" }).click();
+    await page.getByPlaceholder("Paste Conway transaction CBOR hex").fill(cbor);
+    await page.getByRole("button", { name: "Decode", exact: true }).click();
+    await expect(page.getByText("Transaction ID", { exact: true })).toBeVisible({
+      timeout: 20_000,
+    });
+  };
+
+  const detachedWitnessFromStandaloneSigning = async (signingKey: string) => {
+    const signing = page.getByRole("region", { name: "Sign transaction body" });
+    const showKey = signing.getByRole("button", { name: "Show signing key" });
+    if ((await showKey.count()) > 0) await showKey.click();
+    await signing.getByLabel("Transaction signing key").fill(signingKey);
+    await signing.getByRole("button", { name: "Create signed transaction" }).click();
+    const witnessCard = signing
+      .locator(".signing-output-card")
+      .filter({ has: page.getByText("Detached vkey witness CBOR", { exact: true }) });
+    await expect(witnessCard).toBeVisible({ timeout: 20_000 });
+    const witness = (await witnessCard.locator(".signing-output-value").textContent())?.trim();
+    if (!witness) throw new Error("Standalone signing did not render a detached witness.");
+    return witness;
+  };
+
+  const collectedWitnessesFor = (entryId: string) =>
+    page.evaluate(async (id) => {
+      const database = await new Promise<IDBDatabase>((resolve, reject) => {
+        const request = window.indexedDB.open("cardano-swiss-knife.entry-store", 1);
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => resolve(request.result);
+      });
+      try {
+        return await new Promise<Array<{ signerId: string; witnessCborHex: string }>>((resolve, reject) => {
+          const transaction = database.transaction("entries", "readonly");
+          const request = transaction.objectStore("entries").get(id);
+          request.onerror = () => reject(request.error);
+          request.onsuccess = () => resolve(request.result.collectedWitnesses);
+        });
+      } finally {
+        database.close();
+      }
+    }, entryId);
+
+  const putSiblingFixture = (entryId: string) =>
+    page.evaluate(async ({ id, unsignedTxCborHex, signerId }) => {
+      const database = await new Promise<IDBDatabase>((resolve, reject) => {
+        const request = window.indexedDB.open("cardano-swiss-knife.entry-store", 1);
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => resolve(request.result);
+      });
+      try {
+        await new Promise<void>((resolve, reject) => {
+          const transaction = database.transaction("entries", "readwrite");
+          transaction.onerror = () => reject(transaction.error);
+          transaction.oncomplete = () => resolve();
+          transaction.objectStore("entries").put({
+            entryId: id,
+            unsignedTxCborHex,
+            requiredSigners: [signerId],
+            collectedWitnesses: [],
+            invalidAfterSlot: 2_100_000_002,
+            status: "Open",
+          });
+        });
+      } finally {
+        database.close();
+      }
+    }, { id: entryId, unsignedTxCborHex: twoSignerTxCbor, signerId: witnessFixture.requiredSignerHash });
+
+  await page.goto("/vault");
+  await page.getByLabel("Vault passphrase").fill("correct horse battery staple");
+  await page.getByRole("button", { name: "Create vault" }).click();
+  await page.getByRole("navigation", { name: "Primary" }).getByRole("link", { name: "Keys" }).click();
+  await page.getByRole("tab", { name: "Sign & verify", exact: true }).click();
+  const keySigning = page.getByRole("region", { name: "Sign payload" });
+  await keySigning.getByRole("button", { name: "Show signing key" }).click();
+  await keySigning.getByLabel("Signing key").fill(witnessFixture.signingKey);
+  await keySigning.getByLabel("Vault item name").fill("Workbench signer");
+  await keySigning.getByRole("button", { name: "Save signing key to vault" }).click();
+
+  await page.getByRole("navigation", { name: "Primary" }).getByRole("link", { name: "Workbench" }).click();
+  await decode(twoSignerTxCbor);
+  const secondWitness = await detachedWitnessFromStandaloneSigning(witnessFixture.nonTargetSigningKey);
+  const unrelatedWitness = detachedWitnessFromVector(
+    unrelatedWitnessPublicKeyHex,
+    unrelatedWitnessVector.signatureHex,
+  );
+  const firstEntryId = (await page.locator(".loaded-context-hash code").textContent())?.trim();
+  if (!firstEntryId) throw new Error("First workbench transaction did not render an id.");
+
+  const workbench = page.getByRole("region", { name: "Transaction workbench" });
+  await workbench.getByRole("button", { name: "Add current transaction" }).click();
+  const entries = workbench.getByRole("list", { name: "Saved transactions" });
+  const firstEntry = entries.getByRole("listitem").filter({ hasText: firstEntryId });
+  await expect(firstEntry).toContainText("0/2");
+  await expect(firstEntry).toContainText("Incomplete");
+  const emptyWitnessSnapshot = await collectedWitnessesFor(firstEntryId);
+  expect(emptyWitnessSnapshot).toEqual([]);
+  const siblingEntryId = "fixture-sibling-entry";
+  await putSiblingFixture(siblingEntryId);
+  const siblingWitnessSnapshot = await collectedWitnessesFor(siblingEntryId);
+  expect(siblingWitnessSnapshot).toEqual([]);
+
+  await workbench.getByRole("button", { name: "Use vault key Workbench signer" }).click();
+  await workbench.getByRole("button", { name: "Produce witness" }).click();
+  await expect(workbench.getByRole("alert")).toContainText(
+    "Could not fetch the current provider slot.",
+  );
+  await expect.poll(() => collectedWitnessesFor(firstEntryId)).toEqual(emptyWitnessSnapshot);
+
+  providerContextAvailable = true;
+  await workbench.getByRole("button", { name: "Produce witness" }).click();
+  await expect(firstEntry).toContainText("1/2");
+  await expect(workbench.getByText("Normalized witness CBOR", { exact: true })).toBeVisible();
+  await expect(workbench.getByText("TxWitness ConwayEra", { exact: false })).toBeVisible();
+  const producedWitness = await workbench.getByLabel("Normalized witness CBOR").inputValue();
+  expect(producedWitness).not.toBe("");
+
+  await workbench.getByLabel("Pasted detached witness").fill(secondWitness);
+  await workbench.getByRole("button", { name: "Attach pasted witness" }).click();
+  await expect(firstEntry).toContainText("2/2");
+  await expect(firstEntry).toContainText("Complete");
+  const rawWitnessSnapshot = await collectedWitnessesFor(firstEntryId);
+  expect(rawWitnessSnapshot).toEqual([
+    { signerId: witnessFixture.requiredSignerHash, witnessCborHex: producedWitness },
+    { signerId: witnessFixture.nonTargetSignerHash, witnessCborHex: secondWitness },
+  ]);
+
+  const secondWitnessEnvelope = JSON.stringify({
+    type: "TxWitness ConwayEra",
+    description: "Ledger Cddl Format",
+    cborHex: secondWitness,
+  });
+  await workbench.getByLabel("Pasted detached witness").fill(secondWitnessEnvelope);
+  await workbench.getByRole("button", { name: "Attach pasted witness" }).click();
+  await expect(workbench.getByRole("alert")).toContainText(
+    "Signer already has a collected witness.",
+  );
+  await expect(firstEntry).toContainText("2/2");
+  await expect.poll(() => collectedWitnessesFor(firstEntryId)).toEqual(rawWitnessSnapshot);
+
+  await workbench.getByLabel("Replace collected witness").check();
+  await workbench.getByRole("button", { name: "Attach pasted witness" }).click();
+  await expect(firstEntry).toContainText("2/2");
+  await expect.poll(() => collectedWitnessesFor(firstEntryId)).toEqual(rawWitnessSnapshot);
+
+  await workbench.getByLabel("Pasted detached witness").fill("0");
+  await workbench.getByRole("button", { name: "Attach pasted witness" }).click();
+  await expect(workbench.getByRole("alert")).toContainText(
+    "CBOR hexadecimal input must have an even number of characters.",
+  );
+  await expect(firstEntry).toContainText("2/2");
+  await expect.poll(() => collectedWitnessesFor(firstEntryId)).toEqual(rawWitnessSnapshot);
+
+  await workbench.getByLabel("Pasted detached witness").fill(
+    JSON.stringify({
+      type: "Tx ConwayEra",
+      description: "Ledger Cddl Format",
+      cborHex: twoSignerTxCbor,
+    }),
+  );
+  await workbench.getByRole("button", { name: "Attach pasted witness" }).click();
+  await expect(workbench.getByRole("alert")).toContainText(
+    "Witness input must not use a Tx ConwayEra TextEnvelope.",
+  );
+  await expect(firstEntry).toContainText("2/2");
+  await expect.poll(() => collectedWitnessesFor(firstEntryId)).toEqual(rawWitnessSnapshot);
+
+  await workbench.getByLabel("Pasted detached witness").fill(unrelatedWitness);
+  await workbench.getByRole("button", { name: "Attach pasted witness" }).click();
+  await expect(workbench.getByRole("alert")).toContainText(
+    "Pasted witness does not satisfy exactly one required signer for this entry.",
+  );
+  await expect(firstEntry).toContainText("2/2");
+  await expect.poll(() => collectedWitnessesFor(firstEntryId)).toEqual(rawWitnessSnapshot);
+
+  await expect.poll(() => collectedWitnessesFor(siblingEntryId)).toEqual(siblingWitnessSnapshot);
+  await expect.poll(() => tipRequests).toBeGreaterThan(0);
+  await expect.poll(() => protocolParameterRequests).toBeGreaterThan(0);
+  await expect.poll(() => successfulContextRequests).toBeGreaterThan(0);
+
+  await page.reload();
+  await expect(entries.getByRole("button", { name: `Select ${firstEntryId}` })).toBeVisible();
+  await entries.getByRole("button", { name: `Select ${firstEntryId}` }).click();
+  await expect(entries.getByRole("listitem").filter({ hasText: firstEntryId })).toContainText("2/2");
+  await expect(entries.getByRole("listitem").filter({ hasText: siblingEntryId })).toContainText("0/1");
+  await expect.poll(() => collectedWitnessesFor(firstEntryId)).toEqual(rawWitnessSnapshot);
+  await expect.poll(() => collectedWitnessesFor(siblingEntryId)).toEqual(siblingWitnessSnapshot);
 });

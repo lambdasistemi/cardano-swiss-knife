@@ -86,19 +86,19 @@ Tasks: T769, T770, T771, T772, T773, T774
 
 ## Slice 3 — Witness production, attachment, and completeness (driver+navigator)
 
-- [ ] T775 [US3] Add RED Playwright proof for producing a missing signer with
+- [X] T775 [US3] Add RED Playwright proof for producing a missing signer with
   an unlocked local vault key and exporting raw plus TextEnvelope witness data.
-- [ ] T776 [US3] Add RED proof for equivalent raw/TextEnvelope pasted witness
+- [X] T776 [US3] Add RED proof for equivalent raw/TextEnvelope pasted witness
   collection, engine-confirmed signer relevance, and explicit replacement.
-- [ ] T777 [US3] Add RED rejection proof for malformed/wrong-envelope,
+- [X] T777 [US3] Add RED rejection proof for malformed/wrong-envelope,
   unrelated signer, unauthorized duplicate, and persistence failures.
-- [ ] T778 [US3] Implement vault-key witness production through existing WASM
+- [X] T778 [US3] Implement vault-key witness production through existing WASM
   signing and collect it through #75 using the returned signer hash.
-- [ ] T779 [US3] Implement pasted witness normalization via #67, ledger-engine
+- [X] T779 [US3] Implement pasted witness normalization via #67, ledger-engine
   relevance proof, and #75 collection without host-side CBOR/signature logic.
-- [ ] T780 [US3] Persist accepted mutations, render raw/enveloped output and
+- [X] T780 [US3] Persist accepted mutations, render raw/enveloped output and
   exact 0/N→N/N completeness, and preserve isolation across entries/reload.
-- [ ] T781 Obtain navigator RED/GREEN approval, run focused Playwright and
+- [X] T781 Obtain navigator RED/GREEN approval, run focused Playwright and
   `./gate.sh`, and commit once with
   `Tasks: T775, T776, T777, T778, T779, T780, T781`.
 
