@@ -23,6 +23,7 @@
     "test": "npx spago test -p cardano-addresses-test",
     "bundle:lib": "npx esbuild output/Cardano.Address/index.js --bundle --outfile=dist/cardano-addresses.js --format=esm --minify",
     "build:node-api": "npx spago build -p cardano-addresses && npx esbuild node/src/index.js --bundle --platform=node --format=esm --outfile=node/dist/index.js && cp node/src/index.d.ts node/dist/index.d.ts && npx esbuild cli/csk.mjs --bundle --platform=node --format=esm --outfile=node/dist/csk.mjs",
+    "docs:api": "typedoc",
     "test:package": "node --test node/test/package-smoke.mjs"
   },
   "dependencies": {
@@ -43,6 +44,8 @@
     "purs-tidy": "^0.11.1",
     "serve": "^14.2.4",
     "spago": "^1.0.4",
+    "typedoc": "0.28.20",
+    "typedoc-plugin-markdown": "4.12.0",
     "typescript": "5.9.3"
   }
 }

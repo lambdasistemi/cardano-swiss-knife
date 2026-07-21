@@ -27,11 +27,11 @@
 
 **Goal**: Build browsable Markdown from the live contract on every docs and Node-source CI path without committing generated output.
 
-- [ ] T010-S3 Add a RED docs-generation/site proof for the missing `docs/api/index.md` target.
-- [ ] T011-S3 Configure TypeDoc plus `typedoc-plugin-markdown` to generate an `index.md`-rooted API tree from the facade, expose it as the Q-002-authorized `node-api-docs` flake package, and include the #92 property-suite source link.
-- [ ] T012-S3 Ignore `docs/api/`, add the MkDocs **API Reference** nav, and make local, main CI, PR preview, and Pages builds generate before strict MkDocs.
-- [ ] T013-S3 Run TypeDoc generation inside `ci-node-api` and invoke that check explicitly as merge-blocking GitHub CI.
-- [ ] T014-S3 Prove generated Markdown remains untracked, strict MkDocs and `nix run .#ci-node-api` pass, run `./gate.sh`, and commit `docs(node): publish generated API reference` with `Tasks: T010, T011, T012, T013, T014`.
+- [X] T010-S3 Add a RED docs-generation/site proof for the missing `docs/api/index.md` target.
+- [X] T011-S3 Configure TypeDoc plus `typedoc-plugin-markdown` to generate an `index.md`-rooted API tree from the facade, expose it as the Q-002-authorized `node-api-docs` flake package, and include the #92 property-suite source link.
+- [X] T012-S3 Ignore `docs/api/`, add the MkDocs **API Reference** nav, and make local, main CI, PR preview, and Pages builds generate before strict MkDocs.
+- [X] T013-S3 Run TypeDoc generation inside `ci-node-api` and invoke that check explicitly as merge-blocking GitHub CI.
+- [X] T014-S3 Prove generated Markdown remains untracked, strict MkDocs and `nix run .#ci-node-api` pass, run `./gate.sh`, and commit `docs(node): publish generated API reference` with `Tasks: T010, T011, T012, T013, T014`.
 
 ## Finalization (orchestrator-owned, after every task above is checked)
 

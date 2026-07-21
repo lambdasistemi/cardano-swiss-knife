@@ -48,6 +48,8 @@ let
       typescript = packageJson.devDependencies.typescript;
       eslint = packageJson.devDependencies.eslint;
       eslint-plugin-jsdoc = packageJson.devDependencies.eslint-plugin-jsdoc;
+      typedoc = packageJson.devDependencies.typedoc;
+      typedoc-plugin-markdown = packageJson.devDependencies.typedoc-plugin-markdown;
     };
   };
   documentationToolPackageLock = packageLock // {
@@ -58,6 +60,8 @@ let
           typescript = packageLock.packages."".devDependencies.typescript;
           eslint = packageLock.packages."".devDependencies.eslint;
           eslint-plugin-jsdoc = packageLock.packages."".devDependencies.eslint-plugin-jsdoc;
+          typedoc = packageLock.packages."".devDependencies.typedoc;
+          typedoc-plugin-markdown = packageLock.packages."".devDependencies.typedoc-plugin-markdown;
         };
       };
     };
@@ -87,6 +91,20 @@ let
     package = documentationToolPackage;
     packageLock = documentationToolPackageLock;
   };
+
+  node-api-docs = pkgs.runCommand "cardano-swiss-knife-node-api-docs" {
+    nativeBuildInputs = [ nodejs ];
+  } ''
+    mkdir workspace
+    cp -a ${repoRoot}/node workspace/
+    cp ${repoRoot}/package.json ${repoRoot}/typedoc.json workspace/
+    ln -s ${documentationToolNodeModules}/node_modules workspace/node_modules
+    cd workspace
+    npm run docs:api
+    test -f docs/api/index.md
+    mkdir -p $out
+    cp -a docs/api/. $out/
+  '';
 
   commonArgs = {
     src = repoRoot;
@@ -123,7 +141,7 @@ let
     });
 in
 {
-  inherit nodeModules playwrightNodeModules documentationToolNodeModules nodejs mkWorkspaceDerivation;
+  inherit nodeModules playwrightNodeModules documentationToolNodeModules node-api-docs nodejs mkWorkspaceDerivation;
 
   lib-build = mkWorkspaceDerivation {
     name = "cardano-addresses-lib-build";
