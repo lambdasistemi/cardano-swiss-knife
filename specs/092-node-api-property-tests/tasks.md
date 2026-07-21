@@ -22,13 +22,13 @@
 
 ## Slice 3 — Witness and ledger truth contracts
 
-- [ ] T015-S3 Extend canonical `node/test/api-properties.test.mjs` with commented RED→GREEN properties for all six witness-planning, preparation, normalization, attachment, validation, and evaluation exports.
-- [ ] T016-S3 Prove witness raw/TextEnvelope byte round trips, body identity, insertion/replacement/unrelated-signer safety, non-target preservation, and secret-free failures.
-- [ ] T017-S3 Preserve `valid | invalid | incomplete | rejected` and per-redeemer success/failure/incomplete/not-applicable details exactly.
-- [ ] T018-S3 Cover malformed artifact and applicable missing/incompatible/execution/protocol engine taxonomy with no host ledger/CBOR/crypto/Plutus fallback.
-- [ ] T019-S3 Keep the canonical property path wired into `ci-node-api` and add the README pointer to that executable contract, including the #77 follow-up gap.
-- [ ] T020-S3 Run `nix run .#ci-node-api` and `./gate.sh`.
-- [ ] T021-S3 Commit exactly `test(node): specify witness and ledger properties` with `Tasks: T015, T016, T017, T018, T019, T020, T021`.
+- [X] T015-S3 Extend canonical `node/test/api-properties.test.mjs` with commented RED→GREEN properties for all six witness-planning, preparation, normalization, attachment, validation, and evaluation exports.
+- [X] T016-S3 Prove witness raw/TextEnvelope byte round trips, body identity, insertion/replacement/unrelated-signer safety, non-target preservation, and secret-free failures.
+- [X] T017-S3 Preserve `valid | invalid | incomplete | rejected` and per-redeemer success/failure/incomplete/not-applicable details exactly.
+- [X] T018-S3 Cover malformed artifact and applicable missing/incompatible/execution/protocol engine taxonomy with no host ledger/CBOR/crypto/Plutus fallback.
+- [X] T019-S3 Keep the canonical property path wired into `ci-node-api` and add the README pointer to that executable contract, including the #77 follow-up gap.
+- [X] T020-S3 Run `nix run .#ci-node-api` and `./gate.sh`.
+- [X] T021-S3 Commit exactly `test(node): specify witness and ledger properties` with `Tasks: T015, T016, T017, T018, T019, T020, T021`.
 
 ## Orchestrator-owned finalization
 

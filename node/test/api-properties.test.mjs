@@ -236,6 +236,8 @@ const transactionCbor = (await readFile(new URL("../../fixtures/conway-mainnet-t
 const transactionEnvelope = JSON.stringify({ type: "Tx ConwayEra", description: "Ledger Cddl Format", cborHex: transactionCbor });
 const transactionBooks = JSON.parse(await readFile(new URL("./fixtures/transaction-books.json", import.meta.url), "utf8"));
 const providerFailures = JSON.parse(await readFile(new URL("./fixtures/provider-failures.json", import.meta.url), "utf8"));
+const witnessFixture = JSON.parse(await readFile(new URL("./fixtures/transaction-witnesses.json", import.meta.url), "utf8"));
+const ledgerFixture = JSON.parse(await readFile(new URL("./fixtures/transaction-ledger.json", import.meta.url), "utf8"));
 const transactionOperations = ["inspectTransaction", "browseTransaction", "identifyTransaction", "transactionIntent"];
 const providerNetworks = [
   ["blockfrost", "mainnet", "https://cardano-mainnet.blockfrost.io/api/v0/txs/"],
@@ -432,21 +434,231 @@ test("property: RDF engine failures remain exact for books through all transacti
   await assertFailures(async ({ engine, wasm, originalWasm }) => { await writeFile(wasm, await readFile(originalWasm)); await writeFile(engine, "export default async () => {}; export const query = () => 'not RDF query rows';"); }, "RDF_ENGINE_PROTOCOL");
 });
 
-// Contract inventory — valid domain: the current Slice-2 public contract registry; invariant:
+// Fixed inert transaction vector derived once from the committed treasury-reorganize
+// transaction by declaring witness-fixture required signers. Its provenance is
+// node/test/transaction-witness.test.mjs; this property suite deliberately contains
+// no CBOR parser or mutator and delegates all ledger semantics to the packaged engine.
+const witnessTransactionCbor = "84ac00d901028b8258200abab118fb103b983b177fb80c247803f3b5ff7f5d98202ddd2f071b017cb23d0082582044454ed0def64621ef645958830f599b488b699b28e3797cc37c4f4dd1463a7901825820968fd01e074ca33de95087957f59803bb2ee8bacfe922eb81cdf18e8e23ad78800825820968fd01e074ca33de95087957f59803bb2ee8bacfe922eb81cdf18e8e23ad78802825820a5003a714c45d0c25d6d6463f6ac0c1fd059bc6c390388aaf1cea7249e0fe3ab01825820a80f446675b55c8f39a2efadc79d4a5643ed64b13c0750bbc0c4010d335713fa01825820affe90d1fa9a93b3e2a48009ef80634e9de8428640f5d673e85b002a8639998200825820cda0126e9ea7b336bbb338d2bfc7622a41b584e3bebc33c9c320e8895b9bc08201825820cda0126e9ea7b336bbb338d2bfc7622a41b584e3bebc33c9c320e8895b9bc08202825820e95251993c0ed08c52d4063da1aeba193e4327d4900168111fe73f61ed10d3c501825820efff271aa02e9032aba0e5e9020c5840b2aa1b219c59f9f16e1d6e51071bea1e020dd9010281825820968fd01e074ca33de95087957f59803bb2ee8bacfe922eb81cdf18e8e23ad788020e82581c3207c32d806ec2cabc78ff7ed869bd3098b7db93c43cc8aa93ab59eb581c6b067bf7f9934fe990e607a63351a06453a1b746fef116f809b62e0712d901028482582011ace24a7b0caad4a68a38ef2fff18185dc9ea604e84425dab487cae94e4cf540082582025ba96f5deb14bb5c56e7542d6a9ba8450f52cc698ebd74574e1a0525d86109502825820810bfcbde85ae72f27d7e8cd154c03c802de15d3fa0dd83a32a4b0fdba330b3c00825820e7b395a93d49a17994d66df0e4778a01dee05e7711e6612f28d97b63e4e6311c0201828258393132201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0d32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0d821b0000008e46925cd7a1581cc48cbb3d5e57ed56e276bc45f99ab39abe94e6cd7ac39fb402da47ada1480014df105553444d1b000000046da5585f825839018bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c14c7889c658ef4f491a34cf79c35a2e0fe6b0d1b0a856fb9580f2d9c31a0485e7b510825839018bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c14c7889c658ef4f491a34cf79c35a2e0fe6b0d1b0a856fb9580f2d9c31a047a40fc111a0022f42a021a00174d71031a0b7e214105a1581df1a64d1b9e1aeffe54056034d84977061b45a92691efc282fbee3fc094000b5820b8a8dd58b2a5e1ace337bb601b390e22ce1e7c4d72f96c30a7ab6c2938cb3cda075820a996858c84ca5d9376ff24fe1f0677fcafe8b3cd69eee18d1011d50ced200db8a105ab82000082d87980821a001429291a1b37e07482000182d87980821a0014398b1a1b5ff03982000282d87980821a001449ed1a1b87fffe82000482d87980821a00146ab11a1bd81f8882000582d87980821a00147b131a1c002f4d82000682d87980821a00148b751a1c283f1282000782d87980821a00149bd71a1c504ed782000882d87980821a0014ac391a1c785e9c82000982d87980821a0014bc9b1a1ca06e6182000a82d87980821a0014ccfd1a1cc87e268203008280821a000844791a0fa9ec0bf5d90103a100a119069ea464626f6479a6656576656e746a72656f7267616e697a65656c6162656c6a72656f7267616e697a656a7265666572656e636573806b6465736372697074696f6e81783b54726561737572792072656f7267616e697a653a206d65726765205554784f7320696e746f206f6e6520636f6e74696e75696e67206f75747075746b64657374696e6174696f6ea1656c6162656c6874726561737572796d6a757374696669636174696f6e81781c526f7574696e65207472656173757279206d61696e74656e616e63656840636f6e7465787483783e68747470733a2f2f6769746875622e636f6d2f53756e646165537761702d66696e616e63652f74726561737572792d636f6e7472616374732f626c6f622f782861643433313664306433366364656637383066383566633265633862333037653634356464633261781e2f6f6666636861696e2f7372632f6d657461646174612f737065632e6d6468696e7374616e6365783833386336323764343538333537343461326436633732373132346632623538353265353536346165616233663630386530653834656136646d68617368416c676f726974686d6b626c616b6532622d323536";
+
+const witnessTransaction = (representation) => representation === "raw"
+  ? { cborHex: witnessTransactionCbor }
+  : { textEnvelope: JSON.stringify({ type: "Tx ConwayEra", description: "Ledger Cddl Format", cborHex: witnessTransactionCbor }) };
+const witnessRepresentation = (witness, representation) => representation === "raw"
+  ? { cborHex: witness.value.vkeyWitnessCborHex ?? witness.value.cborHex }
+  : { textEnvelope: witness.value.textEnvelope };
+const witnessPlan = (result) => result.value.result.witness_plan;
+const witnessPreparation = async (signingKeyBech32 = witnessFixture.signingKey) => {
+  const identified = await one("identifyTransaction", witnessTransaction("raw"));
+  assert.equal(identified.ok, true, JSON.stringify(identified));
+  return one("prepareTransactionWitness", { bodyHashHex: identified.value.result.identification.body_hash, signingKeyBech32 });
+};
+
+// prepareTransactionWitness/normaliseTransactionWitness — valid domain: the committed
+// body hash and fixture signing key, with raw or TxWitness ConwayEra representations;
+// invariant: signing is deterministic, bytes normalize exactly, and CBOR is preserved;
+// taxonomy: malformed key material is DOMAIN_ERROR, malformed witness encodings are WITNESS_INPUT,
+// and neither successful nor failed serialization may contain a signing secret.
+test("property: detached witness preparation and normalization are deterministic, byte-exact, and secret-free", async () => {
+  for (const representation of ["raw", "envelope"]) {
+    const [first, second] = await Promise.all([witnessPreparation(), witnessPreparation()]);
+    assertEnvelope(first); assert.deepEqual(second, first);
+    assert.equal(first.value.textEnvelope.type, "TxWitness ConwayEra");
+    assert.equal(first.value.textEnvelope.cborHex, first.value.vkeyWitnessCborHex);
+    assert.equal(first.value.signerHashHex, witnessFixture.requiredSignerHash, "prepared witness must bind the committed required signer");
+    const normalised = await one("normaliseTransactionWitness", witnessRepresentation(first, representation));
+    assert.deepEqual(normalised, {
+      ok: true,
+      value: { cborHex: first.value.vkeyWitnessCborHex, textEnvelope: first.value.textEnvelope },
+    });
+    for (const reRepresentation of ["raw", "envelope"]) {
+      const again = await one("normaliseTransactionWitness", witnessRepresentation(normalised, reRepresentation));
+      assert.deepEqual(again, normalised, `normalization must be idempotent through ${representation}/${reRepresentation}`);
+    }
+    assert.equal(JSON.stringify(first).includes(witnessFixture.signingKey), false, "successful witness leaked signing key");
+  }
+  await fc.assert(fc.asyncProperty(
+    fc.shuffledSubarray(["raw", "envelope"], { minLength: 2, maxLength: 2 }),
+    async (representations) => {
+      const prepared = await witnessPreparation();
+      const normalised = [];
+      for (const representation of representations) normalised.push(await one("normaliseTransactionWitness", witnessRepresentation(prepared, representation)));
+      assert.deepEqual(normalised[1], normalised[0], "generated safe representation order must preserve normalized witness bytes");
+    },
+  ), propertyParameters(2));
+  assertError(await one("prepareTransactionWitness", { bodyHashHex: "00".repeat(32), signingKeyBech32: witnessFixture.secretSentinel }), "DOMAIN_ERROR");
+  assertError(await one("normaliseTransactionWitness", { cborHex: "not-cbor" }), "WITNESS_INPUT");
+  const failure = await one("prepareTransactionWitness", { bodyHashHex: "00".repeat(32), signingKeyBech32: witnessFixture.secretSentinel });
+  assert.equal(JSON.stringify(failure).includes(witnessFixture.secretSentinel), false, "witness diagnostic leaked secret");
+});
+
+// attachTransactionWitness/planTransactionWitnesses — valid domain: the fixed required-signer
+// transaction, fixture witnesses, raw/TextEnvelope forms, and explicit replacement option;
+// invariant: body identity, authorized signer transitions, and non-target witness content survive;
+// taxonomy: duplicate replacement and unrelated signers are WITNESS_REPLACEMENT_FORBIDDEN and
+// WITNESS_UNRELATED_SIGNER respectively, while malformed witness forms are WITNESS_INPUT.
+test("property: witness attachment and planning retain exact signer and non-target safety contracts", async () => {
+  const representationPairs = [
+    ["raw", "raw"], ["raw", "envelope"], ["envelope", "raw"], ["envelope", "envelope"],
+  ];
+  await fc.assert(fc.asyncProperty(
+    fc.shuffledSubarray(representationPairs, { minLength: representationPairs.length, maxLength: representationPairs.length }),
+    async (pairs) => {
+      for (const [transactionRepresentation, representation] of pairs) {
+    const prepared = await witnessPreparation();
+    const nonTarget = await witnessPreparation(witnessFixture.nonTargetSigningKey);
+    const unrelated = await witnessPreparation(witnessFixture.unrelatedSigningKey);
+    for (const result of [prepared, nonTarget, unrelated]) assert.equal(result.ok, true, JSON.stringify(result));
+    const preexisting = await one("attachTransactionWitness", witnessTransaction(transactionRepresentation), witnessRepresentation(nonTarget, representation));
+    assert.equal(preexisting.ok, true, JSON.stringify(preexisting));
+    const [before, beforeEnvelope] = await foreign.invoke([
+      { name: "planTransactionWitnesses", args: [{ cborHex: preexisting.value.signedTxCborHex }] },
+      { name: "planTransactionWitnesses", args: [{ textEnvelope: preexisting.value.textEnvelope }] },
+    ]);
+    assert.deepEqual(beforeEnvelope, before, "pre-attachment witness planning must be raw/TextEnvelope parity");
+    const inserted = await one("attachTransactionWitness", { textEnvelope: preexisting.value.textEnvelope }, witnessRepresentation(prepared, representation));
+    const [after, afterEnvelope] = await foreign.invoke([
+      { name: "planTransactionWitnesses", args: [{ cborHex: inserted.value.signedTxCborHex }] },
+      { name: "planTransactionWitnesses", args: [{ textEnvelope: inserted.value.textEnvelope }] },
+    ]);
+    assert.equal(inserted.ok, true, JSON.stringify(inserted)); assert.equal(after.ok, true, JSON.stringify(after));
+    assert.deepEqual(afterEnvelope, after, "post-attachment witness planning must be raw/TextEnvelope parity");
+    assert.equal(inserted.value.witnessPatchAction, "inserted");
+    assert.equal(inserted.value.textEnvelope.type, "Tx ConwayEra");
+    assert.equal(inserted.value.textEnvelope.cborHex, inserted.value.signedTxCborHex);
+    assert.equal(witnessPlan(after).body_hash, witnessPlan(before).body_hash, "attachment changed transaction body identity");
+    assert.ok(witnessPlan(before).missing_vkey_witnesses.some(({ hash }) => hash === prepared.value.signerHashHex), "prepared signer must be missing before attachment");
+    assert.ok(witnessPlan(before).present_vkey_witnesses.some(({ hash }) => hash === nonTarget.value.signerHashHex), "non-target signer must be present before attachment");
+    assert.ok(witnessPlan(after).present_vkey_witnesses.some(({ hash }) => hash === prepared.value.signerHashHex), "prepared signer must be present after attachment");
+    assert.deepEqual(
+      witnessPlan(after).missing_vkey_witnesses,
+      witnessPlan(before).missing_vkey_witnesses.filter(({ hash }) => hash !== prepared.value.signerHashHex),
+      "attachment must remove exactly the prepared signer from the missing set",
+    );
+    assert.deepEqual(
+      witnessPlan(after).present_vkey_witnesses.filter(({ hash }) => hash !== prepared.value.signerHashHex),
+      witnessPlan(before).present_vkey_witnesses,
+      "attachment changed pre-existing non-target vkeys",
+    );
+    for (const field of ["scripts", "datums", "redeemers"]) assert.deepEqual(witnessPlan(after)[field], witnessPlan(before)[field], `attachment changed ${field}`);
+    const duplicate = await one("attachTransactionWitness", { cborHex: inserted.value.signedTxCborHex }, witnessRepresentation(prepared, representation));
+    assertError(duplicate, "WITNESS_REPLACEMENT_FORBIDDEN");
+    const replaced = await one("attachTransactionWitness", { cborHex: inserted.value.signedTxCborHex }, witnessRepresentation(prepared, representation), { replaceExisting: true });
+    assert.equal(replaced.ok, true, JSON.stringify(replaced)); assert.equal(replaced.value.witnessPatchAction, "replaced");
+    const replacedPlan = await one("planTransactionWitnesses", { cborHex: replaced.value.signedTxCborHex });
+    assert.equal(replacedPlan.ok, true, JSON.stringify(replacedPlan));
+    assert.equal(witnessPlan(replacedPlan).body_hash, witnessPlan(before).body_hash, "authorized replacement changed transaction body identity");
+    assert.ok(witnessPlan(replacedPlan).present_vkey_witnesses.some(({ hash }) => hash === nonTarget.value.signerHashHex), "authorized replacement removed the non-target signer");
+    assertError(await one("attachTransactionWitness", witnessTransaction("raw"), witnessRepresentation(unrelated, representation)), "WITNESS_UNRELATED_SIGNER");
+    assert.deepEqual(witnessPlan(after).missing_vkey_witnesses, []);
+      }
+    },
+  ), propertyParameters(2));
+});
+
+// validateTransaction/evaluateTransactionScripts — valid domain: every committed ledger fixture
+// state and its packaged context; invariant: ledger truth states and redeemer details are retained
+// exactly; taxonomy: successful engine verdicts are valid|invalid|incomplete|rejected and
+// succeeded|failed|incomplete|rejected|not_applicable, not JavaScript truthiness or fallback values.
+test("property: ledger validation and script evaluation preserve every committed truth state exactly", async () => {
+  const completeOptions = ledgerFixture.complete.options;
+  const invalidOptions = { ...completeOptions, context: { ...completeOptions.context, network: ledgerFixture.mutations.invalidNetwork } };
+  const rejectedOptions = { ...completeOptions, context: ledgerFixture.mutations.rejectedContext };
+  const transactionRepresentation = (cborHex, representation) => representation === "raw"
+    ? { cborHex }
+    : { textEnvelope: JSON.stringify({ type: "Tx ConwayEra", description: "Ledger Cddl Format", cborHex }) };
+  const ledgerCall = async (name, input, options) => (
+    await foreign.invoke([{ name, args: options === undefined ? [input] : [input, options] }])
+  )[0];
+  const validateCases = [
+    ["valid", ledgerFixture.complete.transactionCbor, completeOptions],
+    ["invalid", ledgerFixture.complete.transactionCbor, invalidOptions],
+    ["incomplete", transactionCbor, undefined],
+    ["rejected", ledgerFixture.complete.transactionCbor, rejectedOptions],
+  ];
+  const evaluateCases = [
+    ["succeeded", ledgerFixture.complete.transactionCbor, completeOptions],
+    ["failed", ledgerFixture.complete.transactionCbor.replace(ledgerFixture.mutations.failedMint.from, ledgerFixture.mutations.failedMint.to), completeOptions],
+    ["incomplete", transactionCbor, undefined],
+    ["rejected", ledgerFixture.complete.transactionCbor, rejectedOptions],
+    ["notApplicable", ledgerFixture.noScriptTransactionCbor, undefined],
+  ];
+  const validation = {};
+  const evaluation = {};
+  for (const [state, cborHex, options] of validateCases) {
+    const [raw, envelope] = await Promise.all(["raw", "envelope"].map((representation) => ledgerCall("validateTransaction", transactionRepresentation(cborHex, representation), options)));
+    assert.deepEqual(envelope, raw, `validation ${state} must be raw/TextEnvelope parity`);
+    validation[state] = raw;
+  }
+  for (const [state, cborHex, options] of evaluateCases) {
+    const [raw, envelope] = await Promise.all(["raw", "envelope"].map((representation) => ledgerCall("evaluateTransactionScripts", transactionRepresentation(cborHex, representation), options)));
+    assert.deepEqual(envelope, raw, `evaluation ${state} must be raw/TextEnvelope parity`);
+    evaluation[state] = raw;
+  }
+  for (const result of [...Object.values(validation), ...Object.values(evaluation)]) assert.equal(result.ok, true, JSON.stringify(result));
+  for (const [state, result] of Object.entries(validation)) assert.equal(result.value.result.validation.status, ledgerFixture.expected.validationStatuses[state]);
+  for (const [state, result] of Object.entries(evaluation)) assert.equal(result.value.result.script_evaluation.status, ledgerFixture.expected.evaluationStatuses[state]);
+  const succeeded = evaluation.succeeded.value.result.script_evaluation.redeemers[0];
+  assert.deepEqual({ purpose: succeeded.purpose, index: succeeded.index, status: succeeded.status, evaluatedExUnits: succeeded.evaluated_ex_units }, ledgerFixture.expected.succeededRedeemer);
+  const failedRedeemer = evaluation.failed.value.result.script_evaluation.redeemers[0];
+  assert.deepEqual({ purpose: failedRedeemer.purpose, index: failedRedeemer.index, status: failedRedeemer.status, failureCode: failedRedeemer.failure.code }, ledgerFixture.expected.failedRedeemer);
+});
+
+// Witness and ledger malformed inputs — valid domain: deliberately wrong TextEnvelope types and
+// malformed CBOR around committed artifacts; invariant: decoding is rejected before a result exists;
+// taxonomy: witness forms are WITNESS_INPUT and transaction forms are DOMAIN_ERROR.
+test("property: witness and ledger artifacts reject malformed and wrong-envelope representations exactly", async () => {
+  const prepared = await witnessPreparation();
+  assert.equal(prepared.ok, true, JSON.stringify(prepared));
+  const wrongWitness = { textEnvelope: { type: "Tx ConwayEra", description: "Ledger Cddl Format", cborHex: prepared.value.vkeyWitnessCborHex } };
+  assertError(await one("attachTransactionWitness", witnessTransaction("raw"), wrongWitness), "WITNESS_INPUT");
+  const wrongTransaction = { textEnvelope: JSON.stringify({ type: "TxWitness ConwayEra", description: "Ledger Cddl Format", cborHex: transactionCbor }) };
+  for (const name of ["planTransactionWitnesses", "validateTransaction", "evaluateTransactionScripts"]) assertError(await one(name, wrongTransaction), "DOMAIN_ERROR");
+  for (const name of ["planTransactionWitnesses", "validateTransaction", "evaluateTransactionScripts"]) assertError(await one(name, { cborHex: "not-cbor" }), "DOMAIN_ERROR");
+});
+
+// Ledger-engine boundaries — valid domain: all four ledger-crossing exports over committed
+// witness/transaction artifacts; invariant: real artifact replacement is the only engine boundary;
+// taxonomy: missing, incompatible, execution, and malformed protocol artifacts remain exact
+// ENGINE_* failures with no fallback ledger result.
+test("property: every ledger-crossing witness export retains exact engine failure taxonomy", async () => {
+  const prepared = await witnessPreparation();
+  assert.equal(prepared.ok, true, JSON.stringify(prepared));
+  const calls = () => foreign.invoke([
+    { name: "attachTransactionWitness", args: [witnessTransaction("raw"), witnessRepresentation(prepared, "raw")] },
+    { name: "planTransactionWitnesses", args: [witnessTransaction("raw")] },
+    { name: "validateTransaction", args: [witnessTransaction("raw")] },
+    { name: "evaluateTransactionScripts", args: [witnessTransaction("raw")] },
+  ]);
+  const assertFailures = async (bytes, code) => withTransactionEngine(bytes, async () => {
+    for (const result of await calls()) assertError(result, code);
+  });
+  await assertFailures(null, "ENGINE_NOT_FOUND");
+  await assertFailures("not a WebAssembly binary", "ENGINE_INCOMPATIBLE");
+  const abnormalExit = Buffer.from([0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x02, 0x60, 0x01, 0x7f, 0x00, 0x60, 0x00, 0x00, 0x02, 0x24, 0x01, 0x16, ...Buffer.from("wasi_snapshot_preview1"), 0x09, ...Buffer.from("proc_exit"), 0x00, 0x00, 0x03, 0x02, 0x01, 0x01, 0x07, 0x0a, 0x01, 0x06, ...Buffer.from("_start"), 0x00, 0x01, 0x0a, 0x08, 0x01, 0x06, 0x00, 0x41, 0x2a, 0x10, 0x00, 0x0b]);
+  const emptyStart = Buffer.from([0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00, 0x01, 0x04, 0x01, 0x60, 0x00, 0x00, 0x03, 0x02, 0x01, 0x00, 0x07, 0x0a, 0x01, 0x06, 0x5f, 0x73, 0x74, 0x61, 0x72, 0x74, 0x00, 0x00, 0x0a, 0x04, 0x01, 0x02, 0x00, 0x0b]);
+  await assertFailures(abnormalExit, "ENGINE_EXECUTION");
+  await assertFailures(emptyStart, "ENGINE_PROTOCOL");
+});
+
+// Contract inventory — valid domain: the current 25-export public surface; invariant:
 // every named public operation has a canonical property group; taxonomy: inventory drift is an
-// assertion failure, never an omitted or fallback contract. The four Slice-2 names are registered
+// assertion failure, never an omitted or fallback contract. The six Slice-3 names are registered
 // only in GREEN, after the substantive properties above have executed and exposed this honest RED.
 const contractInventory = [
   "CskError", "inspectAddress", "generateMnemonic", "validateMnemonic", "deriveKeys", "constructShelleyAddresses",
   "constructIcarusAddressFromMnemonic", "constructByronAddressFromMnemonic", "constructIcarusAddress", "constructByronAddress",
   "signPayload", "verifySignature", "analyzeNativeScriptHex", "analyzeNativeScriptJson", "analyzeScriptTemplateJson",
   "inspectTransaction", "browseTransaction", "identifyTransaction", "transactionIntent",
+  "prepareTransactionWitness", "normaliseTransactionWitness", "attachTransactionWitness", "planTransactionWitnesses",
+  "validateTransaction", "evaluateTransactionScripts",
 ];
-test("property: current-through-Slice-2 public contract inventory is complete", () => {
+test("property: current public contract inventory is complete", () => {
   assert.deepEqual(contractInventory, [
     "CskError", "inspectAddress", "generateMnemonic", "validateMnemonic", "deriveKeys", "constructShelleyAddresses",
     "constructIcarusAddressFromMnemonic", "constructByronAddressFromMnemonic", "constructIcarusAddress", "constructByronAddress",
     "signPayload", "verifySignature", "analyzeNativeScriptHex", "analyzeNativeScriptJson", "analyzeScriptTemplateJson",
     "inspectTransaction", "browseTransaction", "identifyTransaction", "transactionIntent",
+    "prepareTransactionWitness", "normaliseTransactionWitness", "attachTransactionWitness", "planTransactionWitnesses",
+    "validateTransaction", "evaluateTransactionScripts",
   ]);
 });
