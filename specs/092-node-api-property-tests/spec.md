@@ -24,7 +24,8 @@ inputs or committed engine vectors and verifies stable result envelopes through
 the real packaged address/signing WASI artifact.
 
 **Independent Test**: Install the Nix-built npm tarball into a foreign temporary
-project and run the offline property file through Node 22.
+project and run the offline section of `node/test/api-properties.test.mjs`
+through Node 22.
 
 **Acceptance Scenarios**:
 
@@ -128,8 +129,8 @@ witness transitions, validation verdicts, and redeemer outcomes.
   body identity, non-target content, and secret-free diagnostics.
 - **FR-011**: The existing example tests MUST remain; properties supplement
   them and run as part of `checks.<system>.node-api` / `ci-node-api`.
-- **FR-012**: A short root README section MUST point package consumers to the
-  property files as the canonical executable API contract.
+- **FR-012**: A short root README section MUST point package consumers to
+  `node/test/api-properties.test.mjs` as the canonical executable API contract.
 - **FR-013**: Changes to `node/src/index.js` or other csk-93-owned source files
   require a parent Q-file before work begins.
 - **FR-014**: The PR body MUST explicitly state that provider submission from
@@ -139,8 +140,8 @@ witness transitions, validation verdicts, and redeemer outcomes.
 
 - **SC-001**: A static export inventory test proves the property contract names
   exactly every current public package export, with no silent omission.
-- **SC-002**: Every property file passes through the installed Nix-built
-  package from a foreign current working directory on Node 22.
+- **SC-002**: The canonical property file passes through the installed
+  Nix-built package from a foreign current working directory on Node 22.
 - **SC-003**: Shrunk counterexamples report reproducible fast-check seed/path
   information and never leak credentials or signing keys.
 - **SC-004**: Architecture-boundary checks remain green and the diff contains

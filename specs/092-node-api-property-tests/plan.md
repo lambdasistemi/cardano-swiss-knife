@@ -4,12 +4,13 @@
 
 ## Summary
 
-Pin `fast-check` and add three installed-package property files covering the
+Pin `fast-check` and build one canonical installed-package property suite at
+`node/test/api-properties.test.mjs`, extended across three slices to cover the
 complete current Node API. Properties use committed vectors/fixtures as valid
 semantic seeds, generate legal representation and input variations, assert
 exact envelopes/taxonomies, and invoke the real Nix-pinned engines. The only
-mock boundary is provider HTTP. Each file is wired into `ci-node-api` in the
-same bisect-safe commit that introduces it.
+mock boundary is provider HTTP. Slice 1 wires the canonical file into
+`ci-node-api`; later slices extend it without changing the gate path.
 
 ## Technical context
 
@@ -69,7 +70,7 @@ errors, and exact result-envelope shape. Wire the file into `ci-node-api`.
 - `package.json`
 - `package-lock.json`
 - `node/test/property-support.mjs`
-- `node/test/property-offline.test.mjs`
+- `node/test/api-properties.test.mjs`
 - `nix/checks/node-api.nix`
 
 **Forbidden scope**: every `node/src/**` file, existing example tests/fixtures,
@@ -81,17 +82,17 @@ README/docs, flake inputs, engine pins, and host semantic implementations
 
 ### Slice 2 — Transaction, provider, and book contracts
 
-Add RED→GREEN properties for `inspectTransaction`, `browseTransaction`,
-`identifyTransaction`, and `transactionIntent`. Vary raw/TextEnvelope forms,
-browse paths, malformed/exclusive sources, every provider/network combination,
-redacted provider failures, context completeness, ordered books, RDF
-resolutions, and ledger/RDF engine failure/protocol behavior. Use the shared
-harness without changing production source.
+Extend the canonical file with RED→GREEN properties for `inspectTransaction`,
+`browseTransaction`, `identifyTransaction`, and `transactionIntent`. Vary
+raw/TextEnvelope forms, browse paths, malformed/exclusive sources, every
+provider/network combination, redacted provider failures, context
+completeness, ordered books, RDF resolutions, and ledger/RDF engine
+failure/protocol behavior. Use the shared harness without changing production
+source or the already-wired gate path.
 
 **Owned files**:
 
-- `node/test/property-transaction.test.mjs`
-- `nix/checks/node-api.nix`
+- `node/test/api-properties.test.mjs`
 
 **Forbidden scope**: `node/test/property-support.mjs`, dependency manifests,
 every `node/src/**` file, existing example tests/fixtures, README/docs, and
@@ -103,19 +104,19 @@ host-side provider/ledger/RDF implementations
 
 ### Slice 3 — Witness and ledger truth contracts
 
-Add RED→GREEN properties for `prepareTransactionWitness`,
+Extend the canonical file with RED→GREEN properties for
+`prepareTransactionWitness`,
 `normaliseTransactionWitness`, `attachTransactionWitness`,
 `planTransactionWitnesses`, `validateTransaction`, and
 `evaluateTransactionScripts`. Vary witness/transaction representations and
 safe options around committed fixtures; assert byte/body identity, signer
 transitions, non-target preservation, exact validation/redeemer truth states,
 typed malformed/engine/protocol failures, and secret absence. Add a README
-pointer to all three files and wire the final property file into `ci-node-api`.
+pointer to the canonical file; the gate continues using the Slice 1 path.
 
 **Owned files**:
 
-- `node/test/property-ledger.test.mjs`
-- `nix/checks/node-api.nix`
+- `node/test/api-properties.test.mjs`
 - `README.md`
 
 **Forbidden scope**: `node/test/property-support.mjs`, dependency manifests,
@@ -138,9 +139,9 @@ wait for remote CI on the final sentinel SHA before reporting `COMPLETE`.
 ## Dependency and ordering constraints
 
 1. Slice 1 pins the dependency and creates the shared harness.
-2. Slice 2 consumes that frozen harness and extends only the explicit Nix test
-   list plus its new property file.
-3. Slice 3 consumes both earlier layers and adds the package documentation
+2. Slice 2 consumes the frozen harness and extends the canonical property file
+   without changing its `ci-node-api` path.
+3. Slice 3 extends the same canonical file and adds the package documentation
    pointer.
 4. Every slice is RED then GREEN, navigator-approved, one bisect-safe commit,
    and never pushed by the driver.
