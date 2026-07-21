@@ -35,8 +35,14 @@
 - [X] T022-S4 Extend the architecture boundary proof so provider endpoints/decoders, ledger semantics, and RDF query semantics cannot appear in host code.
 - [X] T023-S4 Run `nix run .#ci-node-api`, `nix run .#ci-node-package`, the packaged `csk` smoke, and `./gate.sh`, then commit exactly `feat(cli): expose transaction inspection commands` with `Tasks: T018, T019, T020, T021, T022, T023`.
 
+## Slice 5 — Remote package-smoke checkout parity
+
+- [ ] T027-S5 Make the local package check reproduce GitHub Actions' real checkout layout instead of synthesizing an uncommitted root fixture path, and observe the existing package smoke fail RED with `ENOENT`.
+- [ ] T028-S5 Resolve the transaction input from the committed canonical inspector fixture so the same test source runs under Nix and directly from repository root on Linux, macOS, and Windows.
+- [ ] T029-S5 Run `nix run .#ci-node-package`, the exact repository-root `npm run test:package` command against a freshly built tarball, and `./gate.sh`, then commit exactly `fix(ci): use committed transaction fixture in package smoke` with `Tasks: T027, T028, T029`.
+
 ## Orchestrator-owned finalization
 
 - [X] T024 Append the focused Node API/package transaction checks to the inherited `gate.sh` without replacing any existing check or function.
-- [X] T025 Audit all issue acceptance criteria, public exports/commands, provider fixtures, raw identifier truth, engine ownership, secret handling, and task/commit correspondence.
-- [X] T026 Run the final gate and commit-message audit, update PR #89 with exact proof and residual risks, drop `gate.sh` only under the finalization rule, mark ready, report `COMPLETE`, and do not merge.
+- [ ] T025 Audit all issue acceptance criteria, public exports/commands, provider fixtures, raw identifier truth, engine ownership, secret handling, and task/commit correspondence.
+- [ ] T026 Run the final gate and commit-message audit, update PR #89 with exact proof and residual risks, drop `gate.sh` only after fresh `node-package-smoke` success on ubuntu/macos/windows, mark ready, report `COMPLETE`, and do not merge.
