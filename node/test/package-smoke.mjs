@@ -11,7 +11,7 @@ const tarball = process.env.CSK_PACKAGE_TARBALL;
 const vectors = JSON.parse(await readFile(new URL("../../test-vectors/vectors.json", import.meta.url), "utf8"));
 const mnemonic = vectors.derivationVectors[0].mnemonic.join(" ");
 const signing = vectors.signingVectors[0];
-const transactionCbor = (await readFile(new URL("../../fixtures/conway-mainnet-tx.hex", import.meta.url), "utf8")).trim();
+const transactionCbor = (await readFile(new URL("../../docs/inspector/tests/fixtures/treasury-reorganize-unsigned-tx.hex", import.meta.url), "utf8")).trim();
 const textEnvelope = JSON.stringify({ type: "Tx ConwayEra", description: "Ledger Cddl Format", cborHex: transactionCbor });
 const npmExecPath = process.env.npm_execpath;
 

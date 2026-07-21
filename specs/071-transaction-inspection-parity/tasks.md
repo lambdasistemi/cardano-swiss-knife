@@ -37,9 +37,9 @@
 
 ## Slice 5 — Remote package-smoke checkout parity
 
-- [ ] T027-S5 Make the local package check reproduce GitHub Actions' real checkout layout instead of synthesizing an uncommitted root fixture path, and observe the existing package smoke fail RED with `ENOENT`.
-- [ ] T028-S5 Resolve the transaction input from the committed canonical inspector fixture so the same test source runs under Nix and directly from repository root on Linux, macOS, and Windows.
-- [ ] T029-S5 Run `nix run .#ci-node-package`, the exact repository-root `npm run test:package` command against a freshly built tarball, and `./gate.sh`, then commit exactly `fix(ci): use committed transaction fixture in package smoke` with `Tasks: T027, T028, T029`.
+- [X] T027-S5 Make the local package check reproduce GitHub Actions' real checkout layout instead of synthesizing an uncommitted root fixture path, and observe the existing package smoke fail RED with `ENOENT`.
+- [X] T028-S5 Resolve the transaction input from the committed canonical inspector fixture so the same test source runs under Nix and directly from repository root on Linux, macOS, and Windows.
+- [X] T029-S5 Run `nix run .#ci-node-package`, the exact repository-root `npm run test:package` command against a freshly built tarball, and `./gate.sh`, then commit exactly `fix(ci): use committed transaction fixture in package smoke` with `Tasks: T027, T028, T029`.
 
 ## Orchestrator-owned finalization
 
