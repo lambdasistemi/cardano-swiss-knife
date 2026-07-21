@@ -1,0 +1,35 @@
+{
+  "turtle": "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n<urn:cardano:id:key:7095faf3d48d582fbae8b3f2e726670d7a35e2400c783d992bbdeffb> rdfs:label \"Core owner from Turtle\" .\n",
+  "cip57": {
+    "preamble": { "title": "Transaction books test" },
+    "validators": []
+  },
+  "bundle": {
+    "kind": "amaru.book.bundle.v1",
+    "books": {
+      "wallets": [
+        { "name": "network_compliance scope owner", "address": "8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1" },
+        { "name": "operator fuel wallet", "address": "addr1qx9aqvsf6gne2640jec828s25gzhk5wp2day8u24kf8mrs2v0zyuvk80fay35dx008p45ts0u6cdrv9g2maetq8jm8psznjcrz" }
+      ]
+    }
+  },
+  "store": {
+    "kind": "cardano-ledger-inspector.books.v1",
+    "books": [
+      {
+        "id": "treasury-script",
+        "name": "Treasury script",
+        "source": "fixture",
+        "raw": "@prefix overlay: <https://lambdasistemi.github.io/cardano-ledger-inspector/overlay/amaru-treasury#> .\n@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n<urn:cardano:id:script:5fbb3e5295c211c7595ddd23db2e0a0833131e0681cc7ea800f85d34> a overlay:CardanoScript ; rdfs:label \"Amaru Core Development treasury script\" .\n",
+        "parts": [],
+        "turtle": "@prefix overlay: <https://lambdasistemi.github.io/cardano-ledger-inspector/overlay/amaru-treasury#> .\n@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n<urn:cardano:id:script:5fbb3e5295c211c7595ddd23db2e0a0833131e0681cc7ea800f85d34> a overlay:CardanoScript ; rdfs:label \"Amaru Core Development treasury script\" .\n",
+        "selected": true,
+        "seed": false
+      }
+    ]
+  },
+  "invalidBundle": {
+    "kind": "amaru.book.bundle.v1",
+    "books": { "wallets": [ { "name": "bad", "address": "not-an-address" } ] }
+  }
+}

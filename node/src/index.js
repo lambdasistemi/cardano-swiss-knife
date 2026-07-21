@@ -10,6 +10,8 @@ import * as Either from "../../output/Data.Either/index.js";
 import * as Maybe from "../../output/Data.Maybe/index.js";
 import { CskError, toCskError } from "./error.js";
 import { runTransactionOperation } from "./transaction-engine.js";
+import { importBooks } from "../../lib/src/Cardano/Transaction/Book.js";
+import { resolveRdf } from "./rdf-engine.js";
 
 const ok = (value) => ({ ok: true, value: normalise(value) });
 const fail = (error) => ({ ok: false, error: { code: error.code, message: error.message } });
@@ -116,9 +118,17 @@ const transactionInput = async (input) => {
 };
 
 const transactionOperation = (name, input, options = {}) => operation(async () => {
+  let books;
+  try { books = importBooks(options.books ?? []); }
+  catch (error) { throw new CskError("BOOK_IMPORT", error.message, error); }
   const txCbor = await transactionInput(input);
   if ((name !== "tx.identify" && name !== "tx.intent") || !Object.hasOwn(input, "txHash")) {
-    return runTransactionOperation(name, txCbor, options);
+    const value = await runTransactionOperation(name, txCbor, options);
+    if (books.length === 0) return value;
+    const rdf = await runTransactionOperation("tx.rdf", txCbor, options);
+    const graph = rdf?.result?.rdf?.turtle ?? rdf?.rdf?.turtle ?? rdf?.turtle;
+    if (!graph) throw new CskError("RDF_ENGINE_PROTOCOL", "The ledger-inspector tx.rdf operation returned no Turtle graph.");
+    return { ...value, books, resolutions: await resolveRdf(graph, books) };
   }
 
   const selectedProvider = provider(input.provider);
@@ -128,7 +138,11 @@ const transactionOperation = (name, input, options = {}) => operation(async () =
   const context = await awaitAff(Provider.resolveProducerTxContext(selectedProvider)(selectedNetwork)(credential)(!Provider.needsKey(selectedProvider) || credential !== "")(JSON.stringify(inspection)));
   const contextArgs = JSON.parse(context);
   const value = await runTransactionOperation(name, txCbor, { ...options, ...contextArgs });
-  return { ...value, context: contextArgs.context };
+  if (books.length === 0) return { ...value, context: contextArgs.context };
+  const rdf = await runTransactionOperation("tx.rdf", txCbor, { ...options, ...contextArgs });
+  const graph = rdf?.result?.rdf?.turtle ?? rdf?.rdf?.turtle ?? rdf?.turtle;
+  if (!graph) throw new CskError("RDF_ENGINE_PROTOCOL", "The ledger-inspector tx.rdf operation returned no Turtle graph.");
+  return { ...value, context: contextArgs.context, books, resolutions: await resolveRdf(graph, books) };
 });
 
 export const inspectTransaction = (input, options) => transactionOperation("tx.inspect", input, options);

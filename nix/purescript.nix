@@ -1,4 +1,4 @@
-{ pkgs, repoRoot, txInspectorUi, wasmBinary, txInspectorWasmBinary }:
+{ pkgs, repoRoot, txInspectorUi, wasmBinary, txInspectorWasmBinary, rdfShapesWasmPkg }:
 
 let
   nodejs = pkgs.nodejs_22;
@@ -134,6 +134,8 @@ in
       esbuild cli/csk.mjs --bundle --platform=node --format=esm --outfile=node/dist/csk.mjs
       cp ${wasmBinary}/cardano-addresses.wasm node/dist/cardano-addresses.wasm
       cp ${txInspectorWasmBinary}/wasm-tx-inspector.wasm node/dist/wasm-tx-inspector.wasm
+      cp ${rdfShapesWasmPkg}/rdf_shapes_wasm.js node/dist/rdf_shapes_wasm.js
+      cp ${rdfShapesWasmPkg}/rdf_shapes_wasm_bg.wasm node/dist/rdf_shapes_wasm_bg.wasm
     '';
     installPhase = ''
       mkdir -p $out

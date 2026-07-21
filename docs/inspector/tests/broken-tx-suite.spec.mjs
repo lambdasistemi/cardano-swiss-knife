@@ -12,7 +12,7 @@ import { fileURLToPath } from "node:url";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "../../..");
 const shapesPath = path.join(repoRoot, "docs/inspector/protocols/cardano-rdf/shapes.ttl");
-const overlayBookPath = path.join(repoRoot, "docs/inspector/src/FFI/OverlayBook.js");
+const overlayBookPath = path.join(repoRoot, "lib/src/Cardano/Transaction/Book.js");
 const brokenDir = path.join(
   repoRoot,
   "specs/001-ledger-functional-layer/fixtures/broken",
@@ -125,7 +125,7 @@ async function expectVerdictViolationsMatchChip(page) {
 
 test("bundled Cardano SHACL shapes match the protocol shapes file", async () => {
   const source = readFileSync(overlayBookPath, "utf8");
-  const moduleUrl = `data:text/javascript;base64,${Buffer.from(source).toString("base64")}`;
+  const moduleUrl = `data:text/javascript;base64,${Buffer.from(`globalThis.cardanoShaclShapes=${JSON.stringify(shapes)};\n${source}`).toString("base64")}`;
   const { bundledCardanoShaclShapes } = await import(moduleUrl);
 
   expect(bundledCardanoShaclShapes.trim()).toBe(shapes.trim());
