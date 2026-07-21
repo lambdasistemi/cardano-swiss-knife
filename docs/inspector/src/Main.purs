@@ -3,6 +3,7 @@ module Main (main) where
 import Prelude
 
 import Cardano.BookableIdentifier (isBookableIdentifierKind)
+import Cardano.Transaction.Entry (EntryStatus(..), TxEntry)
 import Cardano.Transaction.Ledger as Ledger
 import Cardano.Transaction.Witness as Witness
 import Cardano.Offline.Key as Bootstrap
@@ -31,8 +32,9 @@ import Examples as Examples
 import FFI.Blockfrost (Network(..), networkName)
 import FFI.BookStore as BookStore
 import FFI.Clipboard (copy) as Clipboard
+import FFI.EntryStore as EntryStore
 import FFI.Inspector (InspectorResult, runLedgerOperation)
-import FFI.Json (Browser, Identification, IntentSummary, MetadataValue(..), RdfGraph, ScriptEvaluation, Validation, WitnessPlan, inspect, operationArgsMerged, operationArgsWithPath, operationBrowser, operationIdentification, operationInspection, operationIntentSummary, operationRdfGraph, operationScriptEvaluation, operationValidation, operationWitnessPlan, pretty, providerResolutionErrorArgs) as Json
+import FFI.Json (Browser, Identification, IntentSummary, MetadataValue(..), RdfGraph, ScriptEvaluation, Validation, WitnessPlan, inspect, operationArgsMerged, operationArgsWithPath, operationBrowser, operationEntrySeed, operationIdentification, operationInspection, operationIntentSummary, operationRdfGraph, operationScriptEvaluation, operationValidation, operationWitnessPlan, pretty, providerResolutionErrorArgs) as Json
 import FFI.OverlayBook as OverlayBook
 import FFI.RdfShapes as RdfShapes
 import FFI.Storage as Storage
@@ -44,6 +46,7 @@ import Shell as Shell
 import Theme as Theme
 import TxSigning as TxSigning
 import Vault as Vault
+import Workbench as Workbench
 import Halogen as H
 import Halogen.Aff as HA
 import Halogen.HTML as HH
@@ -195,6 +198,8 @@ type State =
   , identification :: Maybe Json.Identification
   , intent :: Maybe Json.IntentSummary
   , witnessPlan :: Maybe Json.WitnessPlan
+  , workbenchCandidate :: Maybe TxEntry
+  , workbenchCandidateMessage :: Maybe String
   , txSigningKeyInput :: String
   , showTxSigningKey :: Boolean
   , txSigningRunning :: Boolean
@@ -460,6 +465,7 @@ data Action
   | ToggleTxSigningKey
   | ToggleReplaceExistingWitness
   | RunTxSign
+  | WorkbenchOutput Workbench.Output
   | DeleteVaultEntry String
   | Navigate Route MouseEvent
   | ToggleTheme
@@ -488,6 +494,8 @@ inspectorComponent initial =
         , identification: Nothing
         , intent: Nothing
         , witnessPlan: Nothing
+        , workbenchCandidate: Nothing
+        , workbenchCandidateMessage: Nothing
         , txSigningKeyInput: ""
         , showTxSigningKey: false
         , txSigningRunning: false
@@ -629,6 +637,7 @@ inspectorComponent initial =
                 renderLoadedInspectorHeader state
               else
                 renderLoadForm state
+            , renderWorkbench state
             , if showLoadedHeader then
                 renderBooksPanel state true
               else
@@ -640,6 +649,17 @@ inspectorComponent initial =
                 ]
             ]
         ]
+
+  renderWorkbench state =
+    HH.slot
+      _workbench
+      unit
+      Workbench.component
+      { store: EntryStore.entryStore
+      , candidate: state.workbenchCandidate
+      , candidateMessage: state.workbenchCandidateMessage
+      }
+      WorkbenchOutput
 
   renderKeys state =
     HH.div
@@ -5921,6 +5941,8 @@ inspectorComponent initial =
           , identification = Nothing
           , intent = Nothing
           , witnessPlan = Nothing
+          , workbenchCandidate = Nothing
+          , workbenchCandidateMessage = Nothing
           , txSigningRunning = false
           , txSigningResult = Nothing
           , replaceExistingWitness = false
@@ -6008,6 +6030,27 @@ inspectorComponent initial =
             identification = Json.operationIdentification identifyResult.stdout
             intent = Json.operationIntentSummary intentResult.stdout
             witnessPlan = Json.operationWitnessPlan witnessPlanResult.stdout
+            entrySeed =
+              if operationResult.exitOk && identifyResult.exitOk && witnessPlanResult.exitOk then
+                Json.operationEntrySeed operationResult.stdout identifyResult.stdout witnessPlanResult.stdout
+              else Nothing
+            workbenchCandidate = map
+              (\seed ->
+                { entryId: seed.entryId
+                , unsignedTxCborHex: h
+                , requiredSigners: seed.requiredSigners
+                , collectedWitnesses: []
+                , invalidAfterSlot: seed.invalidAfterSlot
+                , status: Open
+                }
+              )
+              entrySeed
+            workbenchCandidateMessage = case entrySeed of
+              Just _ -> Nothing
+              Nothing ->
+                if operationResult.exitOk && identifyResult.exitOk && witnessPlanResult.exitOk then
+                  Just "A finite invalid_hereafter from the engine is required before saving."
+                else Nothing
             validation = Json.operationValidation validationResult.stdout
             scriptEvaluation = Json.operationScriptEvaluation scriptEvaluationResult.stdout
             rdf = Json.operationRdfGraph rdfResult.stdout
@@ -6039,6 +6082,8 @@ inspectorComponent initial =
               , witnessPlan =
                   if witnessPlanResult.exitOk && witnessPlan.valid then Just witnessPlan
                   else Nothing
+              , workbenchCandidate = workbenchCandidate
+              , workbenchCandidateMessage = workbenchCandidateMessage
               , validation =
                   if validationResult.exitOk && validation.valid then Just validation
                   else Nothing
@@ -6077,6 +6122,14 @@ inspectorComponent initial =
     InspectProducer txId -> do
       H.modify_ _ { mode = ByHash, txHash = txId, fetchError = Nothing }
       handleAction Decode
+    WorkbenchOutput output -> case output of
+      Workbench.EntrySelected entry -> do
+        H.modify_ _
+          { mode = ByHex
+          , txHex = entry.unsignedTxCborHex
+          , fetchError = Nothing
+          }
+        handleAction Decode
     Copy -> do
       mr <- H.gets _.result
       case mr of
@@ -6554,6 +6607,9 @@ inspectorComponent initial =
   libraryEditorModeLabel = case _ of
     RdfEditor.Json -> "JSON"
     RdfEditor.Turtle -> "Turtle"
+
+_workbench :: Proxy "workbench"
+_workbench = Proxy
 
 _libraryEditor :: Proxy "libraryEditor"
 _libraryEditor = Proxy

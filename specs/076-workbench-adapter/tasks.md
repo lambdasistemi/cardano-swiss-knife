@@ -50,17 +50,17 @@ Tasks: T764, T765, T766, T767, T768
 
 ## Slice 2 — Persistent entry list and inspector consumer (driver+navigator)
 
-- [ ] T769 [US2] Add RED Playwright coverage for adding two finite-TTL entries,
+- [X] T769 [US2] Add RED Playwright coverage for adding two finite-TTL entries,
   rendering an entry list, switching selection, and surviving reload.
-- [ ] T770 [US2] Add RED proof that the selected entry drives the existing
+- [X] T770 [US2] Add RED proof that the selected entry drives the existing
   inspector and that missing engine id/signer/expiry data blocks persistence.
-- [ ] T771 [US2] Add a focused Halogen `Workbench` component that loads the
+- [X] T771 [US2] Add a focused Halogen `Workbench` component that loads the
   injected store, owns entry collection/selection, and emits selected entries.
-- [ ] T772 [US2] Derive entry seeds only from typed engine results, persist
+- [X] T772 [US2] Derive entry seeds only from typed engine results, persist
   before success, and wire `Main` so inspection consumes selected entry CBOR.
-- [ ] T773 [US2] Render accessible list/switcher, entry identity/status,
+- [X] T773 [US2] Render accessible list/switcher, entry identity/status,
   #75-derived required/satisfied/missing signer groups, and minimal plain CSS.
-- [ ] T774 Obtain navigator RED/GREEN approval, run focused Playwright and
+- [X] T774 Obtain navigator RED/GREEN approval, run focused Playwright and
   `./gate.sh`, and commit once with
   `Tasks: T769, T770, T771, T772, T773, T774`.
 

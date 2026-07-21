@@ -1099,3 +1099,39 @@ export const operationScriptEvaluationImpl = (raw) => {
     );
   }
 };
+
+export const operationEntrySeedImpl = (inspectionRaw) => (identificationRaw) => (witnessPlanRaw) => {
+  try {
+    const inspection = operationResult(JSON.parse(inspectionRaw))?.inspection;
+    const identification = operationResult(JSON.parse(identificationRaw))?.identification;
+    const witnessPlan = operationResult(JSON.parse(witnessPlanRaw))?.witness_plan;
+    const invalidAfterValue = inspection?.validity_interval?.invalid_hereafter;
+    const invalidAfterSlot =
+      typeof invalidAfterValue === "number"
+        ? invalidAfterValue
+        : typeof invalidAfterValue === "string" && /^\d+$/.test(invalidAfterValue)
+          ? Number(invalidAfterValue)
+          : NaN;
+    const requiredSigners = witnessPlan?.required_signers;
+    const entryId = text(identification?.tx_id).trim();
+    const bodyHash = text(identification?.body_hash).trim();
+
+    if (
+      entryId === "" ||
+      bodyHash === "" ||
+      !Number.isSafeInteger(invalidAfterSlot) ||
+      invalidAfterSlot < 0 ||
+      invalidAfterSlot > 2147483647 ||
+      !Array.isArray(requiredSigners)
+    ) {
+      return null;
+    }
+
+    const signerHashes = requiredSigners.map((signer) => text(signer?.hash).trim());
+    return signerHashes.every((signer) => signer !== "")
+      ? { entryId, requiredSigners: signerHashes, invalidAfterSlot }
+      : null;
+  } catch (_err) {
+    return null;
+  }
+};

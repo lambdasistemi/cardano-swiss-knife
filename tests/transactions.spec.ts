@@ -167,7 +167,103 @@ const addRequiredSigner = (txHex: string, signerHashHex: string) => {
   return Array.from(patched, (byte) => byte.toString(16).padStart(2, "0")).join("");
 };
 
-const txCbor = addRequiredSigner(baseTxCbor, addressSignerHash);
+const withInvalidHereafter = (txHex: string, slot: number) => {
+  if (!Number.isInteger(slot) || slot < 0 || slot > 0xffffffff) {
+    throw new Error(`Expected an unsigned 32-bit slot: ${slot}`);
+  }
+
+  const bytes = hexToBytes(txHex);
+  if (bytes[0] !== 0x84) {
+    throw new Error("Expected the signing fixture to be a four-item transaction array.");
+  }
+
+  const bodyStart = 1;
+  const bodyHeader = bytes[bodyStart];
+  const bodyMajor = bodyHeader >> 5;
+  const bodyCount = bodyHeader & 0x1f;
+  if (bodyMajor !== 5 || bodyCount >= 23) {
+    throw new Error("Expected the signing fixture body to use a short definite map.");
+  }
+
+  const ttl = Uint8Array.from([
+    0x1a,
+    (slot >>> 24) & 0xff,
+    (slot >>> 16) & 0xff,
+    (slot >>> 8) & 0xff,
+    slot & 0xff,
+  ]);
+  let offset = bodyStart + 1;
+  let insertionOffset: number | null = null;
+  for (let index = 0; index < bodyCount; index += 1) {
+    const keyOffset = offset;
+    const keyByte = bytes[keyOffset];
+    if (keyByte > 0x17) {
+      throw new Error("Expected the signing fixture body to use small integer keys.");
+    }
+    offset = skipCborItem(bytes, keyOffset);
+    const valueEnd = skipCborItem(bytes, offset);
+    if (keyByte === 3) {
+      const patched = new Uint8Array(bytes.length - (valueEnd - offset) + ttl.length);
+      patched.set(bytes.slice(0, offset), 0);
+      patched.set(ttl, offset);
+      patched.set(bytes.slice(valueEnd), offset + ttl.length);
+      return Array.from(patched, (byte) => byte.toString(16).padStart(2, "0")).join("");
+    }
+    if (insertionOffset === null && keyByte > 3) insertionOffset = keyOffset;
+    offset = valueEnd;
+  }
+
+  if (insertionOffset === null) insertionOffset = offset;
+  const patched = new Uint8Array(bytes.length + 1 + ttl.length);
+  patched.set(bytes.slice(0, insertionOffset), 0);
+  patched[bodyStart] = bodyHeader + 1;
+  patched[insertionOffset] = 3;
+  patched.set(ttl, insertionOffset + 1);
+  patched.set(bytes.slice(insertionOffset), insertionOffset + 1 + ttl.length);
+  return Array.from(patched, (byte) => byte.toString(16).padStart(2, "0")).join("");
+};
+
+const withoutInvalidHereafter = (txHex: string) => {
+  const bytes = hexToBytes(txHex);
+  if (bytes[0] !== 0x84) {
+    throw new Error("Expected the signing fixture to be a four-item transaction array.");
+  }
+
+  const bodyStart = 1;
+  const bodyHeader = bytes[bodyStart];
+  const bodyMajor = bodyHeader >> 5;
+  const bodyCount = bodyHeader & 0x1f;
+  if (bodyMajor !== 5 || bodyCount >= 23) {
+    throw new Error("Expected the signing fixture body to use a short definite map.");
+  }
+
+  let offset = bodyStart + 1;
+  for (let index = 0; index < bodyCount; index += 1) {
+    const keyOffset = offset;
+    const keyByte = bytes[keyOffset];
+    if (keyByte > 0x17) {
+      throw new Error("Expected the signing fixture body to use small integer keys.");
+    }
+    offset = skipCborItem(bytes, keyOffset);
+    const valueEnd = skipCborItem(bytes, offset);
+    if (keyByte === 3) {
+      const patched = new Uint8Array(bytes.length - (valueEnd - keyOffset));
+      patched.set(bytes.slice(0, keyOffset), 0);
+      patched[bodyStart] = bodyHeader - 1;
+      patched.set(bytes.slice(valueEnd), keyOffset);
+      return Array.from(patched, (byte) => byte.toString(16).padStart(2, "0")).join("");
+    }
+    offset = valueEnd;
+  }
+
+  return txHex;
+};
+
+const txCborWithoutExpiry = withoutInvalidHereafter(
+  addRequiredSigner(baseTxCbor, addressSignerHash),
+);
+const txCbor = withInvalidHereafter(txCborWithoutExpiry, 2_100_000_001);
+const secondTxCbor = withInvalidHereafter(txCborWithoutExpiry, 2_100_000_002);
 
 const readCbor = (bytes: Uint8Array) => {
   let offset = 0;
@@ -524,4 +620,60 @@ test("transaction signing stays disabled until inspection finishes", async ({
     timeout: 20000,
   });
   await expect(signButton).toBeEnabled();
+});
+
+test("workbench persists finite-TTL transactions and selection drives the inspector", async ({
+  page,
+}) => {
+  const decode = async (cbor: string) => {
+    await page.getByRole("tab", { name: "Paste CBOR" }).click();
+    await page.getByPlaceholder("Paste Conway transaction CBOR hex").fill(cbor);
+    await page.getByRole("button", { name: "Decode", exact: true }).click();
+    await expect(page.getByText("Transaction ID", { exact: true })).toBeVisible({
+      timeout: 20000,
+    });
+  };
+
+  await page.goto("/inspect");
+  await decode(txCbor);
+  const firstId = (await page.locator(".loaded-context-hash code").textContent())?.trim();
+  if (!firstId) throw new Error("First decoded transaction did not render an id.");
+
+  const workbench = page.getByRole("region", { name: "Transaction workbench" });
+  await workbench.getByRole("button", { name: "Add current transaction" }).click();
+  await expect(workbench).toContainText("Incomplete");
+  await expect(workbench.getByText("Required signers", { exact: true })).toBeVisible();
+  await expect(workbench.getByText("Satisfied signers", { exact: true })).toBeVisible();
+  await expect(workbench.getByText("Missing signers", { exact: true })).toBeVisible();
+  await expect(workbench).toContainText("None satisfied.");
+  await expect(workbench).toContainText(addressSignerHash);
+
+  await page.getByRole("button", { name: "Change input" }).click();
+  await decode(secondTxCbor);
+  const secondId = (await page.locator(".loaded-context-hash code").textContent())?.trim();
+  if (!secondId) throw new Error("Second decoded transaction did not render an id.");
+  expect(secondId).not.toBe(firstId);
+  await workbench.getByRole("button", { name: "Add current transaction" }).click();
+
+  const entries = workbench.getByRole("list", { name: "Saved transactions" });
+  await expect(entries.getByRole("button", { name: `Select ${firstId}` })).toBeVisible();
+  await expect(entries.getByRole("button", { name: `Select ${secondId}` })).toBeVisible();
+  const savedRows = entries.getByRole("listitem");
+  await expect(savedRows).toHaveCount(2);
+  await expect(savedRows.nth(0)).toContainText("Open");
+  await expect(savedRows.nth(1)).toContainText("Open");
+  await entries.getByRole("button", { name: `Select ${firstId}` }).click();
+  await expect(page.locator(".loaded-context-hash code")).toHaveText(firstId);
+  await entries.getByRole("button", { name: `Select ${secondId}` }).click();
+  await expect(page.locator(".loaded-context-hash code")).toHaveText(secondId);
+
+  await page.reload();
+  await expect(workbench.getByRole("list", { name: "Saved transactions" }).getByRole("button")).toHaveCount(2);
+
+  await page.getByRole("button", { name: "Change input" }).click();
+  await decode(txCborWithoutExpiry);
+  await expect(workbench.getByRole("button", { name: "Add current transaction" })).toBeDisabled();
+  await expect(workbench).toContainText(
+    "A finite invalid_hereafter from the engine is required before saving.",
+  );
 });

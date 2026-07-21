@@ -209,6 +209,57 @@ button:disabled {
   opacity: 0.68;
 }
 
+.workbench {
+  display: grid;
+  gap: var(--space-3);
+  margin: var(--space-4) 0;
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--surface-container-lowest);
+}
+
+.workbench-heading,
+.workbench-list,
+.workbench-completeness {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  justify-content: space-between;
+}
+
+.workbench-list {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+
+.workbench-list button[aria-pressed="true"] {
+  outline: 2px solid var(--accent);
+}
+
+.workbench-completeness {
+  display: grid;
+  align-items: start;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+.workbench-completeness h3 {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+.workbench-signer-group h4,
+.workbench-signer-group p,
+.workbench-signer-group ul,
+.workbench-explanation {
+  margin: 0;
+}
+
+.workbench-signer-group ul {
+  padding-left: var(--space-4);
+  overflow-wrap: anywhere;
+}
+
 code,
 pre,
 kbd,
