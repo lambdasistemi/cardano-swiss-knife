@@ -27,6 +27,7 @@ GREEN: add the hand-written declaration facade, package metadata, build-copy wir
 Owned files:
 
 - `node/src/index.d.ts`
+- `node/test/api-contract.test.mjs`
 - `node/test/package-smoke.mjs`
 - `scripts/check-node-api-exports.mjs`
 - `package.json`
@@ -34,7 +35,7 @@ Owned files:
 - `nix/purescript.nix`
 - `nix/checks/node-api.nix`
 
-Proof: focused drift checker, packed-package smoke, then `./gate.sh`.
+Proof: focused unit cases that force both drift directions, packed-package smoke against the real artifact, then `./gate.sh`.
 
 ### Slice 2 — Make public source documentation mandatory
 
