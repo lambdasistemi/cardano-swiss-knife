@@ -2,13 +2,13 @@
 
 ## Slice 1 — Local context selection in the shared Node path
 
-- [ ] T001-S1 Add RED Node examples/properties for raw and transaction-TextEnvelope local inputs with every Blockfrost/Koios network selection across inspect, identify, intent, witness plan, validate, and script evaluation.
-- [ ] T002-S1 Prove provider options absent preserve exact offline results with zero network access; invalid partial selections and multiple sources fail before engine/provider IO.
-- [ ] T003-S1 Prove local bytes are preserved, the source transaction is never replaced, and unique ordinary/reference producer plus validation-context requests flow only through `Cardano.Provider`.
-- [ ] T004-S1 Cover complete, partial, and incomplete context evidence, hash-source compatibility, exact provider taxonomy, and credential redaction.
-- [ ] T005-S1 Generalize Node transaction input/context routing and TypeScript declarations without adding host-side provider, CBOR, or ledger semantics.
-- [ ] T006-S1 Run `nix run .#ci-node-api` and `./gate.sh`.
-- [ ] T007-S1 Commit exactly `feat(node): enrich local transactions through providers` with `Tasks: T001, T002, T003, T004, T005, T006, T007`.
+- [X] T001-S1 Add RED Node examples/properties for raw and transaction-TextEnvelope local inputs with every Blockfrost/Koios network selection across inspect, identify, intent, witness plan, validate, and script evaluation.
+- [X] T002-S1 Prove provider options absent preserve exact offline results with zero network access; invalid partial selections and multiple sources fail before engine/provider IO.
+- [X] T003-S1 Prove local bytes are preserved, the source transaction is never replaced, and unique ordinary/reference producer plus validation-context requests flow only through `Cardano.Provider`.
+- [X] T004-S1 Cover complete, partial, and incomplete context evidence, hash-source compatibility, exact provider taxonomy, and credential redaction.
+- [X] T005-S1 Generalize Node transaction input/context routing and TypeScript declarations without adding host-side provider, CBOR, or ledger semantics.
+- [X] T006-S1 Run `nix run .#ci-node-api` and `./gate.sh`.
+- [X] T007-S1 Commit exactly `feat(node): enrich local transactions through providers` with `Tasks: T001, T002, T003, T004, T005, T006, T007`.
 
 ## Slice 2 — CLI vault wiring and installed cross-host proof
 
