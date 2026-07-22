@@ -38,6 +38,10 @@ let
         new URL("./docs/inspector/protocols/cardano-rdf/shapes.ttl", import.meta.url),
         "utf8",
       );
+      globalThis.amaruTreasuryJournalJson = readFileSync(
+        new URL("./docs/inspector/protocols/amaru-treasury/journal-2026.json", import.meta.url),
+        "utf8",
+      );
       EOF
 
       if [[ -z "''${PLAYWRIGHT_PORT:-}" ]]; then

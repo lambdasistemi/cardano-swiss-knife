@@ -16,6 +16,7 @@ Use one vertical RED-to-GREEN slice. Add focused tests around the host-neutral `
 - `lib/src/Cardano/Transaction/Book.js`
 - `docs/inspector/src/bootstrap.js`
 - `nix/apps/inspector-playwright.nix`
+- `nix/wasm-ui.nix`
 - Focused regression file(s) under `docs/inspector/tests/`
 - `specs/100-amaru-fallback-bug/tasks.md` only for checkbox stamping in the accepted slice commit
 
@@ -24,4 +25,5 @@ Use one vertical RED-to-GREEN slice. Add focused tests around the host-neutral `
 - The global is initialized before module evaluation, matching established injection semantics.
 - Shape recognition stays structural and conservative; unknown JSON fails explicitly.
 - The source registry is consumed but never edited.
+- The WebUI derivation copies the journal from its existing `protocolRegistry` input before esbuild, beside the existing Sundae/SHACL copies.
 - Fresh remote CI is required after local acceptance.

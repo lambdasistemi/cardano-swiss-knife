@@ -11,6 +11,7 @@ import rdfShapesWasmAssetUrl from "./assets/rdf_shapes_wasm_bg.wasm";
 import { inspectAddressWasmImpl } from "../../lib/src/Cardano/Address/Inspect.js";
 import sundaeSwapV3Blueprint from "../protocols/sundaeswap-v3/plutus.json";
 import cardanoShaclShapes from "../protocols/cardano-rdf/shapes.ttl";
+import amaruTreasuryJournal from "../protocols/amaru-treasury/journal-2026.json";
 import * as rdfEditor from "purescript-rdf-editor";
 
 const scriptBaseUrl = new URL(
@@ -37,6 +38,7 @@ globalThis.inspectCardanoAddress = (address) =>
 globalThis.rdfEditor = rdfEditor;
 globalThis.sundaeSwapV3BlueprintJson = JSON.stringify(sundaeSwapV3Blueprint, null, 2);
 globalThis.cardanoShaclShapes = cardanoShaclShapes;
+globalThis.amaruTreasuryJournalJson = JSON.stringify(amaruTreasuryJournal, null, 2);
 
 globalThis.runInspector = async (stdinText) => {
   const stdin = new OpenFile(
