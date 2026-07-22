@@ -1,9 +1,0 @@
-{
-  "kind": "amaru.book.bundle.v1",
-  "books": {
-    "named:wallets": [
-      { "name": "network_compliance scope owner", "address": "8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1" },
-      { "name": "operator fuel wallet", "address": "addr1qx9aqvsf6gne2640jec828s25gzhk5wp2day8u24kf8mrs2v0zyuvk80fay35dx008p45ts0u6cdrv9g2maetq8jm8psznjcrz" }
-    ]
-  }
-}

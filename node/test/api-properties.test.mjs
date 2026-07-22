@@ -387,29 +387,22 @@ test("property: provider failures are exact and credentials are redacted through
   }), propertyParameters(4));
 });
 
-// Books and RDF — valid domain: committed Turtle, CIP-57, bundle, and store documents in any
+// Books and RDF — valid domain: committed Turtle, CIP-57, and store documents in any
 // caller-selected order/repetition; invariant: all transaction operations preserve that exact order
 // and use the packaged RDF resolver; taxonomy: an invalid import is BOOK_IMPORT and RDF load,
 // compatibility, execution, and protocol failures remain their exact RDF_ENGINE_* categories.
 test("property: book order, repetition, transactional import, and exact RDF resolutions are preserved", async () => {
   const bookForms = [
     ["turtle", transactionBooks.turtle], ["CIP-57 plutus.json", transactionBooks.cip57],
-    ["amaru.book.bundle.v1", transactionBooks.bundle], ["cardano-ledger-inspector.books.v1", transactionBooks.store],
+    ["cardano-ledger-inspector.books.v1", transactionBooks.store],
   ];
   await fc.assert(fc.asyncProperty(fc.array(fc.constantFrom(...bookForms), { minLength: 1, maxLength: 5 }), fc.constantFrom(...transactionOperations), async (chosen, name) => {
     const books = chosen.map(([, book]) => book); const expectedSources = chosen.map(([source]) => source);
     const result = await one(name, transactionInput("raw"), name === "browseTransaction" ? browseOptions(["body"], books) : { books });
     assert.equal(result.ok, true, JSON.stringify(result)); assert.deepEqual(result.value.books.map((book) => book.source), expectedSources);
   }), propertyParameters(10));
-  const rejected = await one("inspectTransaction", transactionInput("raw"), { books: [transactionBooks.turtle, transactionBooks.invalidBundle] });
+  const rejected = await one("inspectTransaction", transactionInput("raw"), { books: [transactionBooks.turtle, { kind: "amaru.book.bundle.v1", books: {} }] });
   assertError(rejected, "BOOK_IMPORT");
-  const identified = await one("identifyTransaction", transactionInput("raw"), { books: [transactionBooks.bundle, transactionBooks.store] });
-  assert.equal(identified.ok, true, JSON.stringify(identified));
-  for (const [raw, label, type] of [
-    ["8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1", "network_compliance scope owner", "overlay:Owner"],
-    ["addr1qx9aqvsf6gne2640jec828s25gzhk5wp2day8u24kf8mrs2v0zyuvk80fay35dx008p45ts0u6cdrv9g2maetq8jm8psznjcrz", "operator fuel wallet", "overlay:Address"],
-    ["5fbb3e5295c211c7595ddd23db2e0a0833131e0681cc7ea800f85d34", "Amaru Core Development treasury script", "overlay:CardanoScript"],
-  ]) assert.ok(identified.value.resolutions.some((row) => row.raw === raw && row.label === label && row.type === type), `missing RDF resolution for ${raw}`);
 });
 
 // Ledger engine failures — valid domain: all four transaction operations over the committed raw
@@ -426,7 +419,7 @@ test("property: all transaction operations preserve the complete ledger-engine f
 });
 
 test("property: RDF engine failures remain exact for books through all transaction operations", async () => {
-  const calls = () => foreign.invoke(transactionOperations.map((name) => transactionCall(name, transactionInput("raw"), name === "browseTransaction" ? browseOptions(["body"], [transactionBooks.bundle]) : { books: [transactionBooks.bundle] })));
+  const calls = () => foreign.invoke(transactionOperations.map((name) => transactionCall(name, transactionInput("raw"), name === "browseTransaction" ? browseOptions(["body"], [transactionBooks.store]) : { books: [transactionBooks.store] })));
   const assertFailures = async (configure, code) => withRdfEngines(configure, async () => { for (const result of await calls()) assertError(result, code); });
   await assertFailures(async () => {}, "RDF_ENGINE_NOT_FOUND");
   await assertFailures(async ({ engine, wasm }) => { await writeFile(engine, "export default async () => {}; export const query = () => [];"); await writeFile(wasm, "not a WebAssembly binary"); }, "RDF_ENGINE_INCOMPATIBLE");

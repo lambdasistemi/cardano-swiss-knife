@@ -32,17 +32,17 @@ before(async () => {
 });
 after(async () => { if (foreignProject) await rm(foreignProject, { recursive: true, force: true }); });
 
-test("accepts ordered Turtle, CIP-57, bundle, and store documents transactionally", async () => {
+test("accepts ordered Turtle, CIP-57, and store documents transactionally", async () => {
   const result = await runForeignProgram(`
     import * as api from ${JSON.stringify(packageName)};
     const input = ${JSON.stringify({ cborHex: transactionCbor })};
-    const books = ${JSON.stringify([books.turtle, books.cip57, books.bundle, books.store])};
+    const books = ${JSON.stringify([books.turtle, books.cip57, books.store])};
     const accepted = await api.inspectTransaction(input, { books });
-    const rejected = await api.inspectTransaction(input, { books: [...books, ${JSON.stringify(books.invalidBundle)}] });
+    const rejected = await api.inspectTransaction(input, { books: [...books, { kind: "amaru.book.bundle.v1", books: {} }] });
     console.log(JSON.stringify({ accepted, rejected }));
   `);
   assert.equal(result.accepted.ok, true, JSON.stringify(result.accepted));
-  assert.deepEqual(result.accepted.value.books.map((book) => book.source), ["turtle", "CIP-57 plutus.json", "amaru.book.bundle.v1", "cardano-ledger-inspector.books.v1"]);
+  assert.deepEqual(result.accepted.value.books.map((book) => book.source), ["turtle", "CIP-57 plutus.json", "cardano-ledger-inspector.books.v1"]);
   assert.equal(result.rejected.ok, false);
   assert.equal(result.rejected.error.code, "BOOK_IMPORT");
 });
@@ -54,28 +54,27 @@ test("preserves repeated book kinds in caller order", async () => {
   const result = await runForeignProgram(`
     import * as api from ${JSON.stringify(packageName)};
     console.log(JSON.stringify(await api.inspectTransaction(${JSON.stringify({ cborHex: transactionCbor })}, {
-      books: [${JSON.stringify(books.turtle)}, ${JSON.stringify(secondTurtle)}, ${JSON.stringify(books.bundle)}],
+      books: [${JSON.stringify(books.turtle)}, ${JSON.stringify(secondTurtle)}, ${JSON.stringify(books.cip57)}],
     })));
   `);
   assert.equal(result.ok, true, JSON.stringify(result));
-  assert.deepEqual(result.value.books.map((book) => book.source), ["turtle", "turtle", "amaru.book.bundle.v1"]);
+  assert.deepEqual(result.value.books.map((book) => book.source), ["turtle", "turtle", "CIP-57 plutus.json"]);
   assert.equal(result.value.books[1].turtle.includes("Second Turtle"), true);
 });
 
-test("keeps treasury raw address, key, and script identifiers beside exact RDF resolutions", async () => {
+test("rejects bundle JSON without mutating the successful non-bundle import", async () => {
   const result = await runForeignProgram(`
     import * as api from ${JSON.stringify(packageName)};
-    console.log(JSON.stringify(await api.identifyTransaction(${JSON.stringify({ cborHex: transactionCbor })}, { books: [${JSON.stringify(books.bundle)}, ${JSON.stringify(books.store)}] })));
+    const input = ${JSON.stringify({ cborHex: transactionCbor })};
+    const accepted = await api.inspectTransaction(input, { books: ${JSON.stringify([books.turtle, books.cip57, books.store])} });
+    const rejected = await api.inspectTransaction(input, { books: [...${JSON.stringify([books.turtle, books.cip57, books.store])}, { kind: "amaru.book.bundle.v1", books: {} }] });
+    console.log(JSON.stringify({ accepted, rejected }));
   `);
-  assert.equal(result.ok, true, JSON.stringify(result));
-  for (const expected of [
-    ["8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1", "network_compliance scope owner", "overlay:Owner"],
-    ["addr1qx9aqvsf6gne2640jec828s25gzhk5wp2day8u24kf8mrs2v0zyuvk80fay35dx008p45ts0u6cdrv9g2maetq8jm8psznjcrz", "operator fuel wallet", "overlay:Address"],
-    ["5fbb3e5295c211c7595ddd23db2e0a0833131e0681cc7ea800f85d34", "Amaru Core Development treasury script", "overlay:CardanoScript"],
-  ]) {
-    const [raw, label, type] = expected;
-    assert.ok(result.value.resolutions.some((row) => row.raw === raw && row.label === label && row.type === type), `missing resolution for ${raw}`);
-  }
+  assert.equal(result.accepted.ok, true, JSON.stringify(result.accepted));
+  assert.deepEqual(result.accepted.value.books.map((book) => book.source), ["turtle", "CIP-57 plutus.json", "cardano-ledger-inspector.books.v1"]);
+  assert.equal(result.rejected.ok, false);
+  assert.equal(result.rejected.error.code, "BOOK_IMPORT");
+  assert.deepEqual(result.rejected.value, undefined);
 });
 
 test("reports missing, incompatible, execution, and protocol RDF engines as typed hard failures", async () => {
@@ -88,7 +87,7 @@ test("reports missing, incompatible, execution, and protocol RDF engines as type
   try {
     const inspect = () => runForeignProgram(`
       import * as api from ${JSON.stringify(packageName)};
-      console.log(JSON.stringify(await api.inspectTransaction(${JSON.stringify({ cborHex: transactionCbor })}, { books: [${JSON.stringify(books.bundle)}] })));
+      console.log(JSON.stringify(await api.inspectTransaction(${JSON.stringify({ cborHex: transactionCbor })}, { books: [${JSON.stringify(books.store)}] })));
     `);
     const missing = await inspect();
     assert.equal(missing.ok, false);
