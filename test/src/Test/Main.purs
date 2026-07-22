@@ -10,6 +10,7 @@ import Cardano.Address.Shelley as Shelley
 import Cardano.Address.Signing as Signing
 import Cardano.Address.Script (analyzeNativeScriptHex, analyzeNativeScriptJson, analyzeScriptTemplateJson)
 import Test.BookableIdentifier (runBookableIdentifierTests)
+import Test.TransactionBook (runTransactionBookTests)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Data.ArrayBuffer.Types (Uint8Array)
@@ -32,6 +33,7 @@ import Test.Vault (runVaultContractTests)
 main :: Effect Unit
 main = launchAff_ do
   runBookableIdentifierTests
+  runTransactionBookTests
   runProviderContractTests
   runOfflineTests
   runTextEnvelopeTests

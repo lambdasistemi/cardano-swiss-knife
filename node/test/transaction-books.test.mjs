@@ -11,6 +11,19 @@ const packageName = "@lambdasistemi/cardano-swiss-knife";
 const packedTarball = process.env.CSK_PACKAGE_TARBALL;
 const transactionCbor = (await readFile(new URL("../../fixtures/conway-mainnet-tx.hex", import.meta.url), "utf8")).trim();
 const books = JSON.parse(await readFile(new URL("./fixtures/transaction-books.json", import.meta.url), "utf8"));
+const amaru = {
+  scope_owners: "scope#000",
+  treasuries: {
+    alpha: {
+      owner: "owner-alpha",
+      budget: 42,
+      address: "addr-alpha",
+      treasury_script: { hash: "treasury-alpha", deployed_at: "tx#000" },
+      permissions_script: { hash: "permissions-alpha", deployed_at: "tx#001" },
+      registry_script: { hash: "registry-alpha", deployed_at: "tx#002" },
+    },
+  },
+};
 
 assert.ok(packedTarball, "CSK_PACKAGE_TARBALL must name the prebuilt npm pack artifact");
 
@@ -36,13 +49,16 @@ test("accepts ordered Turtle, CIP-57, and store documents transactionally", asyn
   const result = await runForeignProgram(`
     import * as api from ${JSON.stringify(packageName)};
     const input = ${JSON.stringify({ cborHex: transactionCbor })};
-    const books = ${JSON.stringify([books.turtle, books.cip57, books.store])};
+    const books = ${JSON.stringify([books.turtle, books.cip57, amaru, books.store])};
     const accepted = await api.inspectTransaction(input, { books });
     const rejected = await api.inspectTransaction(input, { books: [...books, { kind: "amaru.book.bundle.v1", books: {} }] });
     console.log(JSON.stringify({ accepted, rejected }));
   `);
   assert.equal(result.accepted.ok, true, JSON.stringify(result.accepted));
-  assert.deepEqual(result.accepted.value.books.map((book) => book.source), ["turtle", "CIP-57 plutus.json", "cardano-ledger-inspector.books.v1"]);
+  assert.deepEqual(result.accepted.value.books.map((book) => book.source), ["turtle", "CIP-57 plutus.json", "docs/inspector/protocols/amaru-treasury/journal-2026.json", "cardano-ledger-inspector.books.v1"]);
+  assert.equal(result.accepted.value.books[2].parts[0].id, "amaru-treasury-alpha");
+  assert.match(result.accepted.value.books[2].turtle, /overlay:budgetAda 42/);
+  assert.deepEqual(Object.keys(result.accepted.value.books[3]).sort(), ["source", "turtle"]);
   assert.equal(result.rejected.ok, false);
   assert.equal(result.rejected.error.code, "BOOK_IMPORT");
 });
@@ -66,12 +82,12 @@ test("rejects bundle JSON without mutating the successful non-bundle import", as
   const result = await runForeignProgram(`
     import * as api from ${JSON.stringify(packageName)};
     const input = ${JSON.stringify({ cborHex: transactionCbor })};
-    const accepted = await api.inspectTransaction(input, { books: ${JSON.stringify([books.turtle, books.cip57, books.store])} });
-    const rejected = await api.inspectTransaction(input, { books: [...${JSON.stringify([books.turtle, books.cip57, books.store])}, { kind: "amaru.book.bundle.v1", books: {} }] });
+    const accepted = await api.inspectTransaction(input, { books: ${JSON.stringify([books.turtle, books.cip57, amaru, books.store])} });
+    const rejected = await api.inspectTransaction(input, { books: [...${JSON.stringify([books.turtle, books.cip57, amaru, books.store])}, { kind: "amaru.book.bundle.v1", books: {} }] });
     console.log(JSON.stringify({ accepted, rejected }));
   `);
   assert.equal(result.accepted.ok, true, JSON.stringify(result.accepted));
-  assert.deepEqual(result.accepted.value.books.map((book) => book.source), ["turtle", "CIP-57 plutus.json", "cardano-ledger-inspector.books.v1"]);
+  assert.deepEqual(result.accepted.value.books.map((book) => book.source), ["turtle", "CIP-57 plutus.json", "docs/inspector/protocols/amaru-treasury/journal-2026.json", "cardano-ledger-inspector.books.v1"]);
   assert.equal(result.rejected.ok, false);
   assert.equal(result.rejected.error.code, "BOOK_IMPORT");
   assert.deepEqual(result.rejected.value, undefined);

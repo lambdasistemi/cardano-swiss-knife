@@ -664,6 +664,24 @@
         "transformers"
       ]
     },
+    "argonaut-core": {
+      "type": "registry",
+      "version": "7.0.0",
+      "integrity": "sha256-gYZihtBIKthVuXXoiPphMookSf8M5aHyFYkcIWqlxTM=",
+      "dependencies": [
+        "arrays",
+        "control",
+        "either",
+        "foreign-object",
+        "functions",
+        "gen",
+        "maybe",
+        "nonempty",
+        "prelude",
+        "strings",
+        "tailrec"
+      ]
+    },
     "arraybuffer-types": {
       "type": "registry",
       "version": "3.0.2",
@@ -709,10 +727,12 @@
       "dependencies": [
         "aff",
         "aff-promise",
+        "argonaut-core",
         "arraybuffer-types",
         "arrays",
         "effect",
         "either",
+        "foreign-object",
         "integers",
         "maybe",
         "nullable",

@@ -7,13 +7,13 @@ import * as Transaction from "../../output/Cardano.Transaction/index.js";
 import * as TransactionLedger from "../../output/Cardano.Transaction.Ledger/index.js";
 import * as TransactionWitness from "../../output/Cardano.Transaction.Witness/index.js";
 import * as TransactionEntry from "../../output/Cardano.Transaction.Entry/index.js";
+import * as TransactionBook from "../../output/Cardano.Transaction.Book/index.js";
 import * as Provider from "../../output/Cardano.Provider/index.js";
 import * as Aff from "../../output/Effect.Aff/index.js";
 import * as Either from "../../output/Data.Either/index.js";
 import * as Maybe from "../../output/Data.Maybe/index.js";
 import { CskError, toCskError } from "./error.js";
 import { runTransactionOperation } from "./transaction-engine.js";
-import { importBooks } from "../../lib/src/Cardano/Transaction/Book.js";
 import { resolveRdf } from "./rdf-engine.js";
 
 /**
@@ -553,7 +553,18 @@ export const attachTransactionWitness = (input, witness, options = {}) => operat
 
 const transactionOperation = (name, input, options = {}) => operation(async () => {
   let books;
-  try { books = importBooks(options.books ?? []); }
+  try {
+    const documents = (options.books ?? []).map((document) => ({
+      input: typeof document === "string" ? document : JSON.stringify(document),
+      source: typeof document === "string" ? "turtle" : "",
+    }));
+    const imported = TransactionBook.importBooksWithSources(documents);
+    if (imported instanceof Either.Left) throw new Error(imported.value0);
+    if (!(imported instanceof Either.Right)) throw new Error("PureScript returned a malformed book import.");
+    books = imported.value0.map(({ source, turtle, parts }) => (
+      source === "cardano-ledger-inspector.books.v1" ? { source, turtle } : { source, turtle, parts }
+    ));
+  }
   catch (error) { throw new CskError("BOOK_IMPORT", error.message, error); }
   const txCbor = await transactionInput(input);
   const selection = providerContextSelection(input);
