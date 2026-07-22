@@ -19,6 +19,7 @@ The public PureScript surface will expose typed book/part/import records, a reco
 - `lib/src/Cardano/Transaction/Book.purs`
 - `lib/src/Cardano/Transaction/Book.js`
 - `lib/spago.yaml`
+- `spago.lock` (only the dependency-closure update caused by the two declared JSON/object libraries)
 - `test/src/Test/TransactionBook.purs` (new)
 - `test/src/Test/Main.purs`
 - `node/src/index.js`
@@ -33,6 +34,6 @@ The public PureScript surface will expose typed book/part/import records, a reco
 - JavaScript coercion, object-key order, 32-bit FNV behavior, number rendering, whitespace, and final-newline details are pinned by exact golden strings before removal.
 - The sum type separates recognized shapes from rendering so adding a future shape creates a compiler-visible dispatch obligation.
 - Both browser and Node are switched in the same commit, preventing an intermediate host from losing book support.
-- No new npm dependency is permitted; only registry-pinned PureScript packages already represented by `spago.lock` may be declared.
+- No new npm dependency is permitted; only registry-pinned PureScript packages may be declared. The parent authorized the minimal `spago.lock` closure update required by `argonaut` and `foreign-object`; unrelated lock churn is rejected.
 - The inherited Playwright gate can take 7-8 minutes; the ticket owner reruns it in a persistent terminal if a worker call times out.
 - Fresh remote CI is required because local success alone does not prove the Nix/package/browser assembly paths.
