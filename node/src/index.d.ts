@@ -251,8 +251,30 @@ export interface ProviderTransactionInput {
   credential?: string;
 }
 
+/** An explicit provider/network selection used to enrich local transaction bytes. */
+export interface LocalProviderContext {
+  /** Provider used to resolve input producers and validation context. */
+  provider: ProviderName;
+  /** Provider network used to resolve input producers and validation context. */
+  network: ProviderNetwork;
+  /** Optional credential for the selected provider. */
+  credential?: string;
+}
+
+/** Local input with no provider context selection. */
+export interface OfflineLocalProviderContext {
+  provider?: never;
+  network?: never;
+  credential?: never;
+}
+
+/** Local raw transaction CBOR with an optional all-or-nothing provider context selection. */
+export type LocalCborTransactionInput = CborInput & (LocalProviderContext | OfflineLocalProviderContext);
+/** Local transaction text envelope with an optional all-or-nothing provider context selection. */
+export type LocalTextEnvelopeTransactionInput = TextEnvelopeInput & (LocalProviderContext | OfflineLocalProviderContext);
+
 /** Any supported transaction input. */
-export type TransactionInput = CborInput | TextEnvelopeInput | ProviderTransactionInput;
+export type TransactionInput = LocalCborTransactionInput | LocalTextEnvelopeTransactionInput | ProviderTransactionInput;
 /** Any supported witness input. */
 export type WitnessInput = CborInput | TextEnvelopeInput;
 

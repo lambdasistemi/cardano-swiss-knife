@@ -371,6 +371,17 @@ export const submitTransactionEntry = (input) => operation(async () => {
   };
 });
 
+const providerContextSelection = (input) => {
+  const hasSelection = Object.hasOwn(input, "provider") || Object.hasOwn(input, "network") || Object.hasOwn(input, "credential");
+  if (!hasSelection) return null;
+  const selectedProvider = provider(input.provider);
+  const selectedNetwork = providerNetwork(input.network);
+  if (!selectedProvider || !selectedNetwork || (input.credential != null && typeof input.credential !== "string")) {
+    throw new CskError("DOMAIN_ERROR", "Provider context requires paired provider and network with an optional string credential.");
+  }
+  return { provider: selectedProvider, network: selectedNetwork, credential: input.credential ?? "" };
+};
+
 const transactionInput = async (input) => {
   if (!input || typeof input !== "object" || Array.isArray(input)) {
     throw new CskError("DOMAIN_ERROR", "Transaction input must be an object with cborHex, textEnvelope, or txHash provider source.");
@@ -378,18 +389,17 @@ const transactionInput = async (input) => {
 
   const hasCbor = Object.hasOwn(input, "cborHex");
   const hasEnvelope = Object.hasOwn(input, "textEnvelope");
-  const hasHash = Object.hasOwn(input, "txHash") || Object.hasOwn(input, "provider") || Object.hasOwn(input, "network") || Object.hasOwn(input, "credential");
+  const hasHash = Object.hasOwn(input, "txHash");
   if (Number(hasCbor) + Number(hasEnvelope) + Number(hasHash) !== 1) {
     throw new CskError("DOMAIN_ERROR", "Transaction input must contain exactly one of cborHex, textEnvelope, or txHash provider source.");
   }
 
+  const selection = providerContextSelection(input);
   if (hasHash) {
-    const selectedProvider = provider(input.provider);
-    const selectedNetwork = providerNetwork(input.network);
-    if (typeof input.txHash !== "string" || !selectedProvider || !selectedNetwork || (input.credential != null && typeof input.credential !== "string")) {
+    if (typeof input.txHash !== "string" || !selection) {
       throw new CskError("DOMAIN_ERROR", "Transaction hash input requires txHash, provider, network, and an optional string credential.");
     }
-    return awaitAff(Provider.fetchTxCborForNode(selectedProvider)(selectedNetwork)(input.credential ?? "")(input.txHash));
+    return awaitAff(Provider.fetchTxCborForNode(selection.provider)(selection.network)(selection.credential)(input.txHash));
   }
 
   const value = hasCbor
@@ -546,11 +556,12 @@ const transactionOperation = (name, input, options = {}) => operation(async () =
   try { books = importBooks(options.books ?? []); }
   catch (error) { throw new CskError("BOOK_IMPORT", error.message, error); }
   const txCbor = await transactionInput(input);
-  const hashSource = Object.hasOwn(input, "txHash");
+  const selection = providerContextSelection(input);
   const needsProviderContext = TransactionLedger.requiresProviderContext(name)
+    || name === "tx.inspect"
     || name === "tx.identify"
     || name === "tx.intent";
-  if (!hashSource || !needsProviderContext) {
+  if (!selection || !needsProviderContext) {
     const value = await runTransactionOperation(name, txCbor, options);
     if (books.length === 0) return value;
     const rdf = await runTransactionOperation("tx.rdf", txCbor, options);
@@ -559,11 +570,8 @@ const transactionOperation = (name, input, options = {}) => operation(async () =
     return { ...value, books, resolutions: await resolveRdf(graph, books) };
   }
 
-  const selectedProvider = provider(input.provider);
-  const selectedNetwork = providerNetwork(input.network);
-  const credential = input.credential ?? "";
   const inspection = await runTransactionOperation("tx.inspect", txCbor, options);
-  const context = await awaitAff(Provider.resolveProducerTxContext(selectedProvider)(selectedNetwork)(credential)(!Provider.needsKey(selectedProvider) || credential !== "")(JSON.stringify(inspection)));
+  const context = await awaitAff(Provider.resolveProducerTxContext(selection.provider)(selection.network)(selection.credential)(!Provider.needsKey(selection.provider) || selection.credential !== "")(JSON.stringify(inspection)));
   const contextArgs = JSON.parse(context);
   const value = await runTransactionOperation(name, txCbor, { ...options, ...contextArgs });
   if (books.length === 0) return { ...value, context: contextArgs.context };

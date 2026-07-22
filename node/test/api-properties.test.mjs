@@ -14,6 +14,7 @@ import {
   propertyParameters,
   vectors,
 } from "./property-support.mjs";
+import { resolveProducerTxContextImpl } from "../../lib/src/Cardano/Provider.js";
 
 let foreign;
 before(async () => { foreign = await installForeignPackage(); });
@@ -239,6 +240,7 @@ const providerFailures = JSON.parse(await readFile(new URL("./fixtures/provider-
 const witnessFixture = JSON.parse(await readFile(new URL("./fixtures/transaction-witnesses.json", import.meta.url), "utf8"));
 const ledgerFixture = JSON.parse(await readFile(new URL("./fixtures/transaction-ledger.json", import.meta.url), "utf8"));
 const transactionOperations = ["inspectTransaction", "browseTransaction", "identifyTransaction", "transactionIntent"];
+const scopedTransactionOperations = ["inspectTransaction", "identifyTransaction", "transactionIntent", "planTransactionWitnesses", "validateTransaction", "evaluateTransactionScripts"];
 const providerNetworks = [
   ["blockfrost", "mainnet", "https://cardano-mainnet.blockfrost.io/api/v0/txs/"],
   ["blockfrost", "preprod", "https://cardano-preprod.blockfrost.io/api/v0/txs/"],
@@ -258,6 +260,21 @@ const transactionEngine = () => join(foreign.packageRoot, "node", "dist", "wasm-
 const rdfEngine = () => join(foreign.packageRoot, "node", "dist", "rdf_shapes_wasm.js");
 const rdfWasm = () => join(foreign.packageRoot, "node", "dist", "rdf_shapes_wasm_bg.wasm");
 const transactionInput = (representation) => representation === "raw" ? { cborHex: transactionCbor } : { textEnvelope: transactionEnvelope };
+const expectedProducerIds = [
+  "0abab118fb103b983b177fb80c247803f3b5ff7f5d98202ddd2f071b017cb23d",
+  "44454ed0def64621ef645958830f599b488b699b28e3797cc37c4f4dd1463a79",
+  "968fd01e074ca33de95087957f59803bb2ee8bacfe922eb81cdf18e8e23ad788",
+  "a5003a714c45d0c25d6d6463f6ac0c1fd059bc6c390388aaf1cea7249e0fe3ab",
+  "a80f446675b55c8f39a2efadc79d4a5643ed64b13c0750bbc0c4010d335713fa",
+  "affe90d1fa9a93b3e2a48009ef80634e9de8428640f5d673e85b002a86399982",
+  "cda0126e9ea7b336bbb338d2bfc7622a41b584e3bebc33c9c320e8895b9bc082",
+  "e95251993c0ed08c52d4063da1aeba193e4327d4900168111fe73f61ed10d3c5",
+  "efff271aa02e9032aba0e5e9020c5840b2aa1b219c59f9f16e1d6e51071bea1e",
+  "11ace24a7b0caad4a68a38ef2fff18185dc9ea604e84425dab487cae94e4cf54",
+  "25ba96f5deb14bb5c56e7542d6a9ba8450f52cc698ebd74574e1a0525d861095",
+  "810bfcbde85ae72f27d7e8cd154c03c802de15d3fa0dd83a32a4b0fdba330b3c",
+  "e7b395a93d49a17994d66df0e4778a01dee05e7711e6612f28d97b63e4e6311c",
+];
 const browseOptions = (path, books) => ({ path, ...(books ? { books } : {}) });
 const transactionCall = (name, input, options = {}) => ({ name, args: name === "browseTransaction" ? [input, options] : [input, options] });
 
@@ -334,10 +351,20 @@ test("property: offline transaction sources never attempt network access", async
   `);
   const results = await runForeignProgram(`
     import * as api from "@lambdasistemi/cardano-swiss-knife";
-    const input = ${JSON.stringify({ cborHex: transactionCbor })};
-    console.log(JSON.stringify(await Promise.all([api.inspectTransaction(input), api.browseTransaction(input, { path: ["body"] }), api.identifyTransaction(input), api.transactionIntent(input)])));
+    const cborHex = ${JSON.stringify(transactionCbor)};
+    const inputs = [{ cborHex }, { textEnvelope: ${JSON.stringify(transactionEnvelope)} }];
+    const operations = ${JSON.stringify(scopedTransactionOperations)};
+    const results = [];
+    for (const input of inputs) for (const name of operations) results.push({ name, result: await api[name](input) });
+    console.log(JSON.stringify(results));
   `, { import: pathToFileURL(guard).href });
-  for (const result of results) assert.equal(result.ok, true, JSON.stringify(result));
+  assert.equal(results.length, 12);
+  for (const { result } of results) assert.equal(result.ok, true, JSON.stringify(result));
+  for (const name of scopedTransactionOperations) {
+    const [raw, envelope] = results.filter((item) => item.name === name).map((item) => item.result);
+    assert.deepEqual(envelope, raw, `${name} changed its offline result for a TextEnvelope source`);
+    assert.equal(Object.hasOwn(raw.value, "context"), false, `${name} added provider context without a provider selection`);
+  }
 });
 
 // Provider sources — valid domain: all blockfrost|koios × mainnet|preprod|preview hash sources;
@@ -346,25 +373,165 @@ test("property: offline transaction sources never attempt network access", async
 // redacted PROVIDER_* errors with no credential reflected in serialized output.
 test("property: provider/network pairs route every transaction operation through the shared boundary", async () => {
   const response = await runForeignProgram(`
+    import assert from "node:assert/strict";
     const calls = []; globalThis.fetch = async (url, options) => { calls.push({ url, options }); return { status: 200, text: async () => ${JSON.stringify(JSON.stringify({ cbor: transactionCbor }))} }; };
     const api = await import("@lambdasistemi/cardano-swiss-knife"); const pairs = ${JSON.stringify(providerNetworks)};
+    const summary = (result) => {
+      assert.equal(result.ok, true, JSON.stringify(result));
+      assert.equal(JSON.stringify(result).includes("CSK_PROVIDER_SENTINEL"), false, JSON.stringify(result));
+      if (!result.value.context) return { ok: true, redacted: true, context: null };
+      const context = result.value.context;
+      return { ok: true, redacted: true, context: {
+        network: context.network, hasProtocolParameters: typeof context.protocol_parameters === "object",
+        producerTxCount: Object.keys(context.producer_txs).length, resolution: context.resolution,
+      } };
+    };
     const results = []; for (const [provider, network] of pairs) for (const name of ${JSON.stringify(transactionOperations)}) {
       const input = { txHash: "${"a".repeat(64)}", provider, network, credential: "CSK_PROVIDER_SENTINEL" };
-      results.push({ provider, network, name, result: await api[name](input, name === "browseTransaction" ? { path: ["body"] } : {}) });
+      const result = await api[name](input, name === "browseTransaction" ? { path: ["body"] } : {});
+      results.push({ provider, network, name, result: summary(result) });
     } console.log(JSON.stringify({ calls, results }));
   `);
   assert.equal(response.results.length, 24);
   for (const item of response.results) {
-    assert.equal(item.result.ok, true, JSON.stringify(item)); assert.equal(JSON.stringify(item.result).includes("CSK_PROVIDER_SENTINEL"), false);
+    assert.equal(item.result.ok, true, JSON.stringify(item)); assert.equal(item.result.redacted, true, JSON.stringify(item));
     if (["identifyTransaction", "transactionIntent"].includes(item.name)) {
-      const context = item.result.value.context;
-      assert.equal(context.network, item.network === "mainnet" ? "mainnet" : "testnet"); assert.equal(typeof context.protocol_parameters, "object");
-      assert.equal(typeof context.producer_txs, "object"); assert.equal(context.resolution.provider, item.provider);
+      const context = item.result.context;
+      assert.equal(context.network, item.network === "mainnet" ? "mainnet" : "testnet"); assert.equal(context.hasProtocolParameters, true);
+      assert.equal(context.producerTxCount, context.resolution.resolved_count); assert.equal(context.resolution.provider, item.provider);
       assert.equal(context.resolution.requested_tx_count, context.resolution.resolved_count);
       assert.deepEqual(context.resolution.missing, []); assert.deepEqual(context.resolution.errors, []);
     }
   }
   for (const [, , endpoint] of providerNetworks) assert.ok(response.calls.some(({ url }) => url === endpoint || url.startsWith(endpoint)), `missing selected endpoint ${endpoint}`);
+});
+
+// Local provider context — valid domain: the committed local raw/TextEnvelope bytes paired
+// with every supported provider/network; invariant: all six context-sensitive operations retain
+// the supplied bytes, resolve through the shared provider boundary, and surface its evidence;
+// taxonomy: partial provider selection is DOMAIN_ERROR before IO.
+test("property: local transaction sources use explicit shared provider context without source replacement", async () => {
+  const response = await runForeignProgram(`
+    import { createHash } from "node:crypto";
+    const calls = [];
+    const providerResponse = (url) => {
+      if (url.includes("/blocks/latest")) return { slot: 1, epoch: 2 };
+      if (url.includes("/epochs/latest/parameters")) return {};
+      if (url.includes("/tip")) return [{ abs_slot: 1, epoch_no: 2 }];
+      if (url.includes("/cli_protocol_params")) return [{}];
+      return { cbor: ${JSON.stringify(transactionCbor)} };
+    };
+    globalThis.fetch = async (url, options) => {
+      calls.push({ url, method: options.method, body: options.body ?? null });
+      return { status: 200, text: async () => JSON.stringify(providerResponse(url)) };
+    };
+    const api = await import("@lambdasistemi/cardano-swiss-knife");
+    const summary = (result) => result.ok ? { ok: true,
+      engineDigest: createHash("sha256").update(JSON.stringify(result.value.result)).digest("hex"),
+      context: { resolution: result.value.context.resolution },
+    } : result;
+    const pairs = ${JSON.stringify(providerNetworks)};
+    const operations = ["inspectTransaction", "identifyTransaction", "transactionIntent", "planTransactionWitnesses", "validateTransaction", "evaluateTransactionScripts"];
+    const results = [];
+    for (const [provider, network] of pairs) for (const representation of ["raw", "envelope"]) for (const name of operations) {
+      const input = representation === "raw"
+        ? { cborHex: ${JSON.stringify(transactionCbor)}, provider, network, credential: "CSK_LOCAL_PROVIDER_SECRET" }
+        : { textEnvelope: ${JSON.stringify(transactionEnvelope)}, provider, network, credential: "CSK_LOCAL_PROVIDER_SECRET" };
+      results.push({ provider, network, representation, name, result: summary(await api[name](input)) });
+    }
+    const callsBeforePartial = calls.length;
+    const partial = await Promise.all([
+      ...operations.map((name) => api[name]({ cborHex: ${JSON.stringify(transactionCbor)}, provider: "blockfrost" })),
+      ...operations.map((name) => api[name]({ cborHex: ${JSON.stringify(transactionCbor)}, network: "mainnet" })),
+      ...operations.map((name) => api[name]({ cborHex: ${JSON.stringify(transactionCbor)}, credential: "CSK_LOCAL_PROVIDER_SECRET" })),
+    ]);
+    console.log(JSON.stringify({ calls, callsBeforePartial, results, partial }));
+  `);
+
+  assert.equal(response.results.length, 72);
+  for (const item of response.results) {
+    assert.equal(item.result.ok, true, JSON.stringify(item));
+    assert.equal(JSON.stringify(item.result).includes("CSK_LOCAL_PROVIDER_SECRET"), false, JSON.stringify(item));
+    const context = item.result.context;
+    assert.equal(context.resolution.provider, item.provider);
+    assert.equal(context.resolution.requested_input_count, 11);
+    assert.equal(context.resolution.requested_reference_input_count, 4);
+    assert.equal(context.resolution.requested_tx_count, expectedProducerIds.length);
+    assert.equal(context.resolution.resolved_count, expectedProducerIds.length);
+    assert.deepEqual(context.resolution.missing, []);
+    assert.deepEqual(context.resolution.errors, []);
+  }
+  for (const [provider, network] of providerNetworks.map(([provider, network]) => [provider, network])) for (const name of scopedTransactionOperations) {
+    const [raw, envelope] = response.results.filter((item) => item.provider === provider && item.network === network && item.name === name).map((item) => item.result.engineDigest);
+    assert.deepEqual(envelope, raw, `${provider}/${network}/${name} replaced or re-decoded local source bytes`);
+  }
+  assert.equal(response.calls.some(({ url }) => url.includes("/txs/" + "a".repeat(64) + "/cbor")), false, "local input fetched a replacement source transaction");
+  for (const [provider, network, endpoint] of providerNetworks) {
+    const expectedCallsPerPair = scopedTransactionOperations.length * 2;
+    if (provider === "blockfrost") {
+      for (const txId of expectedProducerIds) assert.equal(response.calls.filter(({ url }) => url === `${endpoint}${txId}/cbor`).length, expectedCallsPerPair, `expected one ${provider}/${network} producer request per operation and representation for ${txId}`);
+      const base = endpoint.slice(0, -5);
+      assert.equal(response.calls.filter(({ url }) => url === `${base}/blocks/latest`).length, expectedCallsPerPair);
+      assert.equal(response.calls.filter(({ url }) => url === `${base}/epochs/latest/parameters`).length, expectedCallsPerPair);
+    } else {
+      for (const txId of expectedProducerIds) assert.equal(response.calls.filter(({ url, body }) => url === endpoint && JSON.parse(body)._tx_hashes[0] === txId).length, expectedCallsPerPair, `expected one ${provider}/${network} producer request per operation and representation for ${txId}`);
+      const base = endpoint.replace("/tx_cbor", "");
+      assert.equal(response.calls.filter(({ url }) => url === `${base}/tip`).length, expectedCallsPerPair);
+      assert.equal(response.calls.filter(({ url }) => url === `${base}/cli_protocol_params`).length, expectedCallsPerPair);
+    }
+  }
+  assert.equal(response.calls.length, response.callsBeforePartial, "partial local selections reached the provider boundary");
+  for (const result of response.partial) assertError(result, "DOMAIN_ERROR");
+});
+
+test("property: shared producer resolution keeps unique ordinary/reference, complete, partial, and incomplete evidence exact", async () => {
+  const first = "1".repeat(64);
+  const second = "2".repeat(64);
+  const inspection = JSON.stringify({ result: { inspection: {
+    inputs: [{ tx_id: first, index: 0 }, { tx_id: first, index: 0 }, { tx_id: first, index: 1 }, { tx_id: second, index: 0 }],
+    reference_inputs: [{ tx_id: first, index: 0 }, { tx_id: first, index: 0 }],
+  } } });
+  const resolve = async ({ context = true, producers = true, failingProducer } = {}) => JSON.parse(await resolveProducerTxContextImpl("blockfrost")("blockfrost.txs.cbor")(inspection)(
+    (txId) => async () => {
+      if (!producers) throw new Error("[PROVIDER_AUTHENTICATION] producer transaction credentials not supplied");
+      if (txId === failingProducer) throw new Error("[PROVIDER_RATE_LIMIT] CSK_RESOLVER_SECRET");
+      return "00";
+    },
+  )(async () => JSON.stringify({ network: "mainnet", slot: "123", epoch: "4", protocol_parameters: {}, source: "fixture.context" }))(context)(producers)());
+
+  const complete = await resolve();
+  assert.deepEqual(complete.context.resolution, {
+    provider: "blockfrost", source: "tx-cbor", validation_context_source: "fixture.context",
+    requested_input_count: 3, requested_reference_input_count: 1, requested_tx_count: 2,
+    resolved_count: 2, missing: [], errors: [], error_codes: [], unspent_status: "not_checked",
+  });
+  assert.deepEqual(Object.keys(complete.context.producer_txs).sort(), [first, second]);
+
+  const partial = await resolve({ failingProducer: second });
+  assert.equal(partial.context.resolution.resolved_count, 1);
+  assert.deepEqual(partial.context.resolution.missing, [second]);
+  assert.equal(partial.context.resolution.error_codes[0].code, "PROVIDER_RATE_LIMIT");
+
+  const incomplete = await resolve({ context: false, producers: false });
+  assert.equal(incomplete.context.resolution.resolved_count, 0);
+  assert.deepEqual(incomplete.context.resolution.missing, [first, second]);
+  assert.deepEqual(incomplete.context.resolution.error_codes.map(({ code }) => code), ["PROVIDER_AUTHENTICATION", "PROVIDER_AUTHENTICATION"]);
+});
+
+test("property: local provider failures retain typed, redacted resolver evidence across every scoped operation", async () => {
+  for (const [category, failure] of Object.entries(providerFailures)) for (const name of scopedTransactionOperations) {
+    const credential = `CSK_LOCAL_${category}_${name}_SECRET`;
+    const result = await runForeignProgram(`
+      globalThis.fetch = async () => {
+        ${failure.error ? `throw new Error(${JSON.stringify(failure.error)});` : `return { status: ${failure.status}, text: async () => ${JSON.stringify(failure.body.replace("{{credential}}", credential))} };`}
+      };
+      const api = await import("@lambdasistemi/cardano-swiss-knife");
+      console.log(JSON.stringify(await api[${JSON.stringify(name)}]({ cborHex: ${JSON.stringify(transactionCbor)}, provider: "blockfrost", network: "mainnet", credential: ${JSON.stringify(credential)} })));
+    `);
+    assert.equal(result.ok, true, JSON.stringify(result));
+    assert.ok(result.value.context.resolution.error_codes.some(({ code }) => code === providerFailureCodes[category]), JSON.stringify(result));
+    assert.equal(JSON.stringify(result).includes(credential), false, JSON.stringify(result));
+  }
 });
 
 test("property: provider failures are exact and credentials are redacted through every operation", async () => {
