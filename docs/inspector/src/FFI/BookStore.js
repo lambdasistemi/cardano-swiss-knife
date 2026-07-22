@@ -60,6 +60,8 @@ const normalizeBook = (book, index) => {
     id: requireString(book.id, `books[${index}].id`),
     name: requireString(book.name, `books[${index}].name`),
     source: requireString(book.source, `books[${index}].source`),
+    upstreamSource: typeof book.upstreamSource === "string" ? book.upstreamSource : "",
+    upstreamRef: typeof book.upstreamRef === "string" ? book.upstreamRef : "",
     raw: canonicalizeTurtle(requireString(book.raw, `books[${index}].raw`)),
     parts: book.parts.map(normalizePart),
     turtle: canonicalizeTurtle(requireString(book.turtle, `books[${index}].turtle`)),

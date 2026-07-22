@@ -10,6 +10,10 @@ import cardanoAddressWasmAssetUrl from "./assets/cardano-addresses.wasm";
 import rdfShapesWasmAssetUrl from "./assets/rdf_shapes_wasm_bg.wasm";
 import { inspectAddressWasmImpl } from "../../lib/src/Cardano/Address/Inspect.js";
 import sundaeSwapV3Blueprint from "../protocols/sundaeswap-v3/plutus.json";
+import sundaeswapV3Pin from "../protocols/sundaeswap-v3/pin.json";
+import sundaeswapTreasuryV3Blueprint from "../protocols/sundaeswap-treasury-v3/plutus.json";
+import sundaeswapTreasuryV3Pin from "../protocols/sundaeswap-treasury-v3/pin.json";
+import protocolRegistry from "../protocols/registry.json";
 import cardanoShaclShapes from "../protocols/cardano-rdf/shapes.ttl";
 import amaruTreasuryJournal from "../protocols/amaru-treasury/journal-2026.json";
 import * as rdfEditor from "purescript-rdf-editor";
@@ -37,6 +41,15 @@ globalThis.inspectCardanoAddress = (address) =>
   )((result) => result)(address)();
 globalThis.rdfEditor = rdfEditor;
 globalThis.sundaeSwapV3BlueprintJson = JSON.stringify(sundaeSwapV3Blueprint, null, 2);
+globalThis.protocolRegistryJson = JSON.stringify(protocolRegistry, null, 2);
+globalThis.protocolPinsJson = {
+  "sundaeswap-v3/pin.json": JSON.stringify(sundaeswapV3Pin, null, 2),
+  "sundaeswap-treasury-v3/pin.json": JSON.stringify(sundaeswapTreasuryV3Pin, null, 2),
+};
+globalThis.protocolBlueprintsJson = {
+  "sundaeswap-v3/plutus.json": JSON.stringify(sundaeSwapV3Blueprint, null, 2),
+  "sundaeswap-treasury-v3/plutus.json": JSON.stringify(sundaeswapTreasuryV3Blueprint, null, 2),
+};
 globalThis.cardanoShaclShapes = cardanoShaclShapes;
 globalThis.amaruTreasuryJournalJson = JSON.stringify(amaruTreasuryJournal, null, 2);
 

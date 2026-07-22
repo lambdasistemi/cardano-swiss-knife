@@ -4069,3 +4069,35 @@ md-filled-tonal-button.example-valid {
   min-height: 75vh;
   border: 0;
 }
+
+.library-provenance,
+.book-provenance {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.library-upstream-source,
+.book-upstream-source {
+  font-weight: 600;
+  color: var(--md-sys-color-primary, #0061a4);
+}
+
+.library-upstream-ref,
+.book-upstream-ref {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.85em;
+  opacity: 0.85;
+}
+
+.library-provenance-unpinned,
+.book-provenance-unpinned {
+  font-style: italic;
+  opacity: 0.75;
+}
+
+.library-internal-source,
+.book-source {
+  opacity: 0.65;
+}

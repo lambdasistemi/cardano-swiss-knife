@@ -1831,8 +1831,22 @@ inspectorComponent initial =
             ]
         , HH.div
             [ classNames [ "library-book-meta" ] ]
-            [ HH.span_ [ HH.text (if book.seed then "seed" else "local") ]
-            , HH.span_ [ HH.text book.source ]
+            [ HH.span [ classNames [ "library-book-kind" ] ] [ HH.text (if book.seed then "seed" else "local") ]
+
+            , if book.upstreamSource /= "" && book.upstreamRef /= "" then
+                HH.span
+                  [ classNames [ "library-provenance" ] ]
+                  [ HH.span [ classNames [ "library-upstream-source" ] ] [ HH.text book.upstreamSource ]
+                  , HH.span [ classNames [ "library-provenance-sep" ] ] [ HH.text " @ " ]
+                  , HH.span [ classNames [ "library-upstream-ref" ] ] [ HH.text book.upstreamRef ]
+                  , HH.span [ classNames [ "library-internal-source" ] ] [ HH.text (" (" <> book.source <> ")") ]
+                  ]
+              else
+                HH.span
+                  [ classNames [ "library-provenance" ] ]
+                  [ HH.span [ classNames [ "library-provenance-unpinned" ] ] [ HH.text "local/freeform — no pinned upstream ref" ]
+                  , HH.span [ classNames [ "library-internal-source" ] ] [ HH.text (" (" <> book.source <> ")") ]
+                  ]
             , HH.span_ [ HH.text (libraryEditorModeLabel (libraryBookEditorMode book) <> " editor") ]
             ]
         , HH.div
@@ -2199,9 +2213,20 @@ inspectorComponent initial =
       , HH.div
           [ classNames [ "book-summary-copy" ] ]
           [ HH.strong_ [ HH.text book.name ]
-          , HH.code
-              [ classNames [ "book-source" ] ]
-              [ HH.text book.source ]
+          , if book.upstreamSource /= "" && book.upstreamRef /= "" then
+              HH.span
+                [ classNames [ "book-provenance" ] ]
+                [ HH.code [ classNames [ "book-upstream-source" ] ] [ HH.text book.upstreamSource ]
+                , HH.span [ classNames [ "book-provenance-sep" ] ] [ HH.text " @ " ]
+                , HH.code [ classNames [ "book-upstream-ref" ] ] [ HH.text book.upstreamRef ]
+                , HH.code [ classNames [ "book-source" ] ] [ HH.text (" (" <> book.source <> ")") ]
+                ]
+            else
+              HH.span
+                [ classNames [ "book-provenance" ] ]
+                [ HH.code [ classNames [ "book-provenance-unpinned" ] ] [ HH.text "local/freeform — no pinned upstream ref" ]
+                , HH.code [ classNames [ "book-source" ] ] [ HH.text (" (" <> book.source <> ")") ]
+                ]
           ]
       , HH.span
           [ classNames [ "book-term-count" ] ]
@@ -6455,6 +6480,8 @@ inspectorComponent initial =
               { id: nextLocalBookId st.books
               , name: targetName
               , source: "annotation"
+              , upstreamSource: ""
+              , upstreamRef: ""
               , raw: turtle
               , parts: parsedBook.parts
               , turtle: parsedBook.turtle
@@ -6512,12 +6539,15 @@ inspectorComponent initial =
         { id: nextLocalBookId st.books
         , name: book.title
         , source: book.source
+        , upstreamSource: ""
+        , upstreamRef: ""
         , raw: input
         , parts: book.parts
         , turtle: book.turtle
         , selected: true
         , seed: false
         }
+
       books = Array.snoc st.books newBook
       edits = bookNameEditsFromBooks books
     liftEffect (saveBooks books)
@@ -6578,8 +6608,10 @@ inspectorComponent initial =
       (\book -> if book.id == bookId then update book else book)
       books
 
+  bookNameEditsFromBooks :: forall r. Array { id :: String, name :: String | r } -> Array { id :: String, name :: String }
   bookNameEditsFromBooks books =
     map (\book -> { id: book.id, name: book.name }) books
+
 
   upsertBookNameEdit bookId name edits =
     if Array.any (\edit -> edit.id == bookId) edits then

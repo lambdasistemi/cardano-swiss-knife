@@ -18,11 +18,11 @@ Owned files for the driver:
 - `docs/inspector/dist/styles.css`
 - `docs/inspector/tests/tx-identify.spec.mjs`
 
-- [ ] T680 Pin the merged inspector registry and materialize/inject its raw registry, pin, and referenced artifact documents.
-- [ ] T681 Add a host-neutral PureScript parser with explicit malformed/missing-join failures and focused RED/GREEN tests.
-- [ ] T682 Persist source repository and immutable ref backwards-compatibly through BookStore load/save/export/import.
-- [ ] T683 Render pinned provenance separately from internal source paths, with an explicit unpinned state for local/legacy books.
-- [ ] T684 Prove seed, legacy, persistence, selected-summary, formatting, build, and browser behavior; commit one bisect-safe slice.
+- [X] T680 Pin the merged inspector registry and materialize/inject its raw registry, pin, and referenced artifact documents.
+- [X] T681 Add a host-neutral PureScript parser with explicit malformed/missing-join failures and focused RED/GREEN tests.
+- [X] T682 Persist source repository and immutable ref backwards-compatibly through BookStore load/save/export/import.
+- [X] T683 Render pinned provenance separately from internal source paths, with an explicit unpinned state for local/legacy books.
+- [X] T684 Prove seed, legacy, persistence, selected-summary, formatting, build, and browser behavior; commit one bisect-safe slice.
 
 Forbidden scope: `gate.sh`, `specs/`, `docs/book-interchange.md`, `.github/`, git configuration, sibling-ticket files, provider/TextEnvelope/engine semantics, and every file not listed above.
 

@@ -34,6 +34,30 @@ let
       cat > "$work_tree/playwright-globals.mjs" <<'EOF'
       import { readFileSync } from "node:fs";
 
+      globalThis.protocolRegistryJson = readFileSync(
+        new URL("./docs/inspector/protocols/registry.json", import.meta.url),
+        "utf8",
+      );
+      globalThis.protocolPinsJson = {
+        "sundaeswap-v3/pin.json": readFileSync(
+          new URL("./docs/inspector/protocols/sundaeswap-v3/pin.json", import.meta.url),
+          "utf8",
+        ),
+        "sundaeswap-treasury-v3/pin.json": readFileSync(
+          new URL("./docs/inspector/protocols/sundaeswap-treasury-v3/pin.json", import.meta.url),
+          "utf8",
+        ),
+      };
+      globalThis.protocolBlueprintsJson = {
+        "sundaeswap-v3/plutus.json": readFileSync(
+          new URL("./docs/inspector/protocols/sundaeswap-v3/plutus.json", import.meta.url),
+          "utf8",
+        ),
+        "sundaeswap-treasury-v3/plutus.json": readFileSync(
+          new URL("./docs/inspector/protocols/sundaeswap-treasury-v3/plutus.json", import.meta.url),
+          "utf8",
+        ),
+      };
       globalThis.cardanoShaclShapes = readFileSync(
         new URL("./docs/inspector/protocols/cardano-rdf/shapes.ttl", import.meta.url),
         "utf8",

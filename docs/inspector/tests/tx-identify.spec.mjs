@@ -1395,6 +1395,14 @@ test("library page manages local books with persisted CRUD", async ({ page }) =>
     library.getByRole("heading", { name: "Cardano RDF SHACL shapes" }),
   ).toBeVisible();
 
+  // Verify pinned provenance display vs unpinned freeform display
+  const sundaeBook = library.locator(".library-book", { hasText: "SundaeSwap V3 blueprint" });
+  await expect(sundaeBook.locator(".library-upstream-source")).toHaveText("github.com/SundaeSwap-finance/sundae-contracts");
+  await expect(sundaeBook.locator(".library-upstream-ref")).toHaveText("be33466b7dbe0f8e6c0e0f46ff23737897f45835");
+
+  const amaruBook = library.locator(".library-book", { hasText: "Amaru treasury 2026 overlay" });
+  await expect(amaruBook.locator(".library-provenance-unpinned")).toHaveText("local/freeform — no pinned upstream ref");
+
   await library.getByLabel("Book Turtle").fill(pastedTurtleBook);
   await library.getByRole("button", { name: "Add book" }).click();
   await expect(
@@ -1405,6 +1413,7 @@ test("library page manages local books with persisted CRUD", async ({ page }) =>
   ).toBeVisible();
 
   const localBook = library.locator(".library-book", { hasText: "Pasted overlay Turtle" });
+  await expect(localBook.locator(".library-provenance-unpinned")).toHaveText("local/freeform — no pinned upstream ref");
   await localBook.getByRole("checkbox", { name: "Select Pasted overlay Turtle" }).uncheck();
   await localBook.getByLabel("Rename Pasted overlay Turtle").fill("Renamed local treasury label");
   await localBook.getByRole("button", { name: "Save name for Pasted overlay Turtle" }).click();
@@ -1436,6 +1445,64 @@ test("library page manages local books with persisted CRUD", async ({ page }) =>
   const store = JSON.parse(rawStore);
   expect(store.books.map((book) => book.name)).not.toContain("Renamed local treasury label");
   expect(store.books).toHaveLength(3);
+
+  const sundaeStored = store.books.find((b) => b.id === "seed:sundaeswap-v3-blueprint");
+  expect(sundaeStored).toBeTruthy();
+  expect(sundaeStored.upstreamSource).toBe("github.com/SundaeSwap-finance/sundae-contracts");
+  expect(sundaeStored.upstreamRef).toBe("be33466b7dbe0f8e6c0e0f46ff23737897f45835");
+});
+
+test("library page loads legacy v1 store without provenance fields and displays explicitly unpinned state", async ({
+  page,
+}) => {
+  const legacyStoreJson = JSON.stringify({
+    kind: localBookStoreKey,
+    books: [
+      {
+        id: "legacy-v1-book",
+        name: "Legacy V1 Book",
+        source: "local/legacy.ttl",
+        raw: pastedTurtleBook,
+        parts: [
+          {
+            id: "p1",
+            label: "Part 1",
+            kind: "overlay",
+            turtle: pastedTurtleBook,
+            plutusJson: "",
+          },
+        ],
+        turtle: pastedTurtleBook,
+        selected: true,
+        seed: false,
+      },
+    ],
+  });
+
+  await page.addInitScript(
+    ({ key, value }) => {
+      window.localStorage.setItem(key, value);
+    },
+    { key: localBookStoreKey, value: legacyStoreJson },
+  );
+
+  await page.goto("/library");
+
+  const library = page.locator(".library-page");
+  await expect(library.getByRole("heading", { name: "Legacy V1 Book" })).toBeVisible();
+
+  const legacyBook = library.locator(".library-book", { hasText: "Legacy V1 Book" });
+  await expect(legacyBook.locator(".library-provenance-unpinned")).toHaveText(
+    "local/freeform — no pinned upstream ref",
+  );
+
+  const rawStore = await page.evaluate(
+    (key) => window.localStorage.getItem(key),
+    localBookStoreKey,
+  );
+  const store = JSON.parse(rawStore);
+  expect(store.books[0].upstreamSource).toBe("");
+  expect(store.books[0].upstreamRef).toBe("");
 });
 
 test("library editor saves validated drafts and rejects invalid source without mutating storage", async ({
@@ -3564,7 +3631,7 @@ fixture:linkableNetworkAddress
   const canonicalShapesBook = library
     .locator(".library-book", { hasText: "Cardano RDF SHACL shapes" })
     .filter({
-      has: page.locator(".library-book-meta", { hasText: "local" }),
+      has: page.locator(".library-book-kind", { hasText: "local" }),
     });
   await expect(canonicalShapesBook).toHaveCount(1);
   await expect(

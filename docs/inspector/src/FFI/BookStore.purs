@@ -15,9 +15,12 @@ module FFI.BookStore
 
 import Prelude
 
+import Cardano.Blueprint.Registry (bundledRegistryJson, parseCatalog)
 import Data.Array as Array
 import Data.Either (Either(..))
+import Data.Maybe (Maybe(..))
 import Effect (Effect)
+import Effect.Exception (throw)
 import FFI.OverlayBook (OverlayPart)
 import FFI.OverlayBook as OverlayBook
 import FFI.Storage as Storage
@@ -26,6 +29,8 @@ type Book =
   { id :: String
   , name :: String
   , source :: String
+  , upstreamSource :: String
+  , upstreamRef :: String
   , raw :: String
   , parts :: Array OverlayPart
   , turtle :: String
@@ -48,6 +53,8 @@ type BookStoreInspection =
 type SeedSpec =
   { id :: String
   , raw :: String
+  , upstreamSource :: String
+  , upstreamRef :: String
   }
 
 storageKey :: String
@@ -97,8 +104,10 @@ load = do
         Left _ -> do
           save seed
           pure seed
-        Right store ->
+        Right store -> do
+          save store
           pure store
+
 
 selectedBooks :: Store -> Array Book
 selectedBooks store =
@@ -109,17 +118,30 @@ parseStore = parseStoreImpl Left Right
 
 seedStore :: Effect Store
 seedStore = do
+  sundaeProv <- case parseCatalog bundledRegistryJson of
+    Right entries ->
+      case Array.find (\entry -> entry.id == "sundaeswap-v3") entries of
+        Just entry -> pure entry.provenance
+        Nothing -> throw "Bundled catalog missing sundaeswap-v3 entry"
+    Left err -> throw ("Failed to parse bundled catalog in seedStore: " <> err)
+
   amaru <- seedBook
     { id: "seed:amaru-treasury-2026-overlay"
     , raw: OverlayBook.bundledAmaruJournal
+    , upstreamSource: ""
+    , upstreamRef: ""
     }
   sundae <- seedBook
     { id: "seed:sundaeswap-v3-blueprint"
     , raw: OverlayBook.bundledSundaeSwapBlueprint
+    , upstreamSource: sundaeProv.source
+    , upstreamRef: sundaeProv.ref
     }
   shacl <- seedBook
     { id: "seed:cardano-rdf-shacl-shapes"
     , raw: OverlayBook.bundledCardanoShaclShapes
+    , upstreamSource: ""
+    , upstreamRef: ""
     }
   pure
     { kind: envelopeKind
@@ -135,6 +157,8 @@ seedBook spec = do
           { id: spec.id
           , name: book.title
           , source: book.source
+          , upstreamSource: spec.upstreamSource
+          , upstreamRef: spec.upstreamRef
           , raw: spec.raw
           , parts: book.parts
           , turtle: book.turtle
@@ -145,6 +169,8 @@ seedBook spec = do
           { id: spec.id
           , name: "Unparseable seed book"
           , source: err
+          , upstreamSource: spec.upstreamSource
+          , upstreamRef: spec.upstreamRef
           , raw: spec.raw
           , parts: []
           , turtle: ""
