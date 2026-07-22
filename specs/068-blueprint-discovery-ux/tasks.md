@@ -37,11 +37,11 @@ Owned files for the driver:
 - `docs/inspector/dist/styles.css`
 - `docs/inspector/tests/tx-identify.spec.mjs`
 
-- [ ] T685 Add pure catalog lookup/duplicate identity behavior with focused RED/GREEN tests.
-- [ ] T686 Render the pinned curated blueprint catalog before the freeform fallback controls.
-- [ ] T687 Add an unloaded bundled blueprint through BookStore with exact raw bytes and provenance, selected by default.
-- [ ] T688 Prevent duplicate catalog id/ref additions without weakening local/freeform workflows.
-- [ ] T689 Prove browse, add, reload, duplicate prevention, fallback regression, build, and browser behavior; commit one bisect-safe slice.
+- [X] T685 Add pure catalog lookup/duplicate identity behavior with focused RED/GREEN tests.
+- [X] T686 Render the pinned curated blueprint catalog before the freeform fallback controls.
+- [X] T687 Add an unloaded bundled blueprint through BookStore with exact raw bytes and provenance, selected by default.
+- [X] T688 Prevent duplicate catalog id/ref additions without weakening local/freeform workflows.
+- [X] T689 Prove browse, add, reload, duplicate prevention, fallback regression, build, and browser behavior; commit one bisect-safe slice.
 
 Forbidden scope: `gate.sh`, `specs/`, `docs/book-interchange.md`, `flake.lock`, Nix files, bootstrap injection, `.github/`, git configuration, sibling-ticket files, and every file not listed above.
 

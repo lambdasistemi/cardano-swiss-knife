@@ -3,6 +3,7 @@ module Main (main) where
 import Prelude
 
 import Cardano.BookableIdentifier (isBookableIdentifierKind)
+import Cardano.Blueprint.Registry (bundledRegistryJson, isCatalogEntryLoaded, lookupCatalogEntry, parseCatalog)
 import Cardano.Provider as SharedProvider
 import Cardano.Transaction.Entry (EntryStatus(..), TxEntry)
 import Cardano.Transaction.Ledger as Ledger
@@ -364,6 +365,7 @@ data Action
   | SetTxHash String
   | SetTxHex String
   | LoadExample String
+  | AddCatalogBook String
   | SetLibraryInput String
   | SetLibraryUrl String
   | AddLibraryBook
@@ -1638,9 +1640,90 @@ inspectorComponent initial =
             ]
         , HH.div
             [ classNames [ "library-layout" ] ]
-            [ renderLibraryImport state
+            [ renderLibraryCatalog state
+            , renderLibraryImport state
             , renderLibraryBooks state
             ]
+        ]
+
+  renderLibraryCatalog state =
+    case parseCatalog bundledRegistryJson of
+      Left err ->
+        HH.element (HH.ElemName "md-elevated-card")
+          [ classNames [ "panel", "library-catalog-panel" ]
+          , mdSurface "books"
+          ]
+          [ HH.div
+              [ classNames [ "panel-heading" ] ]
+              [ HH.div_
+                  [ HH.h2_ [ HH.text "Curated catalog" ]
+                  , HH.p_ [ HH.text "Build-pinned protocol blueprints from verified upstream repositories." ]
+                  ]
+              ]
+          , HH.div
+              [ classNames [ "sparql-lens-error", "catalog-parse-error" ]
+              , HH.attr (HH.AttrName "role") "alert"
+              ]
+              [ HH.text ("Failed to load bundled catalog: " <> err) ]
+          ]
+      Right catalogEntries ->
+        HH.element (HH.ElemName "md-elevated-card")
+          [ classNames [ "panel", "library-catalog-panel" ]
+          , mdSurface "books"
+          ]
+          [ HH.div
+              [ classNames [ "panel-heading" ] ]
+              [ HH.div_
+                  [ HH.h2_ [ HH.text "Curated catalog" ]
+                  , HH.p_ [ HH.text "Build-pinned protocol blueprints from verified upstream repositories." ]
+                  ]
+              ]
+          , HH.div
+              [ classNames [ "catalog-list" ] ]
+              (map (renderCatalogEntry state) catalogEntries)
+          ]
+
+  renderCatalogEntry state entry =
+    let
+      loaded = isCatalogEntryLoaded entry state.books
+    in
+      HH.div
+        [ classNames [ "catalog-entry" ] ]
+        [ HH.div
+            [ classNames [ "catalog-entry-header" ] ]
+            [ HH.h3
+                [ classNames [ "catalog-entry-title" ] ]
+                [ HH.text entry.id ]
+            , if loaded then
+                HH.span
+                  [ classNames [ "catalog-loaded-badge" ] ]
+                  [ HH.text "Loaded" ]
+              else
+                HH.element (HH.ElemName "md-filled-button")
+                  [ classNames [ "primary-action", "catalog-add-button" ]
+                  , HH.attr (HH.AttrName "role") "button"
+                  , mdControl "primary"
+                  , HE.onClick (\_ -> AddCatalogBook entry.id)
+                  ]
+                  [ HH.text "Add to library" ]
+            ]
+        , HH.div
+            [ classNames [ "catalog-provenance" ] ]
+            [ HH.span [ classNames [ "catalog-provenance-label" ] ] [ HH.text "Source: " ]
+            , HH.span [ classNames [ "catalog-upstream-source" ] ] [ HH.text entry.provenance.source ]
+            , HH.span [ classNames [ "catalog-provenance-divider" ] ] [ HH.text " @ " ]
+            , HH.span [ classNames [ "catalog-upstream-ref" ] ] [ HH.text entry.provenance.ref ]
+            ]
+        , if Array.null entry.onChainHashes then
+            HH.text ""
+          else
+            HH.div
+              [ classNames [ "catalog-on-chain-hashes" ] ]
+              [ HH.span [ classNames [ "catalog-hashes-label" ] ] [ HH.text "On-chain hashes: " ]
+              , HH.div
+                  [ classNames [ "catalog-hashes-list" ] ]
+                  (map (\h -> HH.code [ classNames [ "catalog-hash-tag" ] ] [ HH.text h ]) entry.onChainHashes)
+              ]
         ]
 
   renderManual state =
@@ -1651,15 +1734,16 @@ inspectorComponent initial =
       ]
 
   renderLibraryImport state =
-    HH.element (HH.ElemName "md-elevated-card")
-      [ classNames [ "panel", "library-import-panel" ]
+    HH.element (HH.ElemName "details")
+      [ classNames [ "panel", "library-import-panel", "library-import-fallback" ]
+      , HH.attr (HH.AttrName "open") "open"
       , mdSurface "books"
       ]
-      [ HH.div
-          [ classNames [ "panel-heading" ] ]
+      [ HH.element (HH.ElemName "summary")
+          [ classNames [ "panel-heading", "library-fallback-summary" ] ]
           [ HH.div_
-              [ HH.h2_ [ HH.text "Add book" ]
-              , HH.p_ [ HH.text "Import overlay, blueprint, SHACL, or store JSON into this browser." ]
+              [ HH.h2_ [ HH.text "Freeform import (fallback)" ]
+              , HH.p_ [ HH.text "Secondary fallback for local Turtle overlays, URLs, files, or store JSON." ]
               ]
           ]
       , HH.label
@@ -5690,6 +5774,29 @@ inspectorComponent initial =
     LoadExample hex -> do
       H.modify_ _ { mode = ByHex, txHex = hex, copied = false, copiedPath = Nothing, fetchError = Nothing }
       handleAction Decode
+    AddCatalogBook entryId -> do
+      st <- H.get
+      case parseCatalog bundledRegistryJson of
+        Left err ->
+          H.modify_ _ { libraryError = Just ("Catalog error: " <> err), libraryStatus = Nothing }
+        Right entries ->
+          case lookupCatalogEntry entryId entries of
+            Nothing ->
+              H.modify_ _ { libraryError = Just ("Catalog entry not found: " <> entryId), libraryStatus = Nothing }
+            Just entry -> do
+              res <- liftEffect (BookStore.addCatalogBook entry { kind: BookStore.envelopeKind, books: st.books })
+              case res of
+                Left err ->
+                  H.modify_ _ { libraryError = Just err, libraryStatus = Nothing }
+                Right updatedStore -> do
+                  let edits = bookNameEditsFromBooks updatedStore.books
+                  H.modify_
+                    _
+                      { books = updatedStore.books
+                      , bookNameEdits = edits
+                      , libraryError = Nothing
+                      , libraryStatus = Just ("Added " <> entry.id <> " from curated catalog.")
+                      }
     SetLibraryInput s ->
       H.modify_ _ { libraryInput = s, libraryError = Nothing, libraryStatus = Nothing }
     SetLibraryUrl s ->

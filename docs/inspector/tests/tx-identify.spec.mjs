@@ -1505,6 +1505,106 @@ test("library page loads legacy v1 store without provenance fields and displays 
   expect(store.books[0].upstreamRef).toBe("");
 });
 
+test("library page renders curated catalog, adds unloaded entry, prevents duplicates, and persists on reload", async ({
+  page,
+}) => {
+  await page.goto("/library");
+
+  const library = page.locator(".library-page");
+
+  // 3. Curated catalog section is visible and precedes freeform fallback controls
+  const catalog = library.locator(".library-catalog-panel");
+  const fallback = library.locator(".library-import-panel");
+  await expect(catalog).toBeVisible();
+  await expect(catalog.getByRole("heading", { name: "Curated catalog" })).toBeVisible();
+  await expect(fallback).toBeVisible();
+  await expect(fallback.getByRole("heading", { name: "Freeform import (fallback)" })).toBeVisible();
+
+  // Verify DOM ordering: catalog comes before freeform fallback
+  const isCatalogBeforeFallback = await page.evaluate(() => {
+    const cat = document.querySelector(".library-catalog-panel");
+    const fall = document.querySelector(".library-import-panel");
+    return cat && fall && (cat.compareDocumentPosition(fall) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+  });
+  expect(isCatalogBeforeFallback).toBe(true);
+
+  // 2. Catalog identity is pair (id, ref): sundaeswap-v3 is Loaded via seeded book, sundaeswap-treasury-v3 is Unloaded despite sharing ref
+  const sundaeEntry = catalog.locator(".catalog-entry", { hasText: "sundaeswap-v3" });
+  await expect(sundaeEntry).toBeVisible();
+  await expect(sundaeEntry.locator(".catalog-upstream-source")).toHaveText(
+    "github.com/SundaeSwap-finance/sundae-contracts",
+  );
+  await expect(sundaeEntry.locator(".catalog-upstream-ref")).toHaveText(
+    "be33466b7dbe0f8e6c0e0f46ff23737897f45835",
+  );
+  await expect(sundaeEntry.locator(".catalog-loaded-badge")).toHaveText("Loaded");
+  await expect(sundaeEntry.locator(".catalog-hash-tag")).toContainText(
+    "fa6a58bbe2d0ff05534431c8e2f0ef2cbdc1602a8456e4b13c8f3077",
+  );
+
+  const treasuryEntry = catalog.locator(".catalog-entry", { hasText: "sundaeswap-treasury-v3" });
+  await expect(treasuryEntry).toBeVisible();
+  await expect(treasuryEntry.locator(".catalog-upstream-source")).toHaveText(
+    "github.com/SundaeSwap-finance/treasury-contracts",
+  );
+  await expect(treasuryEntry.locator(".catalog-upstream-ref")).toHaveText(
+    "dea9e52671f7a696f0ec6a0f475c7fbe52689c9b",
+  );
+  const addTreasuryBtn = treasuryEntry.getByRole("button", { name: "Add to library" });
+  await expect(addTreasuryBtn).toBeEnabled();
+  await expect(treasuryEntry.locator(".catalog-hash-tag")).toContainText(
+    "32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0d",
+  );
+
+  // Add sundaeswap-treasury-v3 with one action
+  await addTreasuryBtn.click();
+
+  // Verify it is added, selected by default, and catalog entry updates to Loaded (duplicate prevention)
+  const treasuryBook = library
+    .locator(".library-book")
+    .filter({ has: page.locator(".library-upstream-ref", { hasText: "dea9e52671f7a696f0ec6a0f475c7fbe52689c9b" }) });
+  await expect(treasuryBook).toBeVisible();
+  await expect(
+    treasuryBook.getByRole("checkbox", { name: /^Select / }),
+  ).toBeChecked();
+  await expect(treasuryBook.locator(".library-upstream-source")).toHaveText(
+    "github.com/SundaeSwap-finance/treasury-contracts",
+  );
+  await expect(treasuryBook.locator(".library-upstream-ref")).toHaveText(
+    "dea9e52671f7a696f0ec6a0f475c7fbe52689c9b",
+  );
+  await expect(treasuryEntry.locator(".catalog-loaded-badge")).toHaveText("Loaded");
+  await expect(addTreasuryBtn).toHaveCount(0);
+
+  // Reload page and confirm persistence
+  await page.reload();
+  const reloadedBook = page
+    .locator(".library-book")
+    .filter({ has: page.locator(".library-upstream-ref", { hasText: "dea9e52671f7a696f0ec6a0f475c7fbe52689c9b" }) });
+  await expect(reloadedBook).toBeVisible();
+
+  // 1. Assert exact raw CIP-57 artifact bytes preservation in storage
+  const rawStore = await page.evaluate(
+    (key) => window.localStorage.getItem(key),
+    localBookStoreKey,
+  );
+  const store = JSON.parse(rawStore);
+  const storedTreasury = store.books.find((b) => b.id === "catalog:sundaeswap-treasury-v3");
+  expect(storedTreasury).toBeTruthy();
+  expect(storedTreasury.upstreamSource).toBe("github.com/SundaeSwap-finance/treasury-contracts");
+  expect(storedTreasury.upstreamRef).toBe("dea9e52671f7a696f0ec6a0f475c7fbe52689c9b");
+
+  const expectedTreasuryRaw = await page.evaluate(
+    () => window.protocolBlueprintsJson["sundaeswap-treasury-v3/plutus.json"],
+  );
+  expect(expectedTreasuryRaw).toBeTruthy();
+  expect(storedTreasury.raw).toBe(expectedTreasuryRaw);
+
+  // Freeform import fallback regression check
+  await expect(fallback.getByLabel("Book Turtle")).toBeVisible();
+  await expect(fallback.getByRole("button", { name: "Add book" })).toBeVisible();
+});
+
 test("library editor saves validated drafts and rejects invalid source without mutating storage", async ({
   page,
 }) => {

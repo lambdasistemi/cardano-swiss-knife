@@ -2,6 +2,7 @@ module FFI.BookStore
   ( Book
   , BookStoreInspection
   , Store
+  , addCatalogBook
   , envelopeKind
   , inspect
   , annotationTurtle
@@ -15,7 +16,7 @@ module FFI.BookStore
 
 import Prelude
 
-import Cardano.Blueprint.Registry (bundledRegistryJson, parseCatalog)
+import Cardano.Blueprint.Registry (BlueprintCatalogEntry, bundledRegistryJson, catalogBookId, isCatalogEntryLoaded, parseCatalog)
 import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
@@ -108,7 +109,6 @@ load = do
           save store
           pure store
 
-
 selectedBooks :: Store -> Array Book
 selectedBooks store =
   Array.filter (\book -> book.selected) store.books
@@ -178,3 +178,33 @@ seedBook spec = do
           , seed: true
           }
     )
+
+addCatalogBook :: BlueprintCatalogEntry -> Store -> Effect (Either String Store)
+addCatalogBook entry store =
+  if isCatalogEntryLoaded entry store.books then
+    pure (Right store)
+  else do
+    parsed <- OverlayBook.parse entry.raw
+    case parsed of
+      Left err ->
+        pure (Left ("Failed to parse catalog blueprint for '" <> entry.id <> "': " <> err))
+      Right book -> do
+        let
+          newBook =
+            { id: catalogBookId entry.id
+            , name: book.title
+            , source: entry.path
+            , upstreamSource: entry.provenance.source
+            , upstreamRef: entry.provenance.ref
+            , raw: entry.raw
+            , parts: book.parts
+            , turtle: book.turtle
+            , selected: true
+            , seed: false
+            }
+          updatedStore =
+            { kind: store.kind
+            , books: Array.snoc store.books newBook
+            }
+        save updatedStore
+        pure (Right updatedStore)

@@ -6,6 +6,10 @@ module Cardano.Blueprint.Registry
   , bundledRegistryJson
   , bundledPinsJson
   , bundledBlueprintsJson
+  , lookupCatalogEntry
+  , isCatalogBookForEntry
+  , isCatalogEntryLoaded
+  , catalogBookId
   ) where
 
 import Prelude
@@ -146,3 +150,25 @@ extractHash targetBpId itemJson = do
   bp <- Object.lookup "blueprint" obj >>= toString
   if bp == targetBpId then Object.lookup "on_chain_hash" obj >>= toString
   else Nothing
+
+catalogBookId :: String -> String
+catalogBookId entryId = "catalog:" <> entryId
+
+lookupCatalogEntry :: String -> Array BlueprintCatalogEntry -> Maybe BlueprintCatalogEntry
+lookupCatalogEntry targetId entries =
+  Array.find (\entry -> entry.id == targetId) entries
+
+isCatalogBookForEntry :: BlueprintCatalogEntry -> { id :: String, upstreamRef :: String } -> Boolean
+isCatalogBookForEntry entry book =
+  book.upstreamRef /= ""
+    && book.upstreamRef == entry.provenance.ref
+    &&
+      ( book.id == "seed:" <> entry.id <> "-blueprint"
+          || book.id == "catalog:" <> entry.id
+          ||
+            book.id == entry.id
+      )
+
+isCatalogEntryLoaded :: forall r. BlueprintCatalogEntry -> Array { id :: String, upstreamRef :: String | r } -> Boolean
+isCatalogEntryLoaded entry books =
+  Array.any (\book -> isCatalogBookForEntry entry { id: book.id, upstreamRef: book.upstreamRef }) books
