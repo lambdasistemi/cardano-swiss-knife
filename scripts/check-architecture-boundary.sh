@@ -108,6 +108,21 @@ check_transaction_host_delegation() {
   fi
 }
 
+check_local_provider_context_boundary() {
+  local root="$1"
+  local cli="$root/cli/csk.mjs" node="$root/node/src/index.js" webui="$root/docs/inspector/src/Provider.purs"
+  require_file "$cli"
+  require_file "$node"
+  require_file "$webui"
+  rg -q 'Provider\.resolveProducerTxContext' "$node" ||
+    fail "Node transaction input must resolve explicit local provider context through Cardano.Provider"
+  rg -q 'Shared\.resolveProducerTxContext' "$webui" ||
+    fail "WebUI provider compatibility adapter must delegate to the shared provider-context resolver"
+  if rg -n -e 'resolveProducerTxContext' -e 'fetch\(' "$cli"; then
+    fail "CLI local provider context must remain a thin Node API adapter"
+  fi
+}
+
 check_documentation_anchors() {
   local root="$1"
   local architecture="$root/docs/architecture/system.md"
@@ -131,6 +146,7 @@ check_tree() {
   check_semantic_dependencies "$1"
   check_host_ownership "$1"
   check_transaction_host_delegation "$1"
+  check_local_provider_context_boundary "$1"
   check_documentation_anchors "$1"
 }
 

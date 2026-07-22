@@ -158,6 +158,10 @@ test("installs a prepacked artifact outside the checkout without network, native
     await writeFile(join(foreignProject, "transaction.json"), textEnvelope);
     await writeFile(join(foreignProject, "transaction.cbor"), `${transactionCbor}\n`);
     await writeFile(join(foreignProject, "book.ttl"), "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n");
+    const providerCapture = join(foreignProject, "provider-capture.json");
+    const providerGuard = join(foreignProject, "provider-guard.mjs");
+    await writeFile(providerGuard, `import { writeFileSync } from "node:fs"; const calls = []; globalThis.fetch = async (url) => { calls.push({ url }); return { status: 401, text: async () => "provider denied" }; }; process.on("exit", () => writeFileSync(process.env.CSK_PROVIDER_CAPTURE, JSON.stringify({ calls, argv: process.argv, env: process.env })));`);
+    const providerGuardUrl = pathToFileURL(providerGuard).href;
     const command = await run(process.execPath, ["--import", networkGuardUrl, cli, "payload", "sign", "--secret-stdin", "--payload-mode", signing.payloadMode, "--payload-input", signing.payloadInput, "--output", "json"], {
       cwd: foreignProject,
       input: `${signing.signingKeyBech32}\n`,
@@ -182,6 +186,22 @@ test("installs a prepacked artifact outside the checkout without network, native
       assert.equal(cliLedger.code, 0, cliLedger.stderr);
       assert.deepEqual(JSON.parse(cliLedger.stdout).value.result[field], expected, `CLI ${field} must preserve the Node engine payload`);
     }
+    for (const args of [
+      ["tx", "inspect", "--cbor-hex", transactionCbor],
+      ["tx", "identify", "--tx-file", join(foreignProject, "transaction.cbor")],
+      ["tx", "intent", "--tx-file", join(foreignProject, "transaction.json")],
+      ["tx", "witness", "plan", "--tx-file", join(foreignProject, "transaction.cbor")],
+      ["tx", "validate", "--tx-file", join(foreignProject, "transaction.cbor")],
+      ["tx", "evaluate-scripts", "--tx-file", join(foreignProject, "transaction.cbor")],
+    ]) {
+      const enriched = await run(process.execPath, ["--import", providerGuardUrl, cli, ...args, "--provider", "koios", "--network", "mainnet", "--output", "json"], { cwd: foreignProject, env: { ...process.env, CSK_PROVIDER_CAPTURE: providerCapture } });
+      assert.equal(enriched.code, 0, enriched.stderr);
+      const context = JSON.parse(enriched.stdout).value.context;
+      assert.equal(context.resolution.provider, "koios");
+      assert.ok(context.resolution.error_codes.some(({ code }) => code === "PROVIDER_AUTHENTICATION"));
+    }
+    const providerRecorded = JSON.parse(await readFile(providerCapture, "utf8"));
+    assert.ok(providerRecorded.calls.length > 0, "installed CLI must resolve local provider context from a foreign CWD");
     const cliAttachment = await run(process.execPath, ["--import", networkGuardUrl, cli, "tx", "witness", "attach", "--tx-file", join(foreignProject, "witness-transaction.cbor"), "--witness-file", join(foreignProject, "detached.json"), "--output", "json"], { cwd: foreignProject });
     assert.equal(cliAttachment.code, 0, cliAttachment.stderr);
     assert.deepEqual(JSON.parse(cliAttachment.stdout).value, result.attachment.value, "installed CLI attachment must preserve the Node engine payload");
