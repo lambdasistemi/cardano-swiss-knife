@@ -3,10 +3,12 @@ package:
   dependencies:
     - aff
     - aff-promise
+    - argonaut-core
     - arrays
     - arraybuffer-types
     - either
     - effect
+    - foreign-object
     - integers
     - maybe
     - nullable

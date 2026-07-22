@@ -8,38 +8,27 @@ module FFI.OverlayBook
   , parse
   ) where
 
+import Prelude (pure)
+
 import Data.Either (Either(..))
 import Effect (Effect)
+import Cardano.Transaction.Book as Book
 
-type OverlayPart =
-  { id :: String
-  , label :: String
-  , kind :: String
-  , turtle :: String
-  , plutusJson :: String
-  }
+type OverlayPart = Book.BookPart
 
-type OverlayBook =
-  { title :: String
-  , source :: String
-  , parts :: Array OverlayPart
-  , turtle :: String
-  , notice :: String
-  }
+type OverlayBook = Book.Book
 
-foreign import bundledAmaruJournal :: String
+bundledAmaruJournal :: String
+bundledAmaruJournal = Book.bundledAmaruJournal
 
-foreign import bundledCardanoShaclShapes :: String
+bundledCardanoShaclShapes :: String
+bundledCardanoShaclShapes = Book.bundledCardanoShaclShapes
 
-foreign import bundledSundaeSwapBlueprint :: String
+bundledSundaeSwapBlueprint :: String
+bundledSundaeSwapBlueprint = Book.bundledSundaeSwapBlueprint
 
-foreign import blueprintArgs :: Array OverlayPart -> String
-
-foreign import parseImpl
-  :: (String -> Either String OverlayBook)
-  -> (OverlayBook -> Either String OverlayBook)
-  -> String
-  -> Effect (Either String OverlayBook)
+blueprintArgs :: Array OverlayPart -> String
+blueprintArgs = Book.blueprintArgs
 
 parse :: String -> Effect (Either String OverlayBook)
-parse = parseImpl Left Right
+parse input = pure (Book.parseBook input)
