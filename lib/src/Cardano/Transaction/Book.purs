@@ -73,20 +73,22 @@ vocab = "overlay:OverlayPart\n  a rdfs:Class ;\n  rdfs:label \"Overlay part\" .\
 
 classifyBookInput :: String -> Either String BookInput
 classifyBookInput input =
-  let raw = String.trim input
-  in if raw == "" then Left "overlay input is empty"
-  else if CodeUnits.take 1 raw == "{" then do
-    value <- jsonParser raw
-    object <- maybeLeft "unrecognized JSON shape." (toObject value)
-    case Object.lookup "kind" object of
-      Just kind -> case toString kind of
-        Just "cardano-ledger-inspector.books.v1" -> Right (BookStore value)
-        _ -> Left ("unsupported JSON kind: " <> jsonText kind <> ".")
-      Nothing | isBlueprint value -> Right (Cip57Blueprint { raw, value })
-      Nothing | isAmaru value -> Right (AmaruJournal value)
-      Nothing -> Left "unrecognized JSON shape."
-  else if isShaclTurtle raw then Right (ShaclTurtle raw)
-  else Right (PastedTurtle raw)
+  let
+    raw = String.trim input
+  in
+    if raw == "" then Left "overlay input is empty"
+    else if CodeUnits.take 1 raw == "{" then do
+      value <- jsonParser raw
+      object <- maybeLeft "unrecognized JSON shape." (toObject value)
+      case Object.lookup "kind" object of
+        Just kind -> case toString kind of
+          Just "cardano-ledger-inspector.books.v1" -> Right (BookStore value)
+          _ -> Left ("unsupported JSON kind: " <> jsonText kind <> ".")
+        Nothing | isBlueprint value -> Right (Cip57Blueprint { raw, value })
+        Nothing | isAmaru value -> Right (AmaruJournal value)
+        Nothing -> Left "unrecognized JSON shape."
+    else if isShaclTurtle raw then Right (ShaclTurtle raw)
+    else Right (PastedTurtle raw)
 
 parseBook :: String -> Either String Book
 parseBook input = classifyBookInput input >>= renderBook
@@ -133,21 +135,24 @@ importStore value = do
 
 pastedTurtleBook :: String -> Book
 pastedTurtleBook raw =
-  let turtle = normalizedTurtle raw
-      part = { id: "pasted-turtle-" <> hashText turtle, label: "Pasted Turtle", kind: "overlay", turtle, plutusJson: "" }
-  in { title: "Pasted overlay Turtle", source: "paste", parts: [ part ], turtle, notice: "" }
+  let
+    turtle = normalizedTurtle raw
+    part = { id: "pasted-turtle-" <> hashText turtle, label: "Pasted Turtle", kind: "overlay", turtle, plutusJson: "" }
+  in
+    { title: "Pasted overlay Turtle", source: "paste", parts: [ part ], turtle, notice: "" }
 
 shaclTurtleBook :: String -> Book
 shaclTurtleBook raw =
-  let turtle = normalizedTurtle raw
-      bundled = String.trim turtle == String.trim bundledCardanoShaclShapes
-      part =
-        { id: if bundled then "cardano-rdf-shacl-shapes" else "pasted-shacl-" <> hashText turtle
-        , label: if bundled then "Cardano transaction SHACL shapes" else "Pasted SHACL shapes"
-        , kind: "shacl"
-        , turtle
-        , plutusJson: ""
-        }
+  let
+    turtle = normalizedTurtle raw
+    bundled = String.trim turtle == String.trim bundledCardanoShaclShapes
+    part =
+      { id: if bundled then "cardano-rdf-shacl-shapes" else "pasted-shacl-" <> hashText turtle
+      , label: if bundled then "Cardano transaction SHACL shapes" else "Pasted SHACL shapes"
+      , kind: "shacl"
+      , turtle
+      , plutusJson: ""
+      }
   in
     { title: if bundled then "Cardano RDF SHACL shapes" else "Pasted SHACL shapes"
     , source: if bundled then "docs/inspector/protocols/cardano-rdf/shapes.ttl" else "paste"
@@ -158,56 +163,67 @@ shaclTurtleBook raw =
 
 blueprintBook :: { raw :: String, value :: Json } -> Book
 blueprintBook { raw, value } =
-  let title = textValue (valueObject value >>= Object.lookup "preamble" >>= toObject >>= Object.lookup "title")
-      lowerTitle = String.toLower title
-      label = if contains "sundae" lowerTitle then "SundaeSwap V3 blueprint" else if title == "" then "CIP-57 blueprint" else titleLabel title <> " blueprint"
-      slug = trimDashes (String.toLower (localName (if title == "" then "blueprint" else title)))
-      identifier = if contains "sundae" lowerTitle then "sundaeswap-v3" else if slug == "" then "blueprint-" <> hashText raw else "blueprint-" <> slug
-      part = { id: identifier, label, kind: "blueprint", turtle: "", plutusJson: raw }
-  in { title: label, source: "CIP-57 plutus.json", parts: [ part ], turtle: "", notice: "" }
+  let
+    title = textValue (valueObject value >>= Object.lookup "preamble" >>= toObject >>= Object.lookup "title")
+    lowerTitle = String.toLower title
+    label = if contains "sundae" lowerTitle then "SundaeSwap V3 blueprint" else if title == "" then "CIP-57 blueprint" else titleLabel title <> " blueprint"
+    slug = trimDashes (String.toLower (localName (if title == "" then "blueprint" else title)))
+    identifier = if contains "sundae" lowerTitle then "sundaeswap-v3" else if slug == "" then "blueprint-" <> hashText raw else "blueprint-" <> slug
+    part = { id: identifier, label, kind: "blueprint", turtle: "", plutusJson: raw }
+  in
+    { title: label, source: "CIP-57 plutus.json", parts: [ part ], turtle: "", notice: "" }
 
 amaruBook :: Json -> Either String Book
 amaruBook journal = do
   object <- maybeLeft "journal is not an object" (toObject journal)
   treasuries <- maybeLeft "journal missing treasuries" (Object.lookup "treasuries" object >>= toObject)
-  let scopeOwners = textValue (Object.lookup "scope_owners" object)
-      parts = Object.keys treasuries # Array.sort # map (\slug -> buildAmaruPart slug (fromMaybe Json.jsonEmptyObject (Object.lookup slug treasuries)) scopeOwners)
-      turtle = String.joinWith "\n" (map _.turtle parts)
+  let
+    scopeOwners = textValue (Object.lookup "scope_owners" object)
+    parts = Object.keys treasuries # Array.sort # map (\slug -> buildAmaruPart slug (fromMaybe Json.jsonEmptyObject (Object.lookup slug treasuries)) scopeOwners)
+    turtle = String.joinWith "\n" (map _.turtle parts)
   pure { title: "Amaru treasury 2026 overlay", source: "docs/inspector/protocols/amaru-treasury/journal-2026.json", parts, turtle, notice: "" }
 
 buildAmaruPart :: String -> Json -> String -> BookPart
 buildAmaruPart slug treasuryValue scopeOwners =
-  let treasury = fromMaybe Object.empty (toObject treasuryValue)
-      safeSlug = localName slug
-      title = titleLabel slug
-      ownerValue = Object.lookup "owner" treasury
-      owner = textValue ownerValue
-      hasOwner = fromMaybe false (map truthyJson ownerValue)
-      script key = fromMaybe Object.empty (Object.lookup key treasury >>= toObject)
-      treasuryScript = script "treasury_script"
-      permissionsScript = script "permissions_script"
-      registryScript = script "registry_script"
-      predicates =
-        [ mkPredicate "a" "overlay:Treasury"
-        , mkPredicate "rdfs:label" (literal ("Amaru " <> title <> " treasury"))
-        , mkPredicate "overlay:slug" (literal slug)
-        , mkPredicate "overlay:budgetAda" (turtleNumber (Object.lookup "budget" treasury))
-        , mkPredicate "overlay:address" ("overlay:amaruAddress-" <> safeSlug)
-        ] <> (if hasOwner then [ mkPredicate "overlay:owner" (iri "key" owner) ] else []) <>
+  let
+    treasury = fromMaybe Object.empty (toObject treasuryValue)
+    safeSlug = localName slug
+    title = titleLabel slug
+    ownerValue = Object.lookup "owner" treasury
+    owner = textValue ownerValue
+    hasOwner = fromMaybe false (map truthyJson ownerValue)
+    script key = fromMaybe Object.empty (Object.lookup key treasury >>= toObject)
+    treasuryScript = script "treasury_script"
+    permissionsScript = script "permissions_script"
+    registryScript = script "registry_script"
+    predicates =
+      [ mkPredicate "a" "overlay:Treasury"
+      , mkPredicate "rdfs:label" (literal ("Amaru " <> title <> " treasury"))
+      , mkPredicate "overlay:slug" (literal slug)
+      , mkPredicate "overlay:budgetAda" (turtleNumber (Object.lookup "budget" treasury))
+      , mkPredicate "overlay:address" ("overlay:amaruAddress-" <> safeSlug)
+      ] <> (if hasOwner then [ mkPredicate "overlay:owner" (iri "key" owner) ] else []) <>
         [ mkPredicate "overlay:scopeOwners" "overlay:amaruScopeOwners"
         , mkPredicate "overlay:treasuryScript" (iri "script" (textValue (Object.lookup "hash" treasuryScript)))
         , mkPredicate "overlay:permissionsScript" (iri "script" (textValue (Object.lookup "hash" permissionsScript)))
         , mkPredicate "overlay:registryScript" (iri "script" (textValue (Object.lookup "hash" registryScript)))
         ]
-      ownerBlock = if hasOwner then block (iri "key" owner) [ mkPredicate "a" "overlay:Owner", mkPredicate "rdfs:label" (literal ("Amaru " <> title <> " owner key")) ] <> "\n" else ""
-      turtle = prefixes <> "\n" <> vocab <> "\n"
-        <> block "overlay:amaruScopeOwners" [ mkPredicate "a" "overlay:ScopeOwners", mkPredicate "rdfs:label" (literal "Amaru treasury scope owners"), mkPredicate "cardano:txOutRef" (literal (txOutRef scopeOwners)) ] <> "\n"
-        <> block ("overlay:amaruAddress-" <> safeSlug) [ mkPredicate "a" "overlay:Address", mkPredicate "rdfs:label" (literal ("Amaru " <> title <> " treasury address")), mkPredicate "cardano:bech32" (literal (textValue (Object.lookup "address" treasury))) ] <> "\n"
-        <> ownerBlock <> block ("overlay:amaruTreasury-" <> safeSlug) predicates <> "\n"
-        <> scriptBlock slug "treasury_script" treasuryScript <> "\n"
-        <> scriptBlock slug "permissions_script" permissionsScript <> "\n"
-        <> scriptBlock slug "registry_script" registryScript
-  in { id: "amaru-treasury-" <> safeSlug, label: sentenceLabel slug, kind: "overlay", turtle: normalizedTurtle turtle, plutusJson: "" }
+    ownerBlock = if hasOwner then block (iri "key" owner) [ mkPredicate "a" "overlay:Owner", mkPredicate "rdfs:label" (literal ("Amaru " <> title <> " owner key")) ] <> "\n" else ""
+    turtle = prefixes <> "\n" <> vocab <> "\n"
+      <> block "overlay:amaruScopeOwners" [ mkPredicate "a" "overlay:ScopeOwners", mkPredicate "rdfs:label" (literal "Amaru treasury scope owners"), mkPredicate "cardano:txOutRef" (literal (txOutRef scopeOwners)) ]
+      <> "\n"
+      <> block ("overlay:amaruAddress-" <> safeSlug) [ mkPredicate "a" "overlay:Address", mkPredicate "rdfs:label" (literal ("Amaru " <> title <> " treasury address")), mkPredicate "cardano:bech32" (literal (textValue (Object.lookup "address" treasury))) ]
+      <> "\n"
+      <> ownerBlock
+      <> block ("overlay:amaruTreasury-" <> safeSlug) predicates
+      <> "\n"
+      <> scriptBlock slug "treasury_script" treasuryScript
+      <> "\n"
+      <> scriptBlock slug "permissions_script" permissionsScript
+      <> "\n"
+      <> scriptBlock slug "registry_script" registryScript
+  in
+    { id: "amaru-treasury-" <> safeSlug, label: sentenceLabel slug, kind: "overlay", turtle: normalizedTurtle turtle, plutusJson: "" }
 
 scriptBlock :: String -> String -> Object.Object Json -> String
 scriptBlock slug role script =
@@ -228,8 +244,10 @@ block subject predicates =
 
 blueprintArgs :: Array BookPart -> String
 blueprintArgs parts =
-  let blueprints = parts # Array.filter (\part -> part.kind == "blueprint" && part.plutusJson /= "") # map (\part -> "{\"id\":" <> literal part.id <> ",\"plutus_json\":" <> literal part.plutusJson <> "}")
-  in if Array.null blueprints then "{}" else "{\"blueprints\":[" <> String.joinWith "," blueprints <> "]}"
+  let
+    blueprints = parts # Array.filter (\part -> part.kind == "blueprint" && part.plutusJson /= "") # map (\part -> "{\"id\":" <> literal part.id <> ",\"plutus_json\":" <> literal part.plutusJson <> "}")
+  in
+    if Array.null blueprints then "{}" else "{\"blueprints\":[" <> String.joinWith "," blueprints <> "]}"
 
 isBlueprint :: Json -> Boolean
 isBlueprint value = isJust (valueObject value >>= Object.lookup "preamble" >>= toObject) && isJust (valueObject value >>= Object.lookup "validators" >>= toArray)
@@ -305,11 +323,13 @@ finiteNumber value
 
 isFiniteNumberText :: String -> Boolean
 isFiniteNumberText raw =
-  let text = String.trim raw
-      chars = CodeUnits.toCharArray text
-      valid char = (char >= '0' && char <= '9') || char == '+' || char == '-' || char == '.' || char == 'e' || char == 'E'
-      hasDigit = Array.any (\char -> char >= '0' && char <= '9') chars
-  in text == "" || (hasDigit && Array.all valid chars)
+  let
+    text = String.trim raw
+    chars = CodeUnits.toCharArray text
+    valid char = (char >= '0' && char <= '9') || char == '+' || char == '-' || char == '.' || char == 'e' || char == 'E'
+    hasDigit = Array.any (\char -> char >= '0' && char <= '9') chars
+  in
+    text == "" || (hasDigit && Array.all valid chars)
 
 truthyJson :: Json -> Boolean
 truthyJson value
@@ -330,10 +350,12 @@ txOutRef :: String -> String
 txOutRef value = case CodeUnits.lastIndexOf (Pattern "#") value of
   Nothing -> value
   Just position ->
-    let prefix = CodeUnits.take (position + 1) value
-        suffix = CodeUnits.drop (position + 1) value
-        stripped = dropLeadingZeros suffix
-    in if suffix /= "" && allDigits suffix then prefix <> if stripped == "" then "0" else stripped else value
+    let
+      prefix = CodeUnits.take (position + 1) value
+      suffix = CodeUnits.drop (position + 1) value
+      stripped = dropLeadingZeros suffix
+    in
+      if suffix /= "" && allDigits suffix then prefix <> if stripped == "" then "0" else stripped else value
 
 dropLeadingZeros :: String -> String
 dropLeadingZeros value = case CodeUnits.charAt 0 value of
