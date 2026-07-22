@@ -12,13 +12,13 @@
 
 ## Slice 2 — CLI vault wiring and installed cross-host proof
 
-- [ ] T008-S2 Add RED CLI tests for all six scoped commands using local raw/file provider enrichment plus invalid provider/network/source combinations.
-- [ ] T009-S2 Prove Blockfrost credentials come only from matching portable-vault entries and Koios retains anonymous or matching-vault policy.
-- [ ] T010-S2 Prove offline CLI output stays unchanged and provider/secret failures retain typed, redacted results across argv, environment, stdout/stderr, and temporary files.
-- [ ] T011-S2 Wire local provider/network options through the thin CLI into Slice 1's public Node input without CLI endpoint, response-decoder, CBOR, or ledger logic.
-- [ ] T012-S2 Extend installed foreign-CWD and architecture/WebUI parity proof for the single shared context resolver and complete/partial/incomplete evidence.
-- [ ] T013-S2 Run `nix run .#ci-node-api`, `nix run .#ci-node-package`, `nix run .#ci-inspector-playwright`, and `./gate.sh`.
-- [ ] T014-S2 Commit exactly `feat(cli): enrich local transactions through providers` with `Tasks: T008, T009, T010, T011, T012, T013, T014`.
+- [X] T008-S2 Add RED CLI tests for all six scoped commands using local raw/file provider enrichment plus invalid provider/network/source combinations.
+- [X] T009-S2 Prove Blockfrost credentials come only from matching portable-vault entries and Koios retains anonymous or matching-vault policy.
+- [X] T010-S2 Prove offline CLI output stays unchanged and provider/secret failures retain typed, redacted results across argv, environment, stdout/stderr, and temporary files.
+- [X] T011-S2 Wire local provider/network options through the thin CLI into Slice 1's public Node input without CLI endpoint, response-decoder, CBOR, or ledger logic.
+- [X] T012-S2 Extend installed foreign-CWD and architecture/WebUI parity proof for the single shared context resolver and complete/partial/incomplete evidence.
+- [X] T013-S2 Run `nix run .#ci-node-api`, `nix run .#ci-node-package`, `nix run .#ci-inspector-playwright`, and `./gate.sh` (parent-authorized tracked #87 exception: issue-specific checks green; WebUI/gate each 100 passed, one unrelated RDF init race).
+- [X] T014-S2 Commit exactly `feat(cli): enrich local transactions through providers` with `Tasks: T008, T009, T010, T011, T012, T013, T014`.
 
 ## Orchestrator-owned finalization
 

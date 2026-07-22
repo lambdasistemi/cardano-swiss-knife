@@ -13,7 +13,12 @@ const derivation = vectors.derivationVectors[0];
 const bootstrap = vectors.bootstrapVectors[0];
 const byron = vectors.bootstrapVectors.find((vector) => vector.style === "Byron" && vector.rootXPubBech32 && vector.derivationPath);
 const signing = vectors.signingVectors[0];
-const transactionCbor = (await readFile(new URL("../../fixtures/conway-mainnet-tx.hex", import.meta.url), "utf8")).trim();
+const transactionFixture = new URL("../../docs/inspector/tests/fixtures/treasury-reorganize-unsigned-tx.hex", import.meta.url);
+const stagedTransactionFixture = new URL("../../fixtures/conway-mainnet-tx.hex", import.meta.url);
+const transactionCbor = (await readFile(transactionFixture, "utf8").catch((error) => {
+  if (error?.code !== "ENOENT") throw error;
+  return readFile(stagedTransactionFixture, "utf8");
+})).trim();
 const textEnvelope = JSON.stringify({ type: "Tx ConwayEra", description: "Ledger Cddl Format", cborHex: transactionCbor });
 const witnessFixture = JSON.parse(await readFile(new URL("./fixtures/transaction-witnesses.json", import.meta.url), "utf8"));
 const runRaw = (args, input = "", inheritedFd, env) => new Promise((resolve) => {
@@ -239,6 +244,90 @@ test("selects only matching transaction vault entry kinds and never exposes prov
     for (const result of [wrong, blockfrost, koios, anonymous, { stdout: child, stderr: "" }]) assert.doesNotMatch(`${result.stdout}${result.stderr}`, new RegExp(`${blockfrostSecret}|${koiosSecret}|${passphrase}`));
     const leaked = (await Promise.all((await readdir(dir)).map((entry) => readFile(join(dir, entry), "utf8").catch(() => "")))).join("");
     assert.doesNotMatch(leaked, new RegExp(`${blockfrostSecret}|${koiosSecret}|${passphrase}`));
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("enriches every local CLI transaction source through the shared provider context without leaking vault secrets", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "csk-cli-local-provider-"));
+  const raw = join(dir, "transaction.cbor");
+  const envelope = join(dir, "transaction.json");
+  const vault = join(dir, "credentials.age");
+  const capture = join(dir, "provider-capture.json");
+  const guard = join(dir, "provider-guard.mjs");
+  const passphrase = "local provider vault passphrase";
+  const blockfrostSecret = "CSK_LOCAL_BLOCKFROST_SECRET";
+  const koiosSecret = "CSK_LOCAL_KOIOS_SECRET";
+  try {
+    await Promise.all([
+      writeFile(raw, `${transactionCbor}\n`),
+      writeFile(envelope, textEnvelope),
+      writeFile(vault, await encryptVault(passphrase, { cardanoSwissKnifeVault: { version: 1, entries: [
+        { id: "blockfrost", kind: "blockfrost-project-id", label: "blockfrost", value: blockfrostSecret, createdAt: "2026-07-22T00:00:00.000Z" },
+        { id: "koios", kind: "koios-bearer-token", label: "koios", value: koiosSecret, createdAt: "2026-07-22T00:00:00.000Z" },
+      ] } })),
+      writeFile(guard, `import { writeFileSync } from "node:fs"; const calls = []; let producerCalls = 0; const respond = (status, body) => ({ status, text: async () => typeof body === "string" ? body : JSON.stringify(body) }); globalThis.fetch = async (url) => { calls.push({ url }); const mode = process.env.CSK_PROVIDER_MODE ?? "authentication"; if (mode === "transport") throw Error("provider transport failed"); if (mode === "authentication") return respond(401, "provider denied"); if (mode === "rate-limit") return respond(429, "provider throttled"); if (mode === "server") return respond(503, "provider unavailable"); if (mode === "decode") return respond(200, { not_cbor: "provider response invalid" }); if (url.includes("blocks/latest") || url.includes("epochs/latest/parameters")) return respond(200, {}); producerCalls += 1; if (mode === "partial" && producerCalls > 1) return respond(429, "producer throttled"); if (mode === "incomplete") return respond(401, "producer denied"); return respond(200, { cbor: "00" }); }; process.on("exit", () => writeFileSync(process.env.CSK_PROVIDER_CAPTURE, JSON.stringify({ calls, argv: process.argv, env: process.env })));`),
+    ]);
+    const guarded = { NODE_OPTIONS: `--import ${new URL(`file://${guard}`).href}`, CSK_PROVIDER_CAPTURE: capture };
+    const calls = async () => JSON.parse(await readFile(capture, "utf8")).calls;
+    const commands = [
+      ["inspect"], ["identify"], ["intent"], ["witness", "plan"], ["validate"], ["evaluate-scripts"],
+    ];
+    const sources = [["--cbor-hex", transactionCbor], ["--tx-file", raw], ["--tx-file", envelope]];
+    let offlineBaseline;
+    for (const source of sources) {
+      const offline = await json(["tx", "inspect", ...source], "", undefined, guarded);
+      assert.equal(offline.code, 0, offline.stderr);
+      assert.equal(Object.hasOwn(JSON.parse(offline.stdout).value, "context"), false);
+      if (offlineBaseline === undefined) offlineBaseline = JSON.parse(offline.stdout);
+      else assert.deepEqual(JSON.parse(offline.stdout), offlineBaseline, `offline ${source[0]} changed the exact CLI result`);
+      assert.deepEqual(await calls(), [], `offline ${source[0]} must make no provider request`);
+    }
+    for (const source of sources) for (const command of commands) {
+      const result = await json(["tx", ...command, ...source, "--provider", "blockfrost", "--network", "mainnet", "--vault", vault, "--vault-entry", "blockfrost", "--passphrase-fd", "3"], "", `${passphrase}\n`, guarded);
+      assert.equal(result.code, 0, `${command.join(" ")} ${source[0]}: ${result.stderr}${result.stdout}`);
+      const context = JSON.parse(result.stdout).value.context;
+      assert.equal(context.resolution.provider, "blockfrost");
+      assert.ok(context.resolution.error_codes.some(({ code }) => code === "PROVIDER_AUTHENTICATION"));
+      for (const secret of [blockfrostSecret, koiosSecret, passphrase]) assert.doesNotMatch(`${result.stdout}${result.stderr}`, new RegExp(secret));
+    }
+    for (const extra of [[], ["--vault", vault, "--vault-entry", "koios", "--passphrase-fd", "3"]]) {
+      const result = await json(["tx", "inspect", "--tx-file", raw, "--provider", "koios", "--network", "mainnet", ...extra], "", extra.length ? `${passphrase}\n` : undefined, guarded);
+      assert.equal(result.code, 0, result.stderr);
+      assert.equal(JSON.parse(result.stdout).value.context.resolution.provider, "koios");
+    }
+    for (const args of [
+      ["tx", "inspect", "--cbor-hex", transactionCbor, "--provider", "blockfrost"],
+      ["tx", "inspect", "--cbor-hex", transactionCbor, "--network", "mainnet"],
+      ["tx", "inspect", "--cbor-hex", transactionCbor, "--vault", vault, "--vault-entry", "blockfrost"],
+      ["tx", "inspect", "--cbor-hex", transactionCbor, "--tx-hash", "a".repeat(64), "--provider", "koios", "--network", "mainnet"],
+    ]) {
+      await writeFile(capture, JSON.stringify({ calls: [] }));
+      const before = await calls();
+      const result = await json(args, "", undefined, guarded);
+      assert.equal(result.code, 2, `${args.join(" ")}: ${result.stderr}`);
+      assert.equal(JSON.parse(result.stdout).error.code, "USAGE");
+      assert.deepEqual(await calls(), before, `${args.join(" ")} reached provider or engine I/O`);
+    }
+    for (const [mode, code] of [["authentication", "PROVIDER_AUTHENTICATION"], ["rate-limit", "PROVIDER_RATE_LIMIT"], ["server", "PROVIDER_SERVER"], ["transport", "PROVIDER_TRANSPORT"], ["decode", "PROVIDER_DECODE"]]) {
+      const result = await json(["tx", "inspect", "--tx-file", raw, "--provider", "blockfrost", "--network", "mainnet", "--vault", vault, "--vault-entry", "blockfrost", "--passphrase-fd", "3"], "", `${passphrase}\n`, { ...guarded, CSK_PROVIDER_MODE: mode });
+      assert.equal(result.code, 0, `${mode}: ${result.stderr}`);
+      assert.ok(JSON.parse(result.stdout).value.context.resolution.error_codes.some((error) => error.code === code), `${mode} was not typed`);
+      for (const secret of [blockfrostSecret, koiosSecret, passphrase]) assert.doesNotMatch(`${result.stdout}${result.stderr}`, new RegExp(secret));
+    }
+    for (const [mode, predicate] of [["complete", (resolution) => resolution.resolved_count === resolution.requested_tx_count && resolution.missing.length === 0], ["partial", (resolution) => resolution.resolved_count > 0 && resolution.missing.length > 0], ["incomplete", (resolution) => resolution.resolved_count === 0 && resolution.missing.length > 0]]) {
+      const result = await json(["tx", "inspect", "--tx-file", raw, "--provider", "blockfrost", "--network", "mainnet", "--vault", vault, "--vault-entry", "blockfrost", "--passphrase-fd", "3"], "", `${passphrase}\n`, { ...guarded, CSK_PROVIDER_MODE: mode });
+      assert.equal(result.code, 0, `${mode}: ${result.stderr}`);
+      assert.equal(predicate(JSON.parse(result.stdout).value.context.resolution), true, `${mode} resolver evidence was not truthful`);
+    }
+    const recorded = JSON.parse(await readFile(capture, "utf8"));
+    assert.ok(recorded.calls.length > 0, "local provider selections must reach the shared provider boundary");
+    for (const secret of [blockfrostSecret, koiosSecret, passphrase]) {
+      assert.doesNotMatch(JSON.stringify({ argv: recorded.argv, env: recorded.env }), new RegExp(secret));
+      const temporaryContents = (await Promise.all((await readdir(dir)).map((entry) => readFile(join(dir, entry), "utf8").catch(() => "")))).join("");
+      assert.doesNotMatch(temporaryContents, new RegExp(secret));
+    }
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

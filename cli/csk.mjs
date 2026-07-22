@@ -11,7 +11,7 @@ import * as script from "../node/src/commands/script.js";
 import * as payload from "../node/src/commands/payload.js";
 import * as tx from "../node/src/commands/tx.js";
 const usage = "Usage: csk vault <create|list|migrate> [options]\n\ncsk vault create --out PATH [--passphrase-fd FD] [--force]\ncsk vault list --vault PATH [--passphrase-fd FD] [--json]\ncsk vault migrate --input PATH --out PATH [--input-passphrase-fd FD] [--passphrase-fd FD] [--force]\n";
-const txUsage = "Usage: csk tx <inspect|browse|identify|intent|validate|evaluate-scripts> (--cbor-hex HEX | --tx-file PATH | --tx-hash HASH --provider blockfrost|koios --network mainnet|preprod|preview) [--vault PATH --vault-entry ID [--passphrase-fd FD]] [--book PATH ...] [--path JSON-PATH] [--output json]\n\ncsk tx submit --entry-file PATH --tx-file PATH --current-slot INTEGER --provider blockfrost|koios --network mainnet|preprod|preview --confirm [--vault PATH --vault-entry ID [--passphrase-fd FD]] [--output json]\ncsk tx witness plan <transaction-source> [provider options] [--output json]\ncsk tx witness attach <transaction-source> (--witness-file PATH | --vault PATH --vault-entry ID [--passphrase-fd FD]) [--replace-existing] [--tx-out PATH] [--witness-out PATH] [--output json]\n";
+const txUsage = "Usage: csk tx <inspect|browse|identify|intent|validate|evaluate-scripts> (--cbor-hex HEX | --tx-file PATH | --tx-hash HASH) [--provider blockfrost|koios --network mainnet|preprod|preview] [--vault PATH --vault-entry ID [--passphrase-fd FD]] [--book PATH ...] [--path JSON-PATH] [--output json]\n\ncsk tx submit --entry-file PATH --tx-file PATH --current-slot INTEGER --provider blockfrost|koios --network mainnet|preprod|preview --confirm [--vault PATH --vault-entry ID [--passphrase-fd FD]] [--output json]\ncsk tx witness plan <transaction-source> [provider options] [--output json]\ncsk tx witness attach <transaction-source> (--witness-file PATH | --vault PATH --vault-entry ID [--passphrase-fd FD]) [--replace-existing] [--tx-out PATH] [--witness-out PATH] [--output json]\n";
 const rootUsage = "Usage: csk <address|mnemonic|key|script|payload|tx|vault> ...\n\ncsk address inspect --address ADDRESS\ncsk mnemonic generate|validate\ncsk key derive|address|restore\ncsk script inspect|author|template\ncsk payload sign|verify\n" + txUsage + "\n" + usage;
 const bad = () => { throw Error("Vault arguments are invalid."); };
 const parse = (args) => { if (args.includes("--help") || args.includes("-h")) return { help: true }; const [group, command, ...rest] = args; const allowed = { create: ["--out", "--passphrase-fd", "--force"], list: ["--vault", "--passphrase-fd", "--json"], migrate: ["--input", "--out", "--input-passphrase-fd", "--passphrase-fd", "--force"] }; if (group !== "vault" || !allowed[command]) bad(); const o = { command }; for (let i = 0; i < rest.length; i += 1) { const key = rest[i]; if (!allowed[command].includes(key) || o[key.slice(2)] !== undefined) bad(); if (["--force", "--json"].includes(key)) o[key.slice(2)] = true; else if (rest[i + 1] && !rest[i + 1].startsWith("--")) o[key.slice(2)] = rest[++i]; else bad(); } if ((command === "create" && !o.out) || (command === "list" && !o.vault) || (command === "migrate" && (!o.input || !o.out)) || [o["passphrase-fd"], o["input-passphrase-fd"]].filter(Boolean).some((fd) => !/^\d+$/.test(fd))) bad(); return o; };
@@ -111,15 +111,27 @@ const transaction = async (args) => {
   const sources = [values["cbor-hex"], values["tx-file"], values["tx-hash"]].filter((value) => value !== undefined);
   if (sources.length !== 1 || (command === "browse") !== (values.path !== undefined)) offlineUsage();
   const hash = values["tx-hash"] !== undefined;
-  if (hash !== (values.provider !== undefined && values.network !== undefined) || (hash && !["blockfrost", "koios"].includes(values.provider)) || (hash && !["mainnet", "preprod", "preview"].includes(values.network))) offlineUsage();
+  const providerSelection = values.provider !== undefined || values.network !== undefined;
+  if ((values.provider !== undefined) !== (values.network !== undefined) || (providerSelection && (!["blockfrost", "koios"].includes(values.provider) || !["mainnet", "preprod", "preview"].includes(values.network))) || (hash && !providerSelection)) offlineUsage();
   if ((values.vault !== undefined) !== (values["vault-entry"] !== undefined) || (values["passphrase-fd"] && (!values.vault || !/^\d+$/.test(values["passphrase-fd"])))) offlineUsage();
   if (attach) {
+    if (!hash && providerSelection) offlineUsage();
     if (hash && values.vault && !values["witness-file"]) offlineUsage();
     const witnessSources = Number(values["witness-file"] !== undefined) + Number(!hash && values.vault !== undefined);
     if (witnessSources !== 1 || values.book.length !== 0 || values.path !== undefined) offlineUsage();
-  } else if ((!hash && (values.vault || values["vault-entry"] || values["passphrase-fd"])) || values["witness-file"] || values["replace-existing"] || values["tx-out"] || values["witness-out"]) offlineUsage();
+  } else if ((!providerSelection && (values.vault || values["vault-entry"] || values["passphrase-fd"])) || values["witness-file"] || values["replace-existing"] || values["tx-out"] || values["witness-out"]) offlineUsage();
   let input;
-  try { if (values["cbor-hex"] !== undefined) input = { cborHex: values["cbor-hex"] }; else if (values["tx-file"] !== undefined) { const contents = (await readFile(values["tx-file"], "utf8")).trim(); input = contents.startsWith("{") ? { textEnvelope: JSON.parse(contents) } : { cborHex: contents }; } else { let credential; if (values.provider === "blockfrost") { if (!values.vault) throw secretFailure(); credential = await secret(values, "blockfrost-project-id"); } else if (values.vault) credential = await secret(values, "koios-bearer-token"); input = { txHash: values["tx-hash"], provider: values.provider, network: values.network, ...(credential ? { credential } : {}) }; } } catch (error) { if (error.exit) throw error; throw txFailure("DOMAIN_ERROR", "Transaction input is invalid."); }
+  try {
+    if (values["cbor-hex"] !== undefined) input = { cborHex: values["cbor-hex"] };
+    else if (values["tx-file"] !== undefined) { const contents = (await readFile(values["tx-file"], "utf8")).trim(); input = contents.startsWith("{") ? { textEnvelope: JSON.parse(contents) } : { cborHex: contents }; }
+    else input = { txHash: values["tx-hash"] };
+    if (providerSelection) {
+      let credential;
+      if (values.provider === "blockfrost") { if (!values.vault) throw secretFailure(); credential = await secret(values, "blockfrost-project-id"); }
+      else if (values.vault) credential = await secret(values, "koios-bearer-token");
+      input = { ...input, provider: values.provider, network: values.network, ...(credential ? { credential } : {}) };
+    }
+  } catch (error) { if (error.exit) throw error; throw txFailure("DOMAIN_ERROR", "Transaction input is invalid."); }
   let books; try { books = await Promise.all(values.book.map((path) => readFile(path, "utf8"))); } catch { throw txFailure("BOOK_IMPORT", "Transaction book input is invalid."); }
   let path; try { path = values.path === undefined ? undefined : JSON.parse(values.path); } catch { offlineUsage(); }
   if (attach) {
