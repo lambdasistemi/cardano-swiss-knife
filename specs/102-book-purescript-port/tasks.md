@@ -17,4 +17,4 @@
 
 ## Finalization — orchestrator-owned
 
-- [ ] T110-F1 Audit the delivered diff and PR body, verify fresh remote CI, stamp finalization, drop `gate.sh`, and mark the PR ready.
+- [X] T110-F1 Audit the delivered diff and PR body, verify fresh remote CI, stamp finalization, drop `gate.sh`, and mark the PR ready.
