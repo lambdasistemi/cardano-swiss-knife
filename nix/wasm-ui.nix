@@ -96,11 +96,13 @@ pkgs.mkSpagoDerivation {
     ln -s ${nodeModules}/node_modules ../node_modules
 
     # Materialize only the registry files imported by the browser bundle.
-    mkdir -p protocols/sundaeswap-v3 protocols/cardano-rdf
+    mkdir -p protocols/sundaeswap-v3 protocols/cardano-rdf protocols/amaru-treasury
     cp ${protocolRegistry}/sundaeswap-v3/plutus.json \
       protocols/sundaeswap-v3/plutus.json
     cp ${protocolRegistry}/cardano-rdf/shapes.ttl \
       protocols/cardano-rdf/shapes.ttl
+    cp ${protocolRegistry}/amaru-treasury/journal-2026.json \
+      protocols/amaru-treasury/journal-2026.json
 
     # Copy the WASM binaries into the src tree so esbuild's --loader:.wasm=file
     # can emit hashed browser assets at bundle time.
