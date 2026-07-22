@@ -3,6 +3,7 @@ set -euo pipefail
 
 git diff --check
 git diff --check origin/main...HEAD
+nix run .#ci-check
 
 lock_snapshot="$(mktemp)"
 cp spago.lock "$lock_snapshot"

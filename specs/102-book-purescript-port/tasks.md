@@ -11,6 +11,10 @@
 - [X] T108-S1 Switch the inspector compatibility facade and Node bundle entry point to the compiled PureScript module.
 - [X] T109-S1 Run focused PureScript and Node verification plus `./gate.sh`, and commit the accepted slice with the required trailer.
 
+## Slice 2 — CI formatting correction
+
+- [X] T111-S2 Apply the repository PureScript formatter to `Book.purs`, extend `gate.sh` with `ci-check`, and verify the correction without behavior changes.
+
 ## Finalization — orchestrator-owned
 
 - [ ] T110-F1 Audit the delivered diff and PR body, verify fresh remote CI, stamp finalization, drop `gate.sh`, and mark the PR ready.
