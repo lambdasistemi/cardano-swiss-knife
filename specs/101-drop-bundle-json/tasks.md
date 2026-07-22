@@ -10,4 +10,4 @@
 
 ## Finalization — orchestrator-owned
 
-- [ ] T106-F1 Audit the PR body, verify fresh remote CI, mark ready, and drop `gate.sh` in the finalization commit.
+- [X] T106-F1 Audit the PR body, verify fresh remote CI, mark ready, and drop `gate.sh` in the finalization commit.
