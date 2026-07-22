@@ -23,7 +23,7 @@
 ## Orchestrator-owned finalization
 
 - [X] T015 Extend inherited `gate.sh` with issue-specific local-provider inventory and Node API/package/WebUI proof without replacing inherited commands.
-- [ ] T016 Audit issue acceptance, unchanged offline behavior, source-byte preservation, shared-provider uniqueness, context truth states, vault policy, redaction, csk-101 scope isolation, and task/commit links.
-- [ ] T017 Run final `./gate.sh` and commit-message audit, update and push draft PR #106, and verify fresh GitHub Actions on the pushed SHA.
-- [ ] T018 Run the named packaged-CLI Koios live-boundary smoke and record a redacted transcript with provider/context counts and truthful verdict.
-- [ ] T019 Only after local gate, live smoke, and fresh remote CI are green, stamp finalization tasks while dropping `gate.sh` in `chore: drop gate.sh (ready for review)`, mark PR #106 ready, report `COMPLETE`, and do not merge.
+- [X] T016 Audit issue acceptance, unchanged offline behavior, source-byte preservation, shared-provider uniqueness, context truth states, vault policy, redaction, csk-101 scope isolation, and task/commit links.
+- [X] T017 Run final `./gate.sh` and commit-message audit, update and push draft PR #106, and verify fresh GitHub Actions on the pushed SHA.
+- [X] T018 Run the named packaged-CLI Koios live-boundary smoke and record a redacted transcript with provider/context counts and truthful verdict.
+- [X] T019 Only after local gate, live smoke, and fresh remote CI are green, stamp finalization tasks while dropping `gate.sh` in `chore: drop gate.sh (ready for review)`, mark PR #106 ready, report `COMPLETE`, and do not merge.
