@@ -61,6 +61,41 @@ const filesBelow = async (root) => {
   return paths;
 };
 
+// Live inventory matcher: package-relative asset/engine suffixes use `/`
+// (see shipped paths below). Keep this the single path used by inventory
+// assertions so host-separator fixes cannot drift from the smoke checks.
+// Normalize both native `\` and `/` so Windows inventory paths match the
+// POSIX suffixes without weakening exactly-one cardinality checks.
+const matchesAssetSuffix = (filePath, suffix) => {
+  const normalize = (path) => path.replaceAll("\\", "/");
+  return normalize(filePath).endsWith(normalize(suffix));
+};
+
+test("asset suffix matcher accepts POSIX and Windows nested paths", () => {
+  const nested = "sundaeswap-v3/plutus.json";
+  const posix =
+    "/tmp/foreign/node_modules/@lambdasistemi/cardano-swiss-knife/share/sundaeswap-v3/plutus.json";
+  const windows =
+    "D:\\a\\cardano-swiss-knife\\cardano-swiss-knife\\node_modules\\@lambdasistemi\\cardano-swiss-knife\\share\\sundaeswap-v3\\plutus.json";
+  const unrelated =
+    "/tmp/foreign/node_modules/@lambdasistemi/cardano-swiss-knife/share/sundaeswap-v3/pin.json";
+  assert.equal(
+    [posix].filter((path) => matchesAssetSuffix(path, nested)).length,
+    1,
+    "POSIX nested asset paths must match package-relative suffixes",
+  );
+  assert.equal(
+    [windows].filter((path) => matchesAssetSuffix(path, nested)).length,
+    1,
+    "Windows nested asset paths must match package-relative suffixes",
+  );
+  assert.equal(
+    [posix, windows, unrelated].filter((path) => matchesAssetSuffix(path, nested)).length,
+    2,
+    "exactly-one inventory must still distinguish the nested asset from siblings",
+  );
+});
+
 test("installs a prepacked artifact outside the checkout without network, native hooks, or secret leakage", async () => {
   assert.ok(tarball, "CSK_PACKAGE_TARBALL must name the prebuilt npm pack artifact");
   assert.ok(npmExecPath, "npm_execpath must name npm's JavaScript entrypoint; run this smoke through npm run");
@@ -95,7 +130,7 @@ test("installs a prepacked artifact outside the checkout without network, native
       "rdf_shapes_wasm_bg.wasm",
     ]) {
       assert.deepEqual(
-        packagedFiles.filter((path) => path.endsWith(engine)).length,
+        packagedFiles.filter((path) => matchesAssetSuffix(path, engine)).length,
         1,
         `package must contain exactly one ${engine}`,
       );
@@ -111,7 +146,7 @@ test("installs a prepacked artifact outside the checkout without network, native
       "sundaeswap-treasury-v3/pin.json",
     ]) {
       assert.deepEqual(
-        packagedFiles.filter((path) => path.endsWith(asset)).length,
+        packagedFiles.filter((path) => matchesAssetSuffix(path, asset)).length,
         1,
         `package must contain exactly one shipped book/registry asset ${asset}`,
       );

@@ -446,3 +446,18 @@ test("just release-version is the focused proof command", () => {
     /release-version:[\s\S]*?node --test node\/test\/version\.test\.mjs/,
   );
 });
+
+// Bundled node/dist/version.js resolves ../../package.json. The sandboxed
+// node-api check unpacks dist under work/node/dist, so root package.json must
+// be staged as work/package.json (see CI ENOENT on /build/work/package.json).
+test("sandbox stages package.json for bundled version.js", () => {
+  const nixCheck = readFileSync(
+    join(repoRoot, "nix", "checks", "node-api.nix"),
+    "utf8",
+  );
+  assert.match(
+    nixCheck,
+    /cp\s+\$\{repoRoot\}\/package\.json\s+work\/package\.json/,
+    "node-api.nix must stage root package.json as work/package.json for bundled version.js",
+  );
+});

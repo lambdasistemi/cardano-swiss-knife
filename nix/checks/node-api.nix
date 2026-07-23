@@ -28,6 +28,7 @@ pkgs.runCommand "cardano-swiss-knife-node-api-check" {
   nativeBuildInputs = [ pkgs.nodejs_22 pkgs.gnutar pkgs.gzip pkgs.ripgrep pkgs.bash ];
 } ''
   mkdir -p work/node work/scripts work/test-vectors work/fixtures
+  cp ${repoRoot}/package.json work/package.json
   cp -a ${repoRoot}/node/test work/node/
   cp -a ${repoRoot}/node/src work/node/
   cp ${repoRoot}/scripts/check-node-api-exports.mjs work/scripts/
