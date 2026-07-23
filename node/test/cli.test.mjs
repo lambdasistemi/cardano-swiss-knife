@@ -4,6 +4,7 @@ import { mkdtemp, readFile, readdir, rename, rm, writeFile } from "node:fs/promi
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import { Encrypter } from "age-encryption";
 import { encryptVault } from "../../lib/src/Cardano/Vault.js";
 
 const cli = new URL("../dist/csk.mjs", import.meta.url);
@@ -503,6 +504,100 @@ test("routes witness planning, attachment, validation, and script evaluation thr
       assert.equal(result.code, 2, `${args.join(" ")}: ${result.stderr}`);
       assert.equal(JSON.parse(result.stdout).error.code, "USAGE");
     }
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("migrates an encrypted amaruTreasuryWitnessVault address-xsk identity and attaches it as a transaction witness", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "csk-cli-amaru-witness-"));
+  const legacyInput = join(dir, "legacy-amaru.age");
+  const migratedVault = join(dir, "migrated.age");
+  const canonicalVault = join(dir, "canonical-signing.age");
+  const txFile = join(dir, "transaction.cbor");
+  const txOut = join(dir, "signed.json");
+  const witnessOut = join(dir, "witness.json");
+  const inputPassphrase = "S5_AMARU_INPUT_PASSPHRASE_SENTINEL";
+  const passphrase = "S5_AMARU_VAULT_PASSPHRASE_SENTINEL";
+  const secret = witnessFixture.secretSentinel;
+  try {
+    const wrapper = { amaruTreasuryWitnessVault: { version: 1, identities: {
+      "Treasury root": { label: "Treasury root", network: "mainnet", keyHash: witnessFixture.requiredSignerHash, source: { kind: "cardano-addresses-addr-xsk", bech32: witnessFixture.signingKey } },
+      "Unrelated identity": { label: "Unrelated identity", network: "mainnet", keyHash: witnessFixture.nonTargetSignerHash, source: { kind: "cardano-addresses-addr-xsk", bech32: witnessFixture.nonTargetSigningKey } },
+      "Foreign kind": { label: "Foreign kind", network: "mainnet", keyHash: "deadbeef", source: { kind: "cardano-cli-skey", keyEnvelope: { version: 1, payload: "not-a-real-envelope" } } },
+    } } };
+    const encrypter = new Encrypter();
+    encrypter.setPassphrase(inputPassphrase);
+    const requiredTransaction = withRequiredSigner(transactionCbor, witnessFixture.requiredSignerHash);
+    await Promise.all([
+      writeFile(legacyInput, await encrypter.encrypt(JSON.stringify(wrapper))),
+      writeFile(txFile, `${requiredTransaction}\n`),
+      writeFile(canonicalVault, await encryptVault(passphrase, { cardanoSwissKnifeVault: { version: 1, entries: [
+        { id: "canonical-signing", kind: "signing-key", label: "canonical", value: witnessFixture.signingKey, createdAt: "2026-07-23T00:00:00.000Z" },
+      ] } })),
+    ]);
+
+    const migrated = await run(["vault", "migrate", "--input", legacyInput, "--out", migratedVault, "--input-passphrase-fd", "0", "--passphrase-fd", "0"], `${inputPassphrase}\n${passphrase}\n`);
+    assert.equal(migrated.code, 0, migrated.stderr);
+
+    const listed = await run(["vault", "list", "--vault", migratedVault, "--passphrase-fd", "0", "--json"], `${passphrase}\n`);
+    assert.equal(listed.code, 0, listed.stderr);
+    const entries = JSON.parse(listed.stdout);
+    const matching = entries.find((entry) => entry.kind === "cardano-addresses-addr-xsk" && entry.keyHash === witnessFixture.requiredSignerHash);
+    const unrelated = entries.find((entry) => entry.kind === "cardano-addresses-addr-xsk" && entry.keyHash === witnessFixture.nonTargetSignerHash);
+    const foreign = entries.find((entry) => entry.kind === "cardano-cli-skey");
+    assert.ok(matching, "migrated address-xsk entry must be listed");
+    assert.ok(unrelated, "migrated non-target address-xsk entry must be listed");
+    assert.ok(foreign, "migrated cardano-cli-skey entry must be listed");
+
+    const beforePlan = await json(["tx", "witness", "plan", "--tx-file", txFile]);
+    assert.equal(beforePlan.code, 0, beforePlan.stderr);
+
+    const attached = await json(["tx", "witness", "attach", "--tx-file", txFile, "--vault", migratedVault, "--vault-entry", matching.id, "--passphrase-fd", "0", "--tx-out", txOut, "--witness-out", witnessOut], `${passphrase}\n`);
+    assert.equal(attached.code, 0, `${attached.stderr}${attached.stdout}`);
+    assert.equal(JSON.parse(attached.stdout).value.textEnvelope.type, "Tx ConwayEra");
+    assert.equal(JSON.parse(await readFile(txOut, "utf8")).type, "Tx ConwayEra");
+    assert.equal(JSON.parse(await readFile(witnessOut, "utf8")).type, "TxWitness ConwayEra");
+
+    const afterPlan = await json(["tx", "witness", "plan", "--tx-file", txOut]);
+    assert.equal(afterPlan.code, 0, afterPlan.stderr);
+    const before = JSON.parse(beforePlan.stdout).value.result.witness_plan;
+    const after = JSON.parse(afterPlan.stdout).value.result.witness_plan;
+    assert.equal(after.body_hash, before.body_hash, "attaching the migrated witness must preserve transaction body identity");
+    assert.ok(after.present_vkey_witnesses.some((entry) => entry.hash === witnessFixture.requiredSignerHash), "post-attach witness plan must contain the required signer");
+    assert.deepEqual(after.missing_vkey_witnesses, [], "the required signer must no longer be missing after attachment");
+
+    const unrelatedAttach = await json(["tx", "witness", "attach", "--tx-file", txFile, "--vault", migratedVault, "--vault-entry", unrelated.id, "--passphrase-fd", "0"], `${passphrase}\n`);
+    assert.notEqual(unrelatedAttach.code, 0);
+    assert.equal(JSON.parse(unrelatedAttach.stdout).error.code, "WITNESS_UNRELATED_SIGNER", unrelatedAttach.stdout);
+    assert.equal(Object.hasOwn(JSON.parse(unrelatedAttach.stdout), "value"), false);
+
+    const foreignAttach = await json(["tx", "witness", "attach", "--tx-file", txFile, "--vault", migratedVault, "--vault-entry", foreign.id, "--passphrase-fd", "0"], `${passphrase}\n`);
+    assert.equal(foreignAttach.code, 4);
+    assert.equal(JSON.parse(foreignAttach.stdout).error.code, "SECRET_SOURCE");
+
+    const missingAttach = await json(["tx", "witness", "attach", "--tx-file", txFile, "--vault", migratedVault, "--vault-entry", "not-an-entry", "--passphrase-fd", "0"], `${passphrase}\n`);
+    assert.equal(missingAttach.code, 4);
+    assert.equal(JSON.parse(missingAttach.stdout).error.code, "SECRET_SOURCE");
+
+    const canonicalAttach = await json(["tx", "witness", "attach", "--tx-file", txFile, "--vault", canonicalVault, "--vault-entry", "canonical-signing", "--passphrase-fd", "0"], `${passphrase}\n`);
+    assert.equal(canonicalAttach.code, 0, canonicalAttach.stderr);
+    assert.equal(JSON.parse(canonicalAttach.stdout).value.textEnvelope.type, "Tx ConwayEra");
+
+    for (const result of [migrated, listed, attached, unrelatedAttach, foreignAttach, missingAttach, canonicalAttach]) {
+      assert.doesNotMatch(`${result.stdout}${result.stderr}`, new RegExp(`${witnessFixture.signingKey}|${witnessFixture.nonTargetSigningKey}|${inputPassphrase}|${passphrase}|${secret}`));
+    }
+    const temporaryContents = (await Promise.all((await readdir(dir)).map((entry) => readFile(join(dir, entry), "utf8").catch(() => "")))).join("");
+    assert.doesNotMatch(temporaryContents, new RegExp(`${witnessFixture.signingKey}|${witnessFixture.nonTargetSigningKey}|${inputPassphrase}|${passphrase}`));
+
+    const capture = join(dir, "child-process.json");
+    const guard = join(dir, "capture.mjs");
+    await writeFile(guard, `import { writeFile } from "node:fs/promises"; await writeFile(process.env.CSK_TEST_CAPTURE, JSON.stringify({ argv: process.argv, env: process.env }));`);
+    const guarded = { NODE_OPTIONS: `--import ${new URL(`file://${guard}`).href}`, CSK_TEST_CAPTURE: capture };
+    const guardedAttach = await json(["tx", "witness", "attach", "--tx-file", txFile, "--vault", migratedVault, "--vault-entry", matching.id, "--passphrase-fd", "0"], `${passphrase}\n`, undefined, guarded);
+    assert.equal(guardedAttach.code, 0, guardedAttach.stderr);
+    const captured = await readFile(capture, "utf8");
+    for (const value of [witnessFixture.signingKey, witnessFixture.nonTargetSigningKey, inputPassphrase, passphrase, secret]) assert.doesNotMatch(captured, new RegExp(value));
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

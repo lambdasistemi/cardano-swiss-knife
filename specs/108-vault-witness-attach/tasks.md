@@ -2,12 +2,12 @@
 
 ## Slice 1 — Accept and prove migrated address-xsk signing sources
 
-- [ ] T001 Add a RED end-to-end CLI regression that encrypts and migrates an `amaruTreasuryWitnessVault`, lists its `cardano-addresses-addr-xsk` entry, and attempts witness attachment with the migrated identity.
-- [ ] T002 Verify the successful attachment's transaction and witness TextEnvelopes and post-attach witness plan contain the required signer without changing transaction body identity.
-- [ ] T003 Prove a valid but unrelated migrated identity is rejected before transaction output and unrelated secret kinds and unsupported representations remain `SECRET_SOURCE`.
-- [ ] T004 Prove passphrase, address xsk, and secret sentinels do not appear in stdout, stderr, captured argv/environment, or temporary artifacts.
-- [ ] T005 Accept exactly `signing-key` and `cardano-addresses-addr-xsk` for vault-backed witness preparation while preserving every other secret consumer's strict kind policy.
-- [ ] T006 Run `nix run .#ci-node-api` and `./gate.sh`, obtain navigator GREEN approval, and commit one bisect-safe slice with the required `Tasks:` trailer.
+- [X] T001 Add a RED end-to-end CLI regression that encrypts and migrates an `amaruTreasuryWitnessVault`, lists its `cardano-addresses-addr-xsk` entry, and attempts witness attachment with the migrated identity.
+- [X] T002 Verify the successful attachment's transaction and witness TextEnvelopes and post-attach witness plan contain the required signer without changing transaction body identity.
+- [X] T003 Prove a valid but unrelated migrated identity is rejected before transaction output and unrelated secret kinds and unsupported representations remain `SECRET_SOURCE`.
+- [X] T004 Prove passphrase, address xsk, and secret sentinels do not appear in stdout, stderr, captured argv/environment, or temporary artifacts.
+- [X] T005 Accept exactly `signing-key` and `cardano-addresses-addr-xsk` for vault-backed witness preparation while preserving every other secret consumer's strict kind policy.
+- [X] T006 Run `nix run .#ci-node-api` and `./gate.sh`, obtain navigator GREEN approval, and commit one bisect-safe slice with the required `Tasks:` trailer.
 
 ## Finalization — Orchestrator-owned
 
