@@ -62,11 +62,33 @@ csk vault list --vault PATH
 csk tx inspect --cbor-hex HEX
 csk tx validate --cbor-hex HEX
 csk tx witness plan --cbor-hex HEX
+csk tx review --tx-file PATH --book PATH
 ```
 
 Every capability row in `release/capabilities.json` names its exact CLI
 command; the reference page lists them all.
 <!-- /release-docs:procedure:cli-commands -->
+
+## Transaction review (CLI)
+
+`csk tx review --tx-file PATH [--book PATH ...] [--provider blockfrost|koios
+--network mainnet|preprod|preview] [--vault PATH --vault-entry ID]` renders a
+deterministic, human-readable summary of a transaction composed from the
+existing inspect, intent, witness-plan, and validate results — payments,
+signer state, book-resolved labels, and a ledger preflight. It is a
+human-only command and rejects `--output json`.
+
+- Without `--provider`/`--network`, the review stays fully offline and the
+  ledger preflight reports `incomplete`, listing every missing input,
+  reference input, and ledger-context item the engine needs.
+- With an explicit paired `--provider`/`--network` (and vault credential when
+  required), the review resolves the same producer-transaction context once
+  and reuses it across every composed operation; when that context is
+  complete, preflight reports `completed` and preserves the ledger's own
+  verdict (`valid`, `invalid`, or `rejected`).
+- Raw identifiers (signer hashes, addresses, RDF entity ids) are always
+  shown; supplied books add labels alongside them without hiding the raw
+  value.
 
 ## Node API
 

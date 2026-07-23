@@ -2,15 +2,15 @@
 
 ## Slice 1 — Review composition, renderer, and integration proof
 
-- [ ] T001 Add RED CLI coverage for the exact `tx review --tx-file --book ...` surface, provider/network pairing, offline no-request behavior, and typed malformed transaction/book failures.
-- [ ] T002 Add a representative Amaru treasury book fixture and byte-exact terminal golden covering transaction identity, counts, ordered outputs/assets, fee, validity, change, collateral, signers, metadata, book resolutions, and incomplete preflight details.
-- [ ] T003 Add provider-backed coverage over the existing complete Conway ledger fixture proving a completed preflight and preserved ledger verdict.
-- [ ] T004 Compose existing inspection, intent, witness-plan, validation, provider-context, book-import, and RDF-resolution results without adding host-side semantic fallbacks or a parallel provider path.
-- [ ] T005 Add the deterministic terminal renderer with stable sections/order and raw identifiers retained beside optional labels.
-- [ ] T006 Wire `csk tx review` to exactly one `--tx-file`, repeated `--book`, and the existing paired provider/network plus vault credential policy while keeping offline default behavior.
-- [ ] T007 Document the terminal review command, completed versus incomplete preflight semantics, and explicit-provider behavior.
-- [ ] T008 Run `nix run .#ci-node-api` and `./gate.sh`, recording raw RED and GREEN evidence.
-- [ ] T009 Commit exactly `feat(cli): add human-readable transaction review` with the required task trailer.
+- [X] T001 Add RED CLI coverage for the exact `tx review --tx-file --book ...` surface, provider/network pairing, offline no-request behavior, and typed malformed transaction/book failures.
+- [X] T002 Add a representative Amaru treasury book fixture and byte-exact terminal golden covering transaction identity, counts, ordered outputs/assets, fee, validity, change, collateral, signers, metadata, book resolutions, and incomplete preflight details.
+- [X] T003 Add provider-backed coverage over the existing complete Conway ledger fixture proving a completed preflight and preserved ledger verdict.
+- [X] T004 Compose existing inspection, intent, witness-plan, validation, provider-context, book-import, and RDF-resolution results without adding host-side semantic fallbacks or a parallel provider path.
+- [X] T005 Add the deterministic terminal renderer with stable sections/order and raw identifiers retained beside optional labels.
+- [X] T006 Wire `csk tx review` to exactly one `--tx-file`, repeated `--book`, and the existing paired provider/network plus vault credential policy while keeping offline default behavior.
+- [X] T007 Document the terminal review command, completed versus incomplete preflight semantics, and explicit-provider behavior.
+- [X] T008 Run `nix run .#ci-node-api` and `./gate.sh`, recording raw RED and GREEN evidence.
+- [X] T009 Commit exactly `feat(cli): add human-readable transaction review` with the required task trailer.
 
 ## Orchestrator-owned finalization
 

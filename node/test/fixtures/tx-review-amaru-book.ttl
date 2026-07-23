@@ -1,0 +1,5 @@
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+<urn:cardano:id:PaymentKey:8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1> rdfs:label "Amaru treasury signer" .
+<urn:cardano:id:StakeScript:a64d1b9e1aeffe54056034d84977061b45a92691efc282fbee3fc094> rdfs:label "Amaru treasury script" .
+<urn:cardano:id:38c627d45835744a2d6c727124f2b5852e5564aeab3f608e0e84ea6d> rdfs:label "Amaru treasury journal" .
