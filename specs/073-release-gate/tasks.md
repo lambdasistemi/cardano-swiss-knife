@@ -26,9 +26,9 @@
 
 ## Slice 4 — Single-version runtime contract
 
-- [ ] T012 Export the `package.json` version through Node and packaged `csk --version` without introducing a second version authority.
-- [ ] T013 Verify WebUI, npm, Nix, CLI, Node, release manifest, tag-shaped input, and artifact names agree, including negative mismatch tests.
-- [ ] T014 Wire version proof into `just ci`, record focused/full-gate evidence, obtain navigator verification, and commit as `feat(release): expose one version across all hosts`.
+- [X] T012 Export the `package.json` version through Node and packaged `csk --version` without introducing a second version authority.
+- [X] T013 Verify WebUI, npm, Nix, CLI, Node, release manifest, tag-shaped input, and artifact names agree, including negative mismatch tests.
+- [X] T014 Wire version proof into `just ci`, record focused/full-gate evidence, obtain navigator verification, and commit as `feat(release): expose one version across all hosts`.
 
 ## Slice 5 — Tagged publication and cross-platform clean install
 

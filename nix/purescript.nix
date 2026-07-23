@@ -109,7 +109,7 @@ let
   commonArgs = {
     src = repoRoot;
     spagoLock = repoRoot + /spago.lock;
-    version = "0.1.0";
+    version = packageJson.version;
     buildNodeModulesArgs = {
       inherit nodejs;
       npmRoot = repoRoot;
