@@ -45,6 +45,9 @@ export const _routeSuffix = () => routeState().suffix;
 
 export const _basePath = () => routeState().basePath;
 
+export const _scriptHashQuery = () =>
+  new URLSearchParams(window.location.search).get("script_hash") || "";
+
 export const _pushPath = (basePath) => (suffix) => () => {
   const path = routePath(basePath, suffix);
   if (window.location.pathname !== path) {

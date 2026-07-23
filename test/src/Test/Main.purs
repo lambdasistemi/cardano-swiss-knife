@@ -29,9 +29,11 @@ import Test.TransactionLedger (runTransactionLedgerTests)
 import Test.TransactionEntry (runTransactionEntryTests)
 import Test.TransactionWitness (runTransactionWitnessTests)
 import Test.Vault (runVaultContractTests)
+import Test.BlueprintRegistry (runBlueprintRegistryTests)
 
 main :: Effect Unit
 main = launchAff_ do
+  liftEffect runBlueprintRegistryTests
   runBookableIdentifierTests
   runTransactionBookTests
   runProviderContractTests

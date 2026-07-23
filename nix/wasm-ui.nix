@@ -96,9 +96,17 @@ pkgs.mkSpagoDerivation {
     ln -s ${nodeModules}/node_modules ../node_modules
 
     # Materialize only the registry files imported by the browser bundle.
-    mkdir -p protocols/sundaeswap-v3 protocols/cardano-rdf protocols/amaru-treasury
+    mkdir -p protocols/sundaeswap-v3 protocols/sundaeswap-treasury-v3 protocols/cardano-rdf protocols/amaru-treasury
+    cp ${protocolRegistry}/registry.json \
+      protocols/registry.json
     cp ${protocolRegistry}/sundaeswap-v3/plutus.json \
       protocols/sundaeswap-v3/plutus.json
+    cp ${protocolRegistry}/sundaeswap-v3/pin.json \
+      protocols/sundaeswap-v3/pin.json
+    cp ${protocolRegistry}/sundaeswap-treasury-v3/plutus.json \
+      protocols/sundaeswap-treasury-v3/plutus.json
+    cp ${protocolRegistry}/sundaeswap-treasury-v3/pin.json \
+      protocols/sundaeswap-treasury-v3/pin.json
     cp ${protocolRegistry}/cardano-rdf/shapes.ttl \
       protocols/cardano-rdf/shapes.ttl
     cp ${protocolRegistry}/amaru-treasury/journal-2026.json \

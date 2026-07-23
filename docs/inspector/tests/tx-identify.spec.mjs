@@ -59,6 +59,10 @@ const contingencyMetadataFixturePath = path.join(
   "signed-tx.hex",
 );
 const previewPrefix = "/lambdasistemi/cardano-ledger-inspector/pr-99/";
+const treasuryScriptHash =
+  "32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0d";
+const unknownScriptHash =
+  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 const localBookStoreKey = "cardano-ledger-inspector.books.v1";
 const pastedTurtleBook = `
 @prefix cardano: <https://lambdasistemi.github.io/cardano-ledger-rdf/vocab/cardano#> .
@@ -985,7 +989,7 @@ function blockfrostParamsFromLedger(params) {
   };
 }
 
-async function decodeFixtureAt(page, route, txFixturePath = fixturePath) {
+async function decodeFixtureAt(page, route, txFixturePath = fixturePath, beforeSubmit) {
   const txCbor = (await readFile(txFixturePath, "utf8")).trim();
   const validationContext = await loadValidationContext();
 
@@ -995,12 +999,122 @@ async function decodeFixtureAt(page, route, txFixturePath = fixturePath) {
   });
   await mockKoiosValidationContext(page, validationContext);
 
-  await decodeTxCbor(page, route, txCbor);
+  await decodeTxCbor(page, route, txCbor, beforeSubmit);
 }
 
-async function decodeTxCbor(page, route, txCbor) {
+async function decodeTxCbor(page, route, txCbor, beforeSubmit) {
   await page.goto(route);
+  if (beforeSubmit) {
+    await beforeSubmit(page);
+  }
   await submitTxCbor(page, txCbor);
+}
+
+async function injectSyntheticStructureScriptRow(page) {
+  await page.evaluate((scriptHash) => {
+    const originalRdfShapes = globalThis.rdfShapes;
+    const originalQuery = originalRdfShapes.query;
+    const replacementRdfShapes = Object.create(originalRdfShapes);
+    Object.defineProperty(replacementRdfShapes, "query", {
+      configurable: true,
+      writable: true,
+      value: function (...args) {
+        const result = originalQuery.apply(originalRdfShapes, args);
+        const query = args[1];
+        if (
+          typeof query !== "string" ||
+          !query.includes("SELECT ?label ?kind ?entity ?value ?raw ?sort") ||
+          !Array.isArray(result?.json?.results?.bindings)
+        ) {
+          return result;
+        }
+
+        const bindings = result.json.results.bindings.map((binding) => {
+          if (binding.label?.value !== "Script data hash") {
+            return binding;
+          }
+
+          return {
+            ...binding,
+            kind: { ...binding.kind, value: "script" },
+            entity: {
+              ...binding.entity,
+              value: `urn:cardano:id:script:${scriptHash}`,
+            },
+            value: { ...binding.value, value: scriptHash },
+            raw: { ...binding.raw, value: scriptHash },
+          };
+        });
+
+        return {
+          ...result,
+          json: {
+            ...result.json,
+            results: { ...result.json.results, bindings },
+          },
+        };
+      },
+    });
+    globalThis.rdfShapes = replacementRdfShapes;
+  }, treasuryScriptHash);
+}
+
+async function injectSyntheticIntentScriptRow(page) {
+  await page.evaluate((scriptHash) => {
+    const originalRunInspector = globalThis.runInspector;
+    globalThis.runInspector = async (stdinText) => {
+      const result = await originalRunInspector.call(globalThis, stdinText);
+      let request;
+      let response;
+      try {
+        request = JSON.parse(stdinText);
+        response = JSON.parse(result.stdout);
+      } catch (_error) {
+        return result;
+      }
+
+      if (request?.op !== "tx.intent" || !result.exitOk) {
+        return result;
+      }
+
+      const operation = response.result ?? response;
+      if (!operation?.intent) {
+        return result;
+      }
+
+      const syntheticSection = {
+        title: "Script fixture",
+        empty: "",
+        rows: [
+          {
+            label: "Synthetic script witness",
+            value: scriptHash,
+            copyValue: scriptHash,
+            path: '["intent","synthetic_script_witness"]',
+            detail: "Script fixture",
+            identifierCandidates: [`urn:cardano:id:script:${scriptHash}`],
+          },
+        ],
+      };
+      const intent = {
+        ...operation.intent,
+        sections: [
+          ...(Array.isArray(operation.intent.sections) ? operation.intent.sections : []),
+          syntheticSection,
+        ],
+      };
+      const patchedOperation = { ...operation, intent };
+      const patchedResponse = response.result
+        ? { ...response, result: patchedOperation }
+        : patchedOperation;
+      return { ...result, stdout: JSON.stringify(patchedResponse) };
+    };
+  }, treasuryScriptHash);
+}
+
+async function injectSyntheticScriptDiscoveryRows(page) {
+  await injectSyntheticStructureScriptRow(page);
+  await injectSyntheticIntentScriptRow(page);
 }
 
 async function submitTxCbor(page, txCbor) {
@@ -1395,6 +1509,14 @@ test("library page manages local books with persisted CRUD", async ({ page }) =>
     library.getByRole("heading", { name: "Cardano RDF SHACL shapes" }),
   ).toBeVisible();
 
+  // Verify pinned provenance display vs unpinned freeform display
+  const sundaeBook = library.locator(".library-book", { hasText: "SundaeSwap V3 blueprint" });
+  await expect(sundaeBook.locator(".library-upstream-source")).toHaveText("github.com/SundaeSwap-finance/sundae-contracts");
+  await expect(sundaeBook.locator(".library-upstream-ref")).toHaveText("be33466b7dbe0f8e6c0e0f46ff23737897f45835");
+
+  const amaruBook = library.locator(".library-book", { hasText: "Amaru treasury 2026 overlay" });
+  await expect(amaruBook.locator(".library-provenance-unpinned")).toHaveText("local/freeform — no pinned upstream ref");
+
   await library.getByLabel("Book Turtle").fill(pastedTurtleBook);
   await library.getByRole("button", { name: "Add book" }).click();
   await expect(
@@ -1405,6 +1527,7 @@ test("library page manages local books with persisted CRUD", async ({ page }) =>
   ).toBeVisible();
 
   const localBook = library.locator(".library-book", { hasText: "Pasted overlay Turtle" });
+  await expect(localBook.locator(".library-provenance-unpinned")).toHaveText("local/freeform — no pinned upstream ref");
   await localBook.getByRole("checkbox", { name: "Select Pasted overlay Turtle" }).uncheck();
   await localBook.getByLabel("Rename Pasted overlay Turtle").fill("Renamed local treasury label");
   await localBook.getByRole("button", { name: "Save name for Pasted overlay Turtle" }).click();
@@ -1436,6 +1559,306 @@ test("library page manages local books with persisted CRUD", async ({ page }) =>
   const store = JSON.parse(rawStore);
   expect(store.books.map((book) => book.name)).not.toContain("Renamed local treasury label");
   expect(store.books).toHaveLength(3);
+
+  const sundaeStored = store.books.find((b) => b.id === "seed:sundaeswap-v3-blueprint");
+  expect(sundaeStored).toBeTruthy();
+  expect(sundaeStored.upstreamSource).toBe("github.com/SundaeSwap-finance/sundae-contracts");
+  expect(sundaeStored.upstreamRef).toBe("be33466b7dbe0f8e6c0e0f46ff23737897f45835");
+});
+
+test("library page loads legacy v1 store without provenance fields and displays explicitly unpinned state", async ({
+  page,
+}) => {
+  const legacyStoreJson = JSON.stringify({
+    kind: localBookStoreKey,
+    books: [
+      {
+        id: "legacy-v1-book",
+        name: "Legacy V1 Book",
+        source: "local/legacy.ttl",
+        raw: pastedTurtleBook,
+        parts: [
+          {
+            id: "p1",
+            label: "Part 1",
+            kind: "overlay",
+            turtle: pastedTurtleBook,
+            plutusJson: "",
+          },
+        ],
+        turtle: pastedTurtleBook,
+        selected: true,
+        seed: false,
+      },
+    ],
+  });
+
+  await page.addInitScript(
+    ({ key, value }) => {
+      window.localStorage.setItem(key, value);
+    },
+    { key: localBookStoreKey, value: legacyStoreJson },
+  );
+
+  await page.goto("/library");
+
+  const library = page.locator(".library-page");
+  await expect(library.getByRole("heading", { name: "Legacy V1 Book" })).toBeVisible();
+
+  const legacyBook = library.locator(".library-book", { hasText: "Legacy V1 Book" });
+  await expect(legacyBook.locator(".library-provenance-unpinned")).toHaveText(
+    "local/freeform — no pinned upstream ref",
+  );
+
+  const rawStore = await page.evaluate(
+    (key) => window.localStorage.getItem(key),
+    localBookStoreKey,
+  );
+  const store = JSON.parse(rawStore);
+  expect(store.books[0].upstreamSource).toBe("");
+  expect(store.books[0].upstreamRef).toBe("");
+});
+
+test("library page renders curated catalog, adds unloaded entry, prevents duplicates, and persists on reload", async ({
+  page,
+}) => {
+  await page.goto("/library");
+
+  const library = page.locator(".library-page");
+
+  // 3. Curated catalog section is visible and precedes freeform fallback controls
+  const catalog = library.locator(".library-catalog-panel");
+  const fallback = library.locator(".library-import-panel");
+  await expect(catalog).toBeVisible();
+  await expect(catalog.getByRole("heading", { name: "Curated catalog" })).toBeVisible();
+  await expect(fallback).toBeVisible();
+  await expect(fallback.getByRole("heading", { name: "Freeform import (fallback)" })).toBeVisible();
+
+  // Verify DOM ordering: catalog comes before freeform fallback
+  const isCatalogBeforeFallback = await page.evaluate(() => {
+    const cat = document.querySelector(".library-catalog-panel");
+    const fall = document.querySelector(".library-import-panel");
+    return cat && fall && (cat.compareDocumentPosition(fall) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+  });
+  expect(isCatalogBeforeFallback).toBe(true);
+
+  // 2. Catalog identity is pair (id, ref): sundaeswap-v3 is Loaded via seeded book, sundaeswap-treasury-v3 is Unloaded despite sharing ref
+  const sundaeEntry = catalog.locator(".catalog-entry", { hasText: "sundaeswap-v3" });
+  await expect(sundaeEntry).toBeVisible();
+  await expect(sundaeEntry.locator(".catalog-upstream-source")).toHaveText(
+    "github.com/SundaeSwap-finance/sundae-contracts",
+  );
+  await expect(sundaeEntry.locator(".catalog-upstream-ref")).toHaveText(
+    "be33466b7dbe0f8e6c0e0f46ff23737897f45835",
+  );
+  await expect(sundaeEntry.locator(".catalog-loaded-badge")).toHaveText("Loaded");
+  await expect(sundaeEntry.locator(".catalog-hash-tag")).toContainText(
+    "fa6a58bbe2d0ff05534431c8e2f0ef2cbdc1602a8456e4b13c8f3077",
+  );
+
+  const treasuryEntry = catalog.locator(".catalog-entry", { hasText: "sundaeswap-treasury-v3" });
+  await expect(treasuryEntry).toBeVisible();
+  await expect(treasuryEntry.locator(".catalog-upstream-source")).toHaveText(
+    "github.com/SundaeSwap-finance/treasury-contracts",
+  );
+  await expect(treasuryEntry.locator(".catalog-upstream-ref")).toHaveText(
+    "dea9e52671f7a696f0ec6a0f475c7fbe52689c9b",
+  );
+  const addTreasuryBtn = treasuryEntry.getByRole("button", { name: "Add to library" });
+  await expect(addTreasuryBtn).toBeEnabled();
+  await expect(treasuryEntry.locator(".catalog-hash-tag")).toContainText(
+    "32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0d",
+  );
+
+  // Add sundaeswap-treasury-v3 with one action
+  await addTreasuryBtn.click();
+
+  // Verify it is added, selected by default, and catalog entry updates to Loaded (duplicate prevention)
+  const treasuryBook = library
+    .locator(".library-book")
+    .filter({ has: page.locator(".library-upstream-ref", { hasText: "dea9e52671f7a696f0ec6a0f475c7fbe52689c9b" }) });
+  await expect(treasuryBook).toBeVisible();
+  await expect(
+    treasuryBook.getByRole("checkbox", { name: /^Select / }),
+  ).toBeChecked();
+  await expect(treasuryBook.locator(".library-upstream-source")).toHaveText(
+    "github.com/SundaeSwap-finance/treasury-contracts",
+  );
+  await expect(treasuryBook.locator(".library-upstream-ref")).toHaveText(
+    "dea9e52671f7a696f0ec6a0f475c7fbe52689c9b",
+  );
+  await expect(treasuryEntry.locator(".catalog-loaded-badge")).toHaveText("Loaded");
+  await expect(addTreasuryBtn).toHaveCount(0);
+
+  // Reload page and confirm persistence
+  await page.reload();
+  const reloadedBook = page
+    .locator(".library-book")
+    .filter({ has: page.locator(".library-upstream-ref", { hasText: "dea9e52671f7a696f0ec6a0f475c7fbe52689c9b" }) });
+  await expect(reloadedBook).toBeVisible();
+
+  // 1. Assert exact raw CIP-57 artifact bytes preservation in storage
+  const rawStore = await page.evaluate(
+    (key) => window.localStorage.getItem(key),
+    localBookStoreKey,
+  );
+  const store = JSON.parse(rawStore);
+  const storedTreasury = store.books.find((b) => b.id === "catalog:sundaeswap-treasury-v3");
+  expect(storedTreasury).toBeTruthy();
+  expect(storedTreasury.upstreamSource).toBe("github.com/SundaeSwap-finance/treasury-contracts");
+  expect(storedTreasury.upstreamRef).toBe("dea9e52671f7a696f0ec6a0f475c7fbe52689c9b");
+
+  const expectedTreasuryRaw = await page.evaluate(
+    () => window.protocolBlueprintsJson["sundaeswap-treasury-v3/plutus.json"],
+  );
+  expect(expectedTreasuryRaw).toBeTruthy();
+  expect(storedTreasury.raw).toBe(expectedTreasuryRaw);
+
+  // Freeform import fallback regression check
+  await expect(fallback.getByLabel("Book Turtle")).toBeVisible();
+  await expect(fallback.getByRole("button", { name: "Add book" })).toBeVisible();
+});
+
+test("script discovery scopes the Library and links only unresolved scripts", async ({ page }) => {
+  const uppercaseHash = treasuryScriptHash.toUpperCase();
+
+  await page.goto(`/library?script_hash=${uppercaseHash}`);
+  const library = page.locator(".library-page");
+  const scope = library.locator(".library-script-scope");
+  await expect(scope).toContainText(treasuryScriptHash);
+  await expect(scope).toContainText("Showing blueprints for");
+  const scopedCatalog = library.locator(".catalog-entry");
+  await expect(scopedCatalog).toHaveCount(1);
+  await expect(scopedCatalog.first()).toContainText("sundaeswap-treasury-v3");
+  await expect(scopedCatalog.first()).toHaveClass(/catalog-entry--script-match/);
+  await expect(library.locator(".library-import-panel")).toBeVisible();
+
+  await page.goto(`/library?script_hash=${unknownScriptHash}`);
+  await expect(library.locator(".library-script-scope")).toContainText(unknownScriptHash);
+  await expect(
+    library.getByText(`No blueprint for ${unknownScriptHash}.`, { exact: true }),
+  ).toBeVisible();
+  await expect(library.locator(".catalog-entry")).toHaveCount(0);
+  await expect(library.locator(".library-import-panel")).toBeVisible();
+
+  for (const invalidHash of [
+    treasuryScriptHash.slice(0, -1),
+    `${treasuryScriptHash}0`,
+    "g".repeat(56),
+  ]) {
+    await page.goto(`/library?script_hash=${invalidHash}`);
+    await expect(library.locator(".library-script-scope")).toHaveCount(0);
+    await expect(library.locator(".catalog-entry")).toHaveCount(2);
+    await expect(library.locator(".library-import-panel")).toBeVisible();
+  }
+
+  const amaruBook = library.locator(".library-book", {
+    hasText: "Amaru treasury 2026 overlay",
+  });
+  const amaruSelection = amaruBook.getByRole("checkbox", {
+    name: "Select Amaru treasury 2026 overlay",
+  });
+  await expect(amaruSelection).toBeChecked();
+  await amaruSelection.uncheck();
+
+  await decodeFixtureAt(
+    page,
+    "/inspect",
+    treasuryReorganizeFixturePath,
+    injectSyntheticScriptDiscoveryRows,
+  );
+  const structure = await selectResultTab(page, "Structure");
+  await expandDecodedStructure(structure);
+  const structureLink = structure.getByRole("link", {
+    name: `no blueprint for ${treasuryScriptHash}`,
+  });
+  await expect(structureLink).toHaveAttribute(
+    "href",
+    `/library?script_hash=${treasuryScriptHash}`,
+  );
+  const genericHashRows = structure
+    .locator(".decoded-tree-row")
+    .filter({ has: page.locator(".decoded-tree-type", { hasText: /^hash$/ }) });
+  await expect(genericHashRows.getByRole("link")).toHaveCount(0);
+
+  const witness = await selectResultTab(page, "Witness");
+  const witnessLink = witness.getByRole("link", {
+    name: `no blueprint for ${treasuryScriptHash}`,
+  });
+  await expect(witnessLink).toHaveAttribute(
+    "href",
+    `/library?script_hash=${treasuryScriptHash}`,
+  );
+
+  await page.goto("/library");
+  await library.getByLabel("Book Turtle").fill(`
+@prefix overlay: <https://lambdasistemi.github.io/cardano-ledger-rdf/overlay/local#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+<urn:cardano:id:script:${treasuryScriptHash}>
+  a overlay:CardanoScript ;
+  rdfs:label "Resolved treasury script" .
+`);
+  await library.getByRole("button", { name: "Add book" }).click();
+  await decodeFixtureAt(
+    page,
+    "/inspect",
+    treasuryReorganizeFixturePath,
+    injectSyntheticScriptDiscoveryRows,
+  );
+  const resolvedStructure = await selectResultTab(page, "Structure");
+  await expect(resolvedStructure).toContainText("Resolved treasury script");
+  await expect(
+    resolvedStructure.getByRole("link", {
+      name: `no blueprint for ${treasuryScriptHash}`,
+    }),
+  ).toHaveCount(0);
+  const resolvedWitness = await selectResultTab(page, "Witness");
+  await expect(resolvedWitness).toContainText("Resolved treasury script");
+  await expect(
+    resolvedWitness.getByRole("link", {
+      name: `no blueprint for ${treasuryScriptHash}`,
+    }),
+  ).toHaveCount(0);
+
+  await withPrefixedInspectorSite(async (baseUrl) => {
+    await page.goto(`${baseUrl}library/`);
+    const previewLibrary = page.locator(".library-page");
+    await expect(previewLibrary).toBeVisible();
+    const previewAmaruBook = previewLibrary.locator(".library-book", {
+      hasText: "Amaru treasury 2026 overlay",
+    });
+    const previewAmaruSelection = previewAmaruBook.getByRole("checkbox", {
+      name: "Select Amaru treasury 2026 overlay",
+    });
+    await expect(previewAmaruSelection).toBeChecked();
+    await previewAmaruSelection.uncheck();
+
+    await decodeFixtureAt(
+      page,
+      `${baseUrl}inspect/`,
+      treasuryReorganizeFixturePath,
+      injectSyntheticScriptDiscoveryRows,
+    );
+    const previewStructure = await selectResultTab(page, "Structure");
+    await expect(
+      previewStructure.getByRole("link", {
+        name: `no blueprint for ${treasuryScriptHash}`,
+      }),
+    ).toHaveAttribute(
+      "href",
+      `${previewPrefix}library?script_hash=${treasuryScriptHash}`,
+    );
+    const previewWitness = await selectResultTab(page, "Witness");
+    await expect(
+      previewWitness.getByRole("link", {
+        name: `no blueprint for ${treasuryScriptHash}`,
+      }),
+    ).toHaveAttribute(
+      "href",
+      `${previewPrefix}library?script_hash=${treasuryScriptHash}`,
+    );
+  });
 });
 
 test("library editor saves validated drafts and rejects invalid source without mutating storage", async ({
@@ -3233,6 +3656,7 @@ test("selected library blueprint book applies typed RDF fields", async ({
 
 test("exposes the vendored RDF query engine", async ({ page }) => {
   await page.goto("/");
+  await page.evaluate(() => globalThis.rdfShapesReady);
 
   const result = await page.evaluate(() => {
     const graph = `
@@ -3564,7 +3988,7 @@ fixture:linkableNetworkAddress
   const canonicalShapesBook = library
     .locator(".library-book", { hasText: "Cardano RDF SHACL shapes" })
     .filter({
-      has: page.locator(".library-book-meta", { hasText: "local" }),
+      has: page.locator(".library-book-kind", { hasText: "local" }),
     });
   await expect(canonicalShapesBook).toHaveCount(1);
   await expect(

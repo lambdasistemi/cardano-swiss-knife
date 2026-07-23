@@ -3,6 +3,7 @@ module Main (main) where
 import Prelude
 
 import Cardano.BookableIdentifier (isBookableIdentifierKind)
+import Cardano.Blueprint.Registry (bundledRegistryJson, catalogEntriesForScriptHash, isCatalogEntryLoaded, lookupCatalogEntry, normalizeScriptHash, parseCatalog)
 import Cardano.Provider as SharedProvider
 import Cardano.Transaction.Entry (EntryStatus(..), TxEntry)
 import Cardano.Transaction.Ledger as Ledger
@@ -82,6 +83,7 @@ main = HA.runHalogenAff do
   net  <- liftEffect (Storage.getItem networkKey)
   route <- liftEffect Routing.currentRoute
   routeBase <- liftEffect Routing.currentBasePath
+  scriptHashScope <- liftEffect (normalizeScriptHash <$> Routing.currentScriptHashQuery)
   theme <- liftEffect Shell.initialTheme
   bookStore <- liftEffect BookStore.load
   let initialProv = case prov of
@@ -100,6 +102,7 @@ main = HA.runHalogenAff do
         , network: initialNetwork
         , route
         , routeBase
+        , scriptHashScope
         , theme
         , books: bookStore.books
         }
@@ -290,6 +293,7 @@ type State =
   , providerVaultLabelInput :: String
   , route :: Route
   , routeBase :: String
+  , scriptHashScope :: Maybe String
   , theme :: Theme.Theme
   }
 
@@ -350,6 +354,7 @@ type InitialKeys =
   , network :: Network
   , route :: Route
   , routeBase :: String
+  , scriptHashScope :: Maybe String
   , theme :: Theme.Theme
   , books :: Array BookStore.Book
   }
@@ -364,6 +369,7 @@ data Action
   | SetTxHash String
   | SetTxHex String
   | LoadExample String
+  | AddCatalogBook String
   | SetLibraryInput String
   | SetLibraryUrl String
   | AddLibraryBook
@@ -587,6 +593,7 @@ inspectorComponent initial =
         , providerVaultLabelInput: ""
         , route: initial.route
         , routeBase: initial.routeBase
+        , scriptHashScope: initial.scriptHashScope
         , theme: initial.theme
         }
     , render
@@ -1638,9 +1645,110 @@ inspectorComponent initial =
             ]
         , HH.div
             [ classNames [ "library-layout" ] ]
-            [ renderLibraryImport state
+            [ renderLibraryCatalog state
+            , renderLibraryImport state
             , renderLibraryBooks state
             ]
+        ]
+
+  renderLibraryCatalog state =
+    case parseCatalog bundledRegistryJson of
+      Left err ->
+        HH.element (HH.ElemName "md-elevated-card")
+          [ classNames [ "panel", "library-catalog-panel" ]
+          , mdSurface "books"
+          ]
+          ( [ HH.div
+              [ classNames [ "panel-heading" ] ]
+              [ HH.div_
+                  [ HH.h2_ [ HH.text "Curated catalog" ]
+                  , HH.p_ [ HH.text "Build-pinned protocol blueprints from verified upstream repositories." ]
+                  ]
+              ]
+          , HH.div
+              [ classNames [ "sparql-lens-error", "catalog-parse-error" ]
+              , HH.attr (HH.AttrName "role") "alert"
+              ]
+              [ HH.text ("Failed to load bundled catalog: " <> err) ]
+          ] )
+      Right catalogEntries ->
+        let
+          scopedEntries = case state.scriptHashScope of
+            Just scriptHash -> catalogEntriesForScriptHash scriptHash catalogEntries
+            Nothing -> catalogEntries
+          scopeNotice = case state.scriptHashScope of
+            Just scriptHash ->
+              [ HH.div
+                  [ classNames [ "library-script-scope" ] ]
+                  [ HH.p_ [ HH.text "Showing blueprints for ", HH.code_ [ HH.text scriptHash ] ]
+                  , if Array.null scopedEntries then
+                      HH.p_ [ HH.text ("No blueprint for " <> scriptHash <> ".") ]
+                    else
+                      HH.text ""
+                  ]
+              ]
+            Nothing -> []
+        in HH.element (HH.ElemName "md-elevated-card")
+          [ classNames [ "panel", "library-catalog-panel" ]
+          , mdSurface "books"
+          ]
+          ( [ HH.div
+              [ classNames [ "panel-heading" ] ]
+              [ HH.div_
+                  [ HH.h2_ [ HH.text "Curated catalog" ]
+                  , HH.p_ [ HH.text "Build-pinned protocol blueprints from verified upstream repositories." ]
+                  ]
+              ]
+          ] <> scopeNotice <>
+          [ HH.div
+              [ classNames [ "catalog-list" ] ]
+              (map (renderCatalogEntry state) scopedEntries)
+          ] )
+
+  renderCatalogEntry state entry =
+    let
+      loaded = isCatalogEntryLoaded entry state.books
+      matchesScope = case state.scriptHashScope of
+        Just scriptHash -> Array.elem scriptHash entry.onChainHashes
+        Nothing -> false
+    in
+      HH.div
+        [ classNames ([ "catalog-entry" ] <> if matchesScope then [ "catalog-entry--script-match" ] else []) ]
+        [ HH.div
+            [ classNames [ "catalog-entry-header" ] ]
+            [ HH.h3
+                [ classNames [ "catalog-entry-title" ] ]
+                [ HH.text entry.id ]
+            , if loaded then
+                HH.span
+                  [ classNames [ "catalog-loaded-badge" ] ]
+                  [ HH.text "Loaded" ]
+              else
+                HH.element (HH.ElemName "md-filled-button")
+                  [ classNames [ "primary-action", "catalog-add-button" ]
+                  , HH.attr (HH.AttrName "role") "button"
+                  , mdControl "primary"
+                  , HE.onClick (\_ -> AddCatalogBook entry.id)
+                  ]
+                  [ HH.text "Add to library" ]
+            ]
+        , HH.div
+            [ classNames [ "catalog-provenance" ] ]
+            [ HH.span [ classNames [ "catalog-provenance-label" ] ] [ HH.text "Source: " ]
+            , HH.span [ classNames [ "catalog-upstream-source" ] ] [ HH.text entry.provenance.source ]
+            , HH.span [ classNames [ "catalog-provenance-divider" ] ] [ HH.text " @ " ]
+            , HH.span [ classNames [ "catalog-upstream-ref" ] ] [ HH.text entry.provenance.ref ]
+            ]
+        , if Array.null entry.onChainHashes then
+            HH.text ""
+          else
+            HH.div
+              [ classNames [ "catalog-on-chain-hashes" ] ]
+              [ HH.span [ classNames [ "catalog-hashes-label" ] ] [ HH.text "On-chain hashes: " ]
+              , HH.div
+                  [ classNames [ "catalog-hashes-list" ] ]
+                  (map (\h -> HH.code [ classNames [ "catalog-hash-tag" ] ] [ HH.text h ]) entry.onChainHashes)
+              ]
         ]
 
   renderManual state =
@@ -1651,15 +1759,16 @@ inspectorComponent initial =
       ]
 
   renderLibraryImport state =
-    HH.element (HH.ElemName "md-elevated-card")
-      [ classNames [ "panel", "library-import-panel" ]
+    HH.element (HH.ElemName "details")
+      [ classNames [ "panel", "library-import-panel", "library-import-fallback" ]
+      , HH.attr (HH.AttrName "open") "open"
       , mdSurface "books"
       ]
-      [ HH.div
-          [ classNames [ "panel-heading" ] ]
+      [ HH.element (HH.ElemName "summary")
+          [ classNames [ "panel-heading", "library-fallback-summary" ] ]
           [ HH.div_
-              [ HH.h2_ [ HH.text "Add book" ]
-              , HH.p_ [ HH.text "Import overlay, blueprint, SHACL, or store JSON into this browser." ]
+              [ HH.h2_ [ HH.text "Freeform import (fallback)" ]
+              , HH.p_ [ HH.text "Secondary fallback for local Turtle overlays, URLs, files, or store JSON." ]
               ]
           ]
       , HH.label
@@ -1831,8 +1940,22 @@ inspectorComponent initial =
             ]
         , HH.div
             [ classNames [ "library-book-meta" ] ]
-            [ HH.span_ [ HH.text (if book.seed then "seed" else "local") ]
-            , HH.span_ [ HH.text book.source ]
+            [ HH.span [ classNames [ "library-book-kind" ] ] [ HH.text (if book.seed then "seed" else "local") ]
+
+            , if book.upstreamSource /= "" && book.upstreamRef /= "" then
+                HH.span
+                  [ classNames [ "library-provenance" ] ]
+                  [ HH.span [ classNames [ "library-upstream-source" ] ] [ HH.text book.upstreamSource ]
+                  , HH.span [ classNames [ "library-provenance-sep" ] ] [ HH.text " @ " ]
+                  , HH.span [ classNames [ "library-upstream-ref" ] ] [ HH.text book.upstreamRef ]
+                  , HH.span [ classNames [ "library-internal-source" ] ] [ HH.text (" (" <> book.source <> ")") ]
+                  ]
+              else
+                HH.span
+                  [ classNames [ "library-provenance" ] ]
+                  [ HH.span [ classNames [ "library-provenance-unpinned" ] ] [ HH.text "local/freeform — no pinned upstream ref" ]
+                  , HH.span [ classNames [ "library-internal-source" ] ] [ HH.text (" (" <> book.source <> ")") ]
+                  ]
             , HH.span_ [ HH.text (libraryEditorModeLabel (libraryBookEditorMode book) <> " editor") ]
             ]
         , HH.div
@@ -2199,9 +2322,20 @@ inspectorComponent initial =
       , HH.div
           [ classNames [ "book-summary-copy" ] ]
           [ HH.strong_ [ HH.text book.name ]
-          , HH.code
-              [ classNames [ "book-source" ] ]
-              [ HH.text book.source ]
+          , if book.upstreamSource /= "" && book.upstreamRef /= "" then
+              HH.span
+                [ classNames [ "book-provenance" ] ]
+                [ HH.code [ classNames [ "book-upstream-source" ] ] [ HH.text book.upstreamSource ]
+                , HH.span [ classNames [ "book-provenance-sep" ] ] [ HH.text " @ " ]
+                , HH.code [ classNames [ "book-upstream-ref" ] ] [ HH.text book.upstreamRef ]
+                , HH.code [ classNames [ "book-source" ] ] [ HH.text (" (" <> book.source <> ")") ]
+                ]
+            else
+              HH.span
+                [ classNames [ "book-provenance" ] ]
+                [ HH.code [ classNames [ "book-provenance-unpinned" ] ] [ HH.text "local/freeform — no pinned upstream ref" ]
+                , HH.code [ classNames [ "book-source" ] ] [ HH.text (" (" <> book.source <> ")") ]
+                ]
           ]
       , HH.span
           [ classNames [ "book-term-count" ] ]
@@ -2516,6 +2650,7 @@ inspectorComponent initial =
       hasAddressIdentity = decodedRowHasAddressIdentity row
       resolvedName = decodedRowResolvedName state row
       isResolved = resolvedName /= ""
+      scriptDiscoveryHash = if isResolved then Nothing else decodedRowScriptHash row
       rowClasses =
         [ "decoded-tree-row", "decoded-tree-depth-" <> show row.depth ]
           <> (if hasChildren then [ "decoded-tree-row--group" ] else [])
@@ -2639,6 +2774,7 @@ inspectorComponent initial =
                             [ classNames typeClasses ]
                             [ HH.text row.kind ]
                          ]
+                      <> renderScriptDiscoveryLink state scriptDiscoveryHash
                   )
               , if isResolved || hasAddressIdentity then
                   HH.div
@@ -2779,6 +2915,36 @@ inspectorComponent initial =
     row.kind == "address"
       && row.annotationPredicate == "cardano:bech32"
       && row.annotationValue /= ""
+
+  decodedRowScriptHash row =
+    if row.kind == "script" || row.kind == "script_hash" then
+      firstScriptHash [ row.raw, row.value, row.annotationValue ]
+    else
+      Nothing
+
+  witnessScriptHash row =
+    Array.head (Array.mapMaybe scriptHashFromIdentifier row.identifierCandidates)
+
+  firstScriptHash values =
+    Array.head (Array.mapMaybe normalizeScriptHash values)
+
+  scriptHashFromIdentifier value =
+    let prefix = "urn:cardano:id:script:"
+    in
+      if StringCodeUnits.take (StringCodeUnits.length prefix) value == prefix then
+        normalizeScriptHash (StringCodeUnits.drop (StringCodeUnits.length prefix) value)
+      else
+        Nothing
+
+  renderScriptDiscoveryLink state = case _ of
+    Nothing -> []
+    Just scriptHash ->
+      [ HH.a
+          [ classNames [ "script-discovery-link" ]
+          , HP.href (state.routeBase <> "library?script_hash=" <> scriptHash)
+          ]
+          [ HH.text ("no blueprint for " <> scriptHash) ]
+      ]
 
   decodedTreeKindIcon row =
     if row.kind == "address" then "account_balance"
@@ -4940,6 +5106,7 @@ inspectorComponent initial =
   renderWitnessRowWithCopy state showCopy row =
     let
       resolvedName = resolutionNameForCandidates state row.identifierCandidates
+      scriptHash = if resolvedName == "" then witnessScriptHash row else Nothing
     in
       HH.div
         [ classNames [ "identity-row", "witness-row" ] ]
@@ -4967,7 +5134,7 @@ inspectorComponent initial =
             ]
         , HH.code_ [ HH.text row.value ]
         , if resolvedName == "" then
-            HH.text ""
+            HH.span_ (renderScriptDiscoveryLink state scriptHash)
           else
             HH.strong
               [ classNames [ "witness-resolved-name" ] ]
@@ -5665,6 +5832,29 @@ inspectorComponent initial =
     LoadExample hex -> do
       H.modify_ _ { mode = ByHex, txHex = hex, copied = false, copiedPath = Nothing, fetchError = Nothing }
       handleAction Decode
+    AddCatalogBook entryId -> do
+      st <- H.get
+      case parseCatalog bundledRegistryJson of
+        Left err ->
+          H.modify_ _ { libraryError = Just ("Catalog error: " <> err), libraryStatus = Nothing }
+        Right entries ->
+          case lookupCatalogEntry entryId entries of
+            Nothing ->
+              H.modify_ _ { libraryError = Just ("Catalog entry not found: " <> entryId), libraryStatus = Nothing }
+            Just entry -> do
+              res <- liftEffect (BookStore.addCatalogBook entry { kind: BookStore.envelopeKind, books: st.books })
+              case res of
+                Left err ->
+                  H.modify_ _ { libraryError = Just err, libraryStatus = Nothing }
+                Right updatedStore -> do
+                  let edits = bookNameEditsFromBooks updatedStore.books
+                  H.modify_
+                    _
+                      { books = updatedStore.books
+                      , bookNameEdits = edits
+                      , libraryError = Nothing
+                      , libraryStatus = Just ("Added " <> entry.id <> " from curated catalog.")
+                      }
     SetLibraryInput s ->
       H.modify_ _ { libraryInput = s, libraryError = Nothing, libraryStatus = Nothing }
     SetLibraryUrl s ->
@@ -6455,6 +6645,8 @@ inspectorComponent initial =
               { id: nextLocalBookId st.books
               , name: targetName
               , source: "annotation"
+              , upstreamSource: ""
+              , upstreamRef: ""
               , raw: turtle
               , parts: parsedBook.parts
               , turtle: parsedBook.turtle
@@ -6512,12 +6704,15 @@ inspectorComponent initial =
         { id: nextLocalBookId st.books
         , name: book.title
         , source: book.source
+        , upstreamSource: ""
+        , upstreamRef: ""
         , raw: input
         , parts: book.parts
         , turtle: book.turtle
         , selected: true
         , seed: false
         }
+
       books = Array.snoc st.books newBook
       edits = bookNameEditsFromBooks books
     liftEffect (saveBooks books)
@@ -6578,8 +6773,10 @@ inspectorComponent initial =
       (\book -> if book.id == bookId then update book else book)
       books
 
+  bookNameEditsFromBooks :: forall r. Array { id :: String, name :: String | r } -> Array { id :: String, name :: String }
   bookNameEditsFromBooks books =
     map (\book -> { id: book.id, name: book.name }) books
+
 
   upsertBookNameEdit bookId name edits =
     if Array.any (\edit -> edit.id == bookId) edits then
