@@ -14,6 +14,6 @@
 
 ## Orchestrator-owned finalization
 
-- [X] T010 Independently audit the full diff, raw test/gate logs, navigator approval, issue acceptance, typed failure taxonomy, no-fallback boundary, and task/commit links.
-- [X] T011 Push the accepted slice, update draft PR #112 with delivered behavior and proof, and verify fresh remote CI on the pushed SHA.
-- [X] T012 After local and remote proof are green, stamp finalization tasks while dropping `gate.sh` in `chore: drop gate.sh (ready for review)`, mark PR #112 ready, report `COMPLETE`, and do not merge.
+- [ ] T010 Independently audit the full diff, raw test/gate logs, navigator approval, issue acceptance, typed failure taxonomy, no-fallback boundary, and task/commit links.
+- [ ] T011 Push the accepted slice, update draft PR #112 with delivered behavior and proof, and verify fresh remote CI on the pushed SHA.
+- [ ] T012 After local and remote proof are green, stamp finalization tasks while dropping `gate.sh` in `chore: drop gate.sh (ready for review)`, mark PR #112 ready, report `COMPLETE`, and do not merge.
