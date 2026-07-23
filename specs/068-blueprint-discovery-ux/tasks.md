@@ -67,4 +67,4 @@ Forbidden scope: `gate.sh`, `specs/`, `docs/book-interchange.md`, `flake.lock`, 
 
 ## Orchestrator-owned finalization
 
-- [ ] T695 Independently run the final gate, audit all commits/tasks and PR metadata, verify fresh remote CI, drop `gate.sh`, stamp this task in that same final commit, push, and mark PR #110 ready.
+- [X] T695 Independently run the final gate, audit all commits/tasks and PR metadata, verify fresh remote CI, drop `gate.sh`, stamp this task in that same final commit, push, and mark PR #110 ready.
