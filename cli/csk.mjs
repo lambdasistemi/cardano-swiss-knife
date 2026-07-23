@@ -1,7 +1,8 @@
 #!/usr/bin/env node
-import { open, readFile, writeFile } from "node:fs/promises";
-import { spawn, spawnSync } from "node:child_process";
-import { createReadStream } from "node:fs";
+import { readFile, writeFile } from "node:fs/promises";
+import { spawnSync } from "node:child_process";
+import { createReadStream, openSync } from "node:fs";
+import { ReadStream as TtyReadStream } from "node:tty";
 import { addCredentialFile, createVaultFile, invalidMetadataText, listVaultFile, migrateVaultFile, providerCredentialKind } from "./vault-host.mjs";
 import { decryptVault } from "../lib/src/Cardano/Vault.js";
 import * as address from "../node/src/commands/address.js";
@@ -37,23 +38,36 @@ const parse = (args) => {
   const allowed = { create: ["--out", "--passphrase-fd", "--force"], list: ["--vault", "--passphrase-fd", "--json"], migrate: ["--input", "--out", "--input-passphrase-fd", "--passphrase-fd", "--force"] }; if (group !== "vault" || !allowed[command]) bad(); const o = { command }; for (let i = 0; i < rest.length; i += 1) { const key = rest[i]; if (!allowed[command].includes(key) || o[key.slice(2)] !== undefined) bad(); if (["--force", "--json"].includes(key)) o[key.slice(2)] = true; else if (rest[i + 1] && !rest[i + 1].startsWith("--")) o[key.slice(2)] = rest[++i]; else bad(); } if ((command === "create" && !o.out) || (command === "list" && !o.vault) || (command === "migrate" && (!o.input || !o.out)) || [o["passphrase-fd"], o["input-passphrase-fd"]].filter(Boolean).some((fd) => !/^\d+$/.test(fd))) bad(); return o;
 };
 const ttySession = async () => {
-  const handle = await open("/dev/tty", "r+");
-  const saved = spawnSync("stty", ["-g"], { stdio: [handle.fd, "pipe", "ignore"] }).stdout.toString().trim();
-  const restore = () => spawnSync("stty", [saved], { stdio: [handle.fd, "ignore", "ignore"] });
-  let active;
-  const close = async () => { active?.kill(); await handle.close(); };
+  const fd = openSync("/dev/tty", "r+");
+  const saved = spawnSync("stty", ["-g"], { stdio: [fd, "pipe", "ignore"] }).stdout.toString().trim();
+  const restore = () => spawnSync("stty", [saved], { stdio: [fd, "ignore", "ignore"] });
+  const input = new TtyReadStream(fd);
+  let buffer = "";
+  let pending;
+  const fail = (error) => { if (!pending) return; const { reject } = pending; pending = undefined; reject(error); };
+  const deliver = () => {
+    const match = buffer.match(/\r?\n/);
+    if (!match || !pending) return;
+    const line = buffer.slice(0, match.index);
+    buffer = buffer.slice(match.index + match[0].length);
+    const { resolve } = pending;
+    pending = undefined;
+    process.stderr.write("\n");
+    resolve(line);
+  };
+  input.on("data", (chunk) => { buffer += chunk; deliver(); });
+  input.on("error", () => fail(Error("Vault passphrase input is invalid.")));
+  input.on("end", () => fail(Error("Vault passphrase input is invalid.")));
+  const close = async () => { input.destroy(); };
   const codes = { SIGINT: 130, SIGTERM: 143, SIGHUP: 129 };
   const handlers = Object.entries(codes).map(([signal, code]) => [signal, () => { restore(); close().finally(() => process.exit(code)); }]);
   handlers.forEach(([signal, handler]) => process.once(signal, handler));
-  spawnSync("stty", ["-echo"], { stdio: [handle.fd, "ignore", "ignore"] });
+  spawnSync("stty", ["icanon", "-echo"], { stdio: [fd, "ignore", "ignore"] });
   return {
     ask: (prompt) => new Promise((resolve, reject) => {
       process.stderr.write(`${prompt}: `);
-      active = spawn(process.execPath, ["-e", "process.stdin.once('data', x => { process.stdin.destroy(); process.stdout.write(x.toString().replace(/\\r?\\n$/, ''), () => process.exit(0)); })"], { stdio: [handle.fd, "pipe", "ignore"] });
-      let value = "";
-      active.stdout.on("data", (chunk) => { value += chunk; });
-      active.on("error", reject);
-      active.on("close", (code) => { active = undefined; code === 0 ? (process.stderr.write("\n"), resolve(value)) : reject(Error("Vault passphrase input is invalid.")); });
+      pending = { resolve, reject };
+      deliver();
     }),
     close: async () => { restore(); handlers.forEach(([signal, handler]) => process.removeListener(signal, handler)); await close(); },
   };
