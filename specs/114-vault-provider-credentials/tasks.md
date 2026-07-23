@@ -4,14 +4,14 @@
 
 ## Slice 1 — Add, list, and consume provider credentials
 
-- [ ] T001 [US1] Add RED host-level vault mutation tests for unrelated-entry/extension preservation, duplicate-id protection, wrong-passphrase preservation, atomic-seam cleanup, and `0600` output in `test/vault-cross-host.test.mjs`.
-- [ ] T002 [US1] Add RED pseudo-terminal create/add tests for Blockfrost and Koios, no-echo terminal restoration, and inherited passphrase descriptors in `test/vault-cli.test.mjs`.
-- [ ] T003 [US1] Add RED rejection tests for unsupported providers, missing/control-character metadata, whitespace credentials, duplicate ids, and every secret-bearing argument/environment-style form in `test/vault-cli.test.mjs`.
-- [ ] T004 [US2] Add RED human/JSON listing assertions for provider id, kind, label, and creation time with no `value`, credential, or passphrase disclosure in `test/vault-cli.test.mjs`.
-- [ ] T005 [US3] Strengthen local Blockfrost `tx validate` proof so request capture records a non-empty credential header but never its value, while wrong passphrase/kind remain `SECRET_SOURCE`, in `node/test/cli.test.mjs`.
-- [ ] T006 [US1] Implement add-only provider credential mutation using canonical in-memory decrypt/encrypt and the existing atomic replacement helper in `cli/vault-host.mjs`.
-- [ ] T007 [US1] Implement the exact `vault credential add` parser, help, no-echo TTY prompts, provider-kind mapping, and redacted failure boundary in `cli/csk.mjs`.
-- [ ] T008 [US1] Document create/add/list/validate usage and the TTY-only provider-secret invariant in `docs/user/vault.md`; run `nix run .#ci-vault`, `nix run .#ci-vault-cli`, `nix run .#ci-node-api`, and `./gate.sh`; obtain navigator GREEN approval and commit the bisect-safe slice.
+- [X] T001 [US1] Add RED host-level vault mutation tests for unrelated-entry/extension preservation, duplicate-id protection, wrong-passphrase preservation, atomic-seam cleanup, and `0600` output in `test/vault-cross-host.test.mjs`.
+- [X] T002 [US1] Add RED pseudo-terminal create/add tests for Blockfrost and Koios, no-echo terminal restoration, and inherited passphrase descriptors in `test/vault-cli.test.mjs`.
+- [X] T003 [US1] Add RED rejection tests for unsupported providers, missing/control-character metadata, whitespace credentials, duplicate ids, and every secret-bearing argument/environment-style form in `test/vault-cli.test.mjs`.
+- [X] T004 [US2] Add RED human/JSON listing assertions for provider id, kind, label, and creation time with no `value`, credential, or passphrase disclosure in `test/vault-cli.test.mjs`.
+- [X] T005 [US3] Strengthen local Blockfrost `tx validate` proof so request capture records a non-empty credential header but never its value, while wrong passphrase/kind remain `SECRET_SOURCE`, in `node/test/cli.test.mjs`.
+- [X] T006 [US1] Implement add-only provider credential mutation using canonical in-memory decrypt/encrypt and the existing atomic replacement helper in `cli/vault-host.mjs`.
+- [X] T007 [US1] Implement the exact `vault credential add` parser, help, no-echo TTY prompts, provider-kind mapping, and redacted failure boundary in `cli/csk.mjs`.
+- [X] T008 [US1] Document create/add/list/validate usage and the TTY-only provider-secret invariant in `docs/user/vault.md`; run `nix run .#ci-vault`, `nix run .#ci-vault-cli`, `nix run .#ci-node-api`, and `./gate.sh`; obtain navigator GREEN approval and commit the bisect-safe slice.
 
 ## Finalization — Orchestrator-owned
 
