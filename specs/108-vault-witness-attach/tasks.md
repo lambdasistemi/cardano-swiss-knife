@@ -11,6 +11,6 @@
 
 ## Finalization — Orchestrator-owned
 
-- [ ] T007 Independently reproduce the focused test and full gate, audit the implementation diff and navigator approval, stamp T001–T006 into the slice commit, and push it.
-- [ ] T008 Update the PR body with delivered behavior and evidence, pass the finalization audit, remove `gate.sh`, and stamp T007–T009 in the drop-gate commit.
-- [ ] T009 Mark PR #115 ready and verify fresh remote CI is green before declaring the ticket complete.
+- [X] T007 Independently reproduce the focused test and full gate, audit the implementation diff and navigator approval, stamp T001–T006 into the slice commit, and push it.
+- [X] T008 Update the PR body with delivered behavior and evidence, pass the finalization audit, remove `gate.sh`, and stamp T007–T009 in the drop-gate commit.
+- [X] T009 Mark PR #115 ready and verify fresh remote CI is green before declaring the ticket complete.
