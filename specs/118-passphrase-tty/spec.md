@@ -33,6 +33,11 @@ empty or invalid, the command fails after input, or the operator sends Ctrl-C,
 then the command fails closed, creates no unintended output, leaks no secret,
 and restores the exact terminal state captured before prompting.
 
+Given a controlling terminal that is initially noncanonical, when an operator
+enters a multi-character secret, then the prompt temporarily establishes
+canonical no-echo line input, consumes the complete line, and restores that
+exact noncanonical pre-prompt state afterward.
+
 ### US4 — Preserve automation
 
 Given an inherited `--passphrase-fd`, when automation supplies newline-delimited
@@ -46,9 +51,9 @@ redaction, and exit behavior remain unchanged.
   NOT be treated as a complete line.
 - **FR-002**: Interactive passphrase and provider-credential input MUST remain
   no-echo.
-- **FR-003**: The prompt session MUST capture the terminal state before changing
-  it and restore that exact state after success and every failure or signal
-  path.
+- **FR-003**: The prompt session MUST capture the terminal state, establish
+  canonical no-echo input while prompting, and restore the exact captured state
+  after success and every failure or signal path.
 - **FR-004**: A single prompt session MUST support consecutive prompts without
   dropping, merging, or splitting lines.
 - **FR-005**: Secret material MUST remain absent from command arguments,
@@ -58,7 +63,8 @@ redaction, and exit behavior remain unchanged.
   unchanged.
 - **FR-007**: PTY-backed tests MUST type multi-character secrets incrementally,
   rather than sending a whole line in one write, and MUST compare `stty -g`
-  before and after the command.
+  before and after the command in both normal canonical and controlled
+  noncanonical starting modes.
 
 ## Success criteria
 
@@ -67,7 +73,8 @@ redaction, and exit behavior remain unchanged.
 - **SC-002**: Slow, character-by-character PTY input adds a provider credential
   whose complete value is usable through the existing vault flow.
 - **SC-003**: PTY state is byte-for-byte equal before and after success,
-  mismatch, invalid input, Ctrl-C, and command/process failure cases.
+  mismatch, invalid input, Ctrl-C, and command/process failure cases, including
+  a deliberately noncanonical pre-prompt state.
 - **SC-004**: Existing inherited-descriptor tests remain green.
 - **SC-005**: The full local gate, a manual real-PTY exercise, and fresh remote
   CI all pass.

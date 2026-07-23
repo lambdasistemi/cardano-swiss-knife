@@ -7,14 +7,21 @@ The defect is confined to the shared terminal prompt primitive in
 
 The current helper launches a child Node process and treats the first
 `process.stdin` `data` event as a complete secret, immediately destroying the
-stream. A `data` event is only a chunk boundary; it is not a line boundary.
-Existing Expect helpers send an entire secret in one burst, so they accidentally
-make one chunk look like one line and miss the human-typing regression.
+stream, but only disables echo on the controlling terminal. On a canonical
+Linux TTY the kernel still delivers one cooked line per read, so paced typing
+alone does not fail. When the prompt inherits a noncanonical TTY, however, the
+first typed byte is a complete read and the helper advances immediately. That
+controlled precondition explains and deterministically reproduces the reported
+first-character symptom.
+
+Existing Expect helpers start canonical and send an entire secret in one burst,
+so they cannot expose the missing canonical-mode establishment. The regression
+must add a noncanonical precondition while retaining the canonical cases.
 
 ## Technical approach
 
-- Keep `/dev/tty` as the only interactive secret source and keep terminal echo
-  disabled for the lifetime of one prompt session.
+- Keep `/dev/tty` as the only interactive secret source and explicitly
+  establish canonical, no-echo input for the lifetime of one prompt session.
 - Replace the read-one-chunk subprocess with a persistent, line-aware reader
   over the controlling terminal. Consecutive `ask` calls consume exactly one
   complete CR/LF-terminated line each.
@@ -28,16 +35,20 @@ make one chunk look like one line and miss the human-typing regression.
 
 ## Verification design
 
-The regression PTY sends each character separately with a short delay before
-the terminating carriage return. It proves:
+The regression PTY adds a deterministic noncanonical starting mode, then sends
+each character separately with a short delay before the terminating carriage
+return. Existing canonical cases remain in place. Together they prove:
 
 1. `vault create` waits for and consumes both complete passphrase lines.
 2. `vault credential add` waits for and consumes the complete vault
    passphrase and provider credential.
-3. secrets remain absent from terminal transcripts.
-4. `stty -g` is identical before and after success, confirmation mismatch,
-   empty/invalid input, Ctrl-C, and a post-prompt command failure.
-5. inherited passphrase descriptor tests remain unchanged and green.
+3. the prompt temporarily establishes canonical no-echo input even when the
+   saved pre-prompt state is noncanonical.
+4. secrets remain absent from terminal transcripts.
+5. `stty -g` is identical before and after success, confirmation mismatch,
+   empty/invalid input, Ctrl-C, and a post-prompt command failure, including
+   restoration of the deliberately noncanonical saved state.
+6. inherited passphrase descriptor tests remain unchanged and green.
 
 The ticket orchestrator additionally runs a real interactive command in a
 separate PTY, types a multi-character passphrase manually, verifies the output
@@ -71,7 +82,10 @@ drops `gate.sh`, pushes, marks the PR ready, and waits for fresh remote CI.
   use one session-scoped reader/queue.
 - Restoring after the tty handle closes cannot work; restore before resource
   teardown.
-- Generic stream chunks may split at arbitrary points; only CR/LF terminates a
-  secret.
+- A canonical Linux TTY does not expose arbitrary pre-newline chunking; RED must
+  control terminal mode rather than assert otherwise.
+- Merely disabling echo assumes the caller already supplied canonical mode; the
+  prompt must establish its own line-input precondition and then restore the
+  caller's exact state.
 - Test helpers that send the full string in one Expect `send` repeat the
   original blind spot; the regression must deliberately pace characters.

@@ -2,13 +2,15 @@
 
 ## Slice 1 — Complete-line prompt and restoration
 
-- [ ] T001 Add a RED PTY regression that types a multi-character vault-create
-  passphrase and confirmation incrementally and proves the command waits for
-  each complete line.
-- [ ] T002 Add a RED PTY regression that types the vault passphrase and provider
-  credential incrementally and proves both complete values are consumed.
+- [ ] T001 Add a RED PTY regression that starts from a controlled noncanonical
+  state, types a multi-character vault-create passphrase and confirmation
+  incrementally, and proves the command waits for each complete line.
+- [ ] T002 Add a RED PTY regression that starts from a controlled noncanonical
+  state, types the vault passphrase and provider credential incrementally, and
+  proves both complete values are consumed.
 - [ ] T003 Prove exact terminal-state restoration and no-echo behavior after
-  success, mismatch, invalid input, Ctrl-C, and a post-prompt command failure.
+  success, mismatch, invalid input, Ctrl-C, and a post-prompt command failure
+  from both canonical and deliberately noncanonical starting states.
 - [ ] T004 Replace chunk-based interactive input with one session-scoped,
   line-aware `/dev/tty` reader and unconditional prior-state restoration.
 - [ ] T005 Preserve and rerun inherited `--passphrase-fd` behavior and secret
