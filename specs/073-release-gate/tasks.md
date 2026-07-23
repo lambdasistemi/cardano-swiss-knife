@@ -46,7 +46,7 @@
 
 ## Finalization — orchestrator-owned
 
-- [ ] T023 Independently run the full local gate and inspect its actual log.
-- [ ] T024 Build and inspect the npm tarball, `packages.csk`/`apps.csk`, universal bundle, and checksums outside the checkout.
-- [ ] T025 Push final HEAD and verify every fresh GitHub check is green on that exact SHA.
-- [ ] T026 Audit PR metadata and commit/task linkage, drop `gate.sh`, mark PR ready, and report completion without merging.
+- [X] T023 Independently run the full local gate and inspect its actual log.
+- [X] T024 Build and inspect the npm tarball, `packages.csk`/`apps.csk`, universal bundle, and checksums outside the checkout.
+- [X] T025 Push final HEAD and verify every fresh GitHub check is green on that exact SHA.
+- [X] T026 Audit PR metadata and commit/task linkage, drop `gate.sh`, mark PR ready, and report completion without merging.
