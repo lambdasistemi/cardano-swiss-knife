@@ -1,4 +1,4 @@
-{ pkgs, repoRoot, txInspectorUi, wasmBinary, txInspectorWasmBinary, rdfShapesWasmPkg }:
+{ pkgs, repoRoot, txInspectorUi, wasmBinary, txInspectorWasmBinary, rdfShapesWasmPkg, protocolRegistry }:
 
 let
   nodejs = pkgs.nodejs_22;
@@ -185,6 +185,26 @@ in
       cp ${txInspectorWasmBinary}/wasm-tx-inspector.wasm node/dist/wasm-tx-inspector.wasm
       cp ${rdfShapesWasmPkg}/rdf_shapes_wasm.js node/dist/rdf_shapes_wasm.js
       cp ${rdfShapesWasmPkg}/rdf_shapes_wasm_bg.wasm node/dist/rdf_shapes_wasm_bg.wasm
+      # Ship book/blueprint/registry assets package-relative (FR-012).
+      mkdir -p \
+        node/dist/protocols/sundaeswap-v3 \
+        node/dist/protocols/sundaeswap-treasury-v3 \
+        node/dist/protocols/cardano-rdf \
+        node/dist/protocols/amaru-treasury
+      cp ${protocolRegistry}/registry.json \
+        node/dist/protocols/registry.json
+      cp ${protocolRegistry}/sundaeswap-v3/plutus.json \
+        node/dist/protocols/sundaeswap-v3/plutus.json
+      cp ${protocolRegistry}/sundaeswap-v3/pin.json \
+        node/dist/protocols/sundaeswap-v3/pin.json
+      cp ${protocolRegistry}/sundaeswap-treasury-v3/plutus.json \
+        node/dist/protocols/sundaeswap-treasury-v3/plutus.json
+      cp ${protocolRegistry}/sundaeswap-treasury-v3/pin.json \
+        node/dist/protocols/sundaeswap-treasury-v3/pin.json
+      cp ${protocolRegistry}/cardano-rdf/shapes.ttl \
+        node/dist/protocols/cardano-rdf/shapes.ttl
+      cp ${protocolRegistry}/amaru-treasury/journal-2026.json \
+        node/dist/protocols/amaru-treasury/journal-2026.json
     '';
     installPhase = ''
       mkdir -p $out

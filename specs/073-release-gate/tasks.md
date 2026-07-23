@@ -19,10 +19,10 @@
 
 ## Slice 3 — Portable package and Nix entry points
 
-- [ ] T008 Expose Node-22-backed `packages.csk` and `apps.csk` from one packaged distribution.
-- [ ] T009 Build a universal release bundle and deterministic checksums from the npm/Node artifacts.
-- [ ] T010 Extend package-relative foreign-directory smokes to all authoritative engine and book/registry assets and include packaging in `just ci`.
-- [ ] T011 Record focused builds/smokes and full-gate evidence, obtain navigator verification, and commit as `feat(package): add portable csk release artifacts`.
+- [X] T008 Expose Node-22-backed `packages.csk` and `apps.csk` from one packaged distribution.
+- [X] T009 Build a universal release bundle and deterministic checksums from the npm/Node artifacts.
+- [X] T010 Extend package-relative foreign-directory smokes to all authoritative engine and book/registry assets and include packaging in `just ci`.
+- [X] T011 Record focused builds/smokes and full-gate evidence, obtain navigator verification, and commit as `feat(package): add portable csk release artifacts`.
 
 ## Slice 4 — Single-version runtime contract
 

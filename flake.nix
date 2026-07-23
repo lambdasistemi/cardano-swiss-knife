@@ -73,7 +73,7 @@
           '';
           testVectorsPath = test-vectors-json;
           purescript = import ./nix/purescript.nix {
-            inherit pkgs repoRoot txInspectorUi wasmBinary txInspectorWasmBinary rdfShapesWasmPkg;
+            inherit pkgs repoRoot txInspectorUi wasmBinary txInspectorWasmBinary rdfShapesWasmPkg protocolRegistry;
           };
           packages = import ./nix/packages {
             inherit pkgs repoRoot purescript haskellProject playwrightBrowsers testVectorsPath txInspectorUi;
@@ -84,6 +84,7 @@
           apps = import ./nix/apps {
             inherit pkgs checks system repoRoot playwrightBrowsers txInspectorUi inspectorSource protocolRegistry uxJudgeSource;
             nodeApi = packages.node-api;
+            cskPackage = packages.csk;
             combinedSite = packages.combined-site;
             webDist = packages.web-dist;
           };
@@ -96,6 +97,8 @@
           packages.node-api = packages.node-api;
           packages.node-api-docs = purescript.node-api-docs;
           packages.node-package = packages.node-package;
+          packages.csk = packages.csk;
+          packages.release-bundle = packages.release-bundle;
           packages.tx-inspector-wasm = txInspectorWasmBinary;
           packages.tx-inspector-ui = packages.tx-inspector-ui;
           packages.web-dist = packages.web-dist;

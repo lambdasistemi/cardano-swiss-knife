@@ -88,7 +88,34 @@ test("installs a prepacked artifact outside the checkout without network, native
       assert.equal(contents.includes(signing.signingKeyBech32), false, `private key leaked into package: ${path}`);
     }
     const packagedFiles = await filesBelow(packageRoot);
-    assert.deepEqual(packagedFiles.filter((path) => path.endsWith("wasm-tx-inspector.wasm")).length, 1, "package must contain exactly one ledger engine");
+    for (const engine of [
+      "cardano-addresses.wasm",
+      "wasm-tx-inspector.wasm",
+      "rdf_shapes_wasm.js",
+      "rdf_shapes_wasm_bg.wasm",
+    ]) {
+      assert.deepEqual(
+        packagedFiles.filter((path) => path.endsWith(engine)).length,
+        1,
+        `package must contain exactly one ${engine}`,
+      );
+    }
+    // Shipped book/blueprint/registry assets must be package-relative (FR-012).
+    for (const asset of [
+      "registry.json",
+      "shapes.ttl",
+      "journal-2026.json",
+      "sundaeswap-v3/plutus.json",
+      "sundaeswap-v3/pin.json",
+      "sundaeswap-treasury-v3/plutus.json",
+      "sundaeswap-treasury-v3/pin.json",
+    ]) {
+      assert.deepEqual(
+        packagedFiles.filter((path) => path.endsWith(asset)).length,
+        1,
+        `package must contain exactly one shipped book/registry asset ${asset}`,
+      );
+    }
     assert.equal(packagedFiles.some((path) => /plutus/i.test(path) && path.endsWith(".wasm")), false, "package must not contain a fallback Plutus engine");
     const installedApi = await import(pathToFileURL(join(packageRoot, "node", "dist", "index.js")).href);
     const witnessTransaction = { cborHex: withRequiredSigner(transactionCbor, witnessFixture.requiredSignerHash) };

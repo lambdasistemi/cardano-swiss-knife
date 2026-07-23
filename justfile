@@ -83,4 +83,7 @@ release-gates:
   bash scripts/check-architecture-boundary.sh
   node --test node/test/release-manifests.test.mjs node/test/release-parity.test.mjs
 
-ci: check build haskell-quality check-vectors test test-playwright release-gates
+release-package:
+  node --test node/test/release-package.test.mjs
+
+ci: check build haskell-quality check-vectors test test-playwright release-gates release-package

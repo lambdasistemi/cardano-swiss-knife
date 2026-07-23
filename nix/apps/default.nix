@@ -1,4 +1,4 @@
-{ pkgs, checks, system, repoRoot, nodeApi, playwrightBrowsers, txInspectorUi, inspectorSource, protocolRegistry, uxJudgeSource, combinedSite, webDist }:
+{ pkgs, checks, system, repoRoot, nodeApi, cskPackage, playwrightBrowsers, txInspectorUi, inspectorSource, protocolRegistry, uxJudgeSource, combinedSite, webDist }:
 
 let
   lib = import ./lib.nix { inherit pkgs system; };
@@ -15,7 +15,7 @@ in
     checkName = "node-package";
   };
   "ci-vault" = import ./vault-test.nix { inherit pkgs repoRoot; };
-  "csk" = import ./csk.nix { inherit pkgs nodeApi; };
+  "csk" = import ./csk.nix { inherit pkgs cskPackage; };
   "ci-vault-cli" = import ./vault-cli-test.nix { inherit pkgs repoRoot; };
   "ci-playwright" = import ./playwright.nix { inherit lib; };
   "ci-inspector-playwright" = import ./inspector-playwright.nix {
