@@ -1,7 +1,7 @@
 # Specification Quality Checklist: Vault Provider Credentials
 
-**Purpose**: Validate specification completeness and quality before planning  
-**Created**: 2026-07-23  
+**Purpose**: Validate specification completeness and quality before planning
+**Created**: 2026-07-23
 **Feature**: `../spec.md`
 
 ## Content Quality

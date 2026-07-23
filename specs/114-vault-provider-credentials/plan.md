@@ -13,14 +13,14 @@ unchanged.
 
 ## Technical Context
 
-**Language/Version**: Node.js 22 ESM JavaScript; PureScript provider core remains unchanged  
-**Primary Dependencies**: Existing `age-encryption`, Node filesystem and terminal primitives  
-**Storage**: Canonical age v1 vault file  
-**Testing**: Node test runner, `expect` pseudo-terminal tests, Nix check apps, Playwright/full repository gate  
-**Target Platform**: Packaged `csk` CLI on Linux/macOS/Windows; no native addon  
-**Project Type**: CLI host over shared PureScript/WASM operations  
-**Performance Goals**: One decrypt/encrypt/write cycle per add; no network request during vault mutation  
-**Constraints**: No secret argv/env values, decrypted bytes memory-only, atomic `0600` writes, no host-side Cardano/provider semantics  
+**Language/Version**: Node.js 22 ESM JavaScript; PureScript provider core remains unchanged
+**Primary Dependencies**: Existing `age-encryption`, Node filesystem and terminal primitives
+**Storage**: Canonical age v1 vault file
+**Testing**: Node test runner, `expect` pseudo-terminal tests, Nix check apps, Playwright/full repository gate
+**Target Platform**: Packaged `csk` CLI on Linux/macOS/Windows; no native addon
+**Project Type**: CLI host over shared PureScript/WASM operations
+**Performance Goals**: One decrypt/encrypt/write cycle per add; no network request during vault mutation
+**Constraints**: No secret argv/env values, decrypted bytes memory-only, atomic `0600` writes, no host-side Cardano/provider semantics
 **Scale/Scope**: One provider entry per invocation; canonical v1 vaults of operator-managed size
 
 ## Constitution Check

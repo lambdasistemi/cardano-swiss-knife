@@ -1,8 +1,8 @@
 # Feature Specification: Vault Provider Credentials
 
-**Feature Branch**: `feat/114-vault-provider-credentials`  
-**Created**: 2026-07-23  
-**Status**: Draft  
+**Feature Branch**: `feat/114-vault-provider-credentials`
+**Created**: 2026-07-23
+**Status**: Draft
 **Input**: Issue #114, parent epic #74, merged provider context #104, and merged vault witness fix #108
 
 ## P1 user story
