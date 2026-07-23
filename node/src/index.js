@@ -583,7 +583,11 @@ const transactionOperation = (name, input, options = {}) => operation(async () =
   }
 
   const inspection = await runTransactionOperation("tx.inspect", txCbor, options);
-  const context = await awaitAff(Provider.resolveProducerTxContext(selection.provider)(selection.network)(selection.credential)(!Provider.needsKey(selection.provider) || selection.credential !== "")(JSON.stringify(inspection)));
+  const consumesCertState = name === TransactionLedger.validateTransactionOperation || name === TransactionLedger.evaluateTransactionScriptsOperation;
+  const discovery = consumesCertState
+    ? { inspection_response: inspection, intent_response: await runTransactionOperation("tx.intent", txCbor, options) }
+    : inspection;
+  const context = await awaitAff(Provider.resolveProducerTxContext(selection.provider)(selection.network)(selection.credential)(!Provider.needsKey(selection.provider) || selection.credential !== "")(JSON.stringify(discovery)));
   const contextArgs = JSON.parse(context);
   const value = await runTransactionOperation(name, txCbor, { ...options, ...contextArgs });
   if (books.length === 0) return { ...value, context: contextArgs.context };
