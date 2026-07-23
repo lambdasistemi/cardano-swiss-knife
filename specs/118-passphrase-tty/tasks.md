@@ -2,20 +2,20 @@
 
 ## Slice 1 — Complete-line prompt and restoration
 
-- [ ] T001 Add a RED PTY regression that starts from a controlled noncanonical
+- [X] T001 Add a RED PTY regression that starts from a controlled noncanonical
   state, types a multi-character vault-create passphrase and confirmation
   incrementally, and proves the command waits for each complete line.
-- [ ] T002 Add a RED PTY regression that starts from a controlled noncanonical
+- [X] T002 Add a RED PTY regression that starts from a controlled noncanonical
   state, types the vault passphrase and provider credential incrementally, and
   proves both complete values are consumed.
-- [ ] T003 Prove exact terminal-state restoration and no-echo behavior after
+- [X] T003 Prove exact terminal-state restoration and no-echo behavior after
   success, mismatch, invalid input, Ctrl-C, and a post-prompt command failure
   from both canonical and deliberately noncanonical starting states.
-- [ ] T004 Replace chunk-based interactive input with one session-scoped,
+- [X] T004 Replace chunk-based interactive input with one session-scoped,
   line-aware `/dev/tty` reader and unconditional prior-state restoration.
-- [ ] T005 Preserve and rerun inherited `--passphrase-fd` behavior and secret
+- [X] T005 Preserve and rerun inherited `--passphrase-fd` behavior and secret
   redaction checks.
-- [ ] T006 Run the focused PTY suite and the full ticket gate before committing.
+- [X] T006 Run the focused PTY suite and the full ticket gate before committing.
 
 ## Slice 2 — Orchestrator finalization
 

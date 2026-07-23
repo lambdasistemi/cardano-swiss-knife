@@ -42,15 +42,19 @@ const redacted = (result, value = secret) => {
   assert.doesNotMatch(`${result.stdout}${result.stderr}`, new RegExp(value));
 };
 const quote = (value) => `'${value.replaceAll("'", "'\\''")}'`;
+const tclString = (value) => `"${value.replace(/[\\$[\]"]/g, (ch) => `\\${ch}`)}"`;
+const typeSlowProc = "proc type_slow {value} {\n  foreach ch [split $value {}] {\n    send -- $ch\n    after 20\n  }\n  send -- \"\\r\"\n}";
+const typeSlow = (value) => `type_slow ${tclString(value)}`;
 const ptyCreate = async (out, mismatch = false) => {
   const before = `${out}.before`;
   const after = `${out}.after`;
   const script = [
     "log_user 0",
     "set timeout 15",
+    typeSlowProc,
     `spawn sh -c {stty -g > ${quote(before)}; node ${quote(cli.pathname)} vault create --out ${quote(out)} --force; status=$?; stty -g > ${quote(after)}; exit $status}`,
-    'expect "Vault passphrase:"', `send -- "${passphrase}\\r"`,
-    'expect "Confirm vault passphrase:"', `send -- "${mismatch ? "different confirmation" : passphrase}\\r"`,
+    'expect "Vault passphrase:"', typeSlow(passphrase),
+    'expect "Confirm vault passphrase:"', typeSlow(mismatch ? "different confirmation" : passphrase),
     "expect eof", "puts -nonewline $expect_out(buffer)", "exit [lindex [wait] 3]",
   ].join("\n");
   let result;
@@ -61,6 +65,47 @@ const ptyCreate = async (out, mismatch = false) => {
 const ptySignal = async (out) => {
   const before = `${out}.before`; const after = `${out}.after`;
   const script = ["log_user 0", "set timeout 15", `spawn sh -c {stty -g > ${quote(before)}; node ${quote(cli.pathname)} vault create --out ${quote(out)}; status=$?; stty -g > ${quote(after)}; exit $status}`, 'expect "Vault passphrase:"', "send \\003", "expect eof", "puts -nonewline $expect_out(buffer)", "exit [lindex [wait] 3]"].join("\n");
+  let result; try { result = { ...(await execFileAsync("expect", ["-c", script])), code: 0 }; } catch (error) { result = { stdout: error.stdout ?? "", stderr: error.stderr ?? "", code: error.code ?? 1 }; }
+  return { ...result, before: await readFile(before, "utf8"), after: await readFile(after, "utf8") };
+};
+const noncanonicalPreamble = "stty -icanon -echo min 1 time 0";
+const ptyCreateNoncanonical = async (out) => {
+  const before = `${out}.before`;
+  const after = `${out}.after`;
+  const script = [
+    "log_user 0",
+    "set timeout 15",
+    typeSlowProc,
+    `spawn sh -c {${noncanonicalPreamble}; stty -g > ${quote(before)}; node ${quote(cli.pathname)} vault create --out ${quote(out)} --force; status=$?; stty -g > ${quote(after)}; exit $status}`,
+    'expect "Vault passphrase:"', typeSlow(passphrase),
+    'expect "Confirm vault passphrase:"', typeSlow(passphrase),
+    "expect eof", "puts -nonewline $expect_out(buffer)", "exit [lindex [wait] 3]",
+  ].join("\n");
+  let result;
+  try { result = { ...(await execFileAsync("expect", ["-c", script])), code: 0 }; }
+  catch (error) { result = { stdout: error.stdout ?? "", stderr: error.stderr ?? "", code: error.code ?? 1 }; }
+  return { ...result, before: await readFile(before, "utf8"), after: await readFile(after, "utf8") };
+};
+const ptyCredentialAddNoncanonical = async (vault, { provider, id, label, credential }) => {
+  const before = `${vault}.${id}.before`;
+  const after = `${vault}.${id}.after`;
+  const script = [
+    "log_user 0",
+    "set timeout 15",
+    typeSlowProc,
+    `spawn sh -c {${noncanonicalPreamble}; stty -g > ${quote(before)}; node ${quote(cli.pathname)} vault credential add --vault ${quote(vault)} --provider ${provider} --id ${quote(id)} --label ${quote(label)}; status=$?; stty -g > ${quote(after)}; exit $status}`,
+    'expect "Vault passphrase:"', typeSlow(passphrase),
+    `expect "${providerPrompt[provider]}:"`, typeSlow(credential),
+    "expect eof", "puts -nonewline $expect_out(buffer)", "exit [lindex [wait] 3]",
+  ].join("\n");
+  let result;
+  try { result = { ...(await execFileAsync("expect", ["-c", script])), code: 0 }; }
+  catch (error) { result = { stdout: error.stdout ?? "", stderr: error.stderr ?? "", code: error.code ?? 1 }; }
+  return { ...result, before: await readFile(before, "utf8"), after: await readFile(after, "utf8") };
+};
+const ptyEmptyPassphrase = async (out) => {
+  const before = `${out}.before`; const after = `${out}.after`;
+  const script = ["log_user 0", "set timeout 15", `spawn sh -c {stty -g > ${quote(before)}; node ${quote(cli.pathname)} vault create --out ${quote(out)}; status=$?; stty -g > ${quote(after)}; exit $status}`, 'expect "Vault passphrase:"', "send -- \"\\r\"", "expect eof", "puts -nonewline $expect_out(buffer)", "exit [lindex [wait] 3]"].join("\n");
   let result; try { result = { ...(await execFileAsync("expect", ["-c", script])), code: 0 }; } catch (error) { result = { stdout: error.stdout ?? "", stderr: error.stderr ?? "", code: error.code ?? 1 }; }
   return { ...result, before: await readFile(before, "utf8"), after: await readFile(after, "utf8") };
 };
@@ -81,9 +126,10 @@ const ptyCredentialAdd = async (vault, { provider, id, label, credential }) => {
   const script = [
     "log_user 0",
     "set timeout 15",
+    typeSlowProc,
     `spawn sh -c {stty -g > ${quote(before)}; node ${quote(cli.pathname)} vault credential add --vault ${quote(vault)} --provider ${provider} --id ${quote(id)} --label ${quote(label)}; status=$?; stty -g > ${quote(after)}; exit $status}`,
-    'expect "Vault passphrase:"', `send -- "${passphrase}\\r"`,
-    `expect "${providerPrompt[provider]}:"`, `send -- "${credential}\\r"`,
+    'expect "Vault passphrase:"', typeSlow(passphrase),
+    `expect "${providerPrompt[provider]}:"`, typeSlow(credential),
     "expect eof", "puts -nonewline $expect_out(buffer)", "exit [lindex [wait] 3]",
   ].join("\n");
   let result;
@@ -230,6 +276,19 @@ test("force atomically replaces an existing target and pseudo-TTY input is no-ec
   assert.doesNotMatch(`${failed.stdout}${failed.stderr}`, new RegExp(`${passphrase}|different confirmation`));
 }));
 
+test("a deliberately noncanonical controlling terminal must not truncate the vault create passphrase lines, and must restore that exact noncanonical state", async () => withVault(async (dir) => {
+  const out = join(dir, "noncanonical-create.age");
+  const result = await ptyCreateNoncanonical(out);
+  const vaultUsableWithFullPassphrase = await readFile(out)
+    .then(async (bytes) => { try { await decryptVault(passphrase, new Uint8Array(bytes)); return true; } catch { return false; } })
+    .catch(() => false);
+  assert.equal(vaultUsableWithFullPassphrase, true, "a line-aware reader must establish canonical input and consume the complete passphrase and confirmation lines even when the terminal starts noncanonical");
+  assert.notEqual(result.before, "");
+  assert.notEqual(result.after, "");
+  assert.equal(result.before, result.after, "the deliberately noncanonical pre-prompt state must be restored exactly, not replaced with a generic canonical state");
+  assert.doesNotMatch(`${result.stdout}${result.stderr}`, new RegExp(passphrase));
+}));
+
 test("SIGINT during a no-echo TTY prompt restores terminal state without creating a vault or leaking a passphrase", async () => withVault(async (dir) => {
   const out = join(dir, "signal.age"); const result = await ptySignal(out);
   assert.notEqual(result.code, 0); assert.notEqual(result.before, ""); assert.equal(result.before, result.after);
@@ -239,7 +298,7 @@ test("SIGINT during a no-echo TTY prompt restores terminal state without creatin
 test("TTY create works with stdin redirected to null and never echoes its passphrase", async () => withVault(async (dir) => {
   const out = join(dir, "redirected.age");
   const before = `${out}.before`; const after = `${out}.after`;
-  const script = ["log_user 1", `log_file {${out}.transcript}`, "set timeout 15", `spawn sh -c {stty -g > ${quote(before)}; node ${quote(cli.pathname)} vault create --out ${quote(out)} </dev/null; status=$?; stty -g > ${quote(after)}; exit $status}`, 'expect "Vault passphrase:"', `send -- "${passphrase}\\r"`, 'expect "Confirm vault passphrase:"', `send -- "${passphrase}\\r"`, "expect eof", "exit [lindex [wait] 3]"].join("\n");
+  const script = ["log_user 1", `log_file {${out}.transcript}`, "set timeout 15", typeSlowProc, `spawn sh -c {stty -g > ${quote(before)}; node ${quote(cli.pathname)} vault create --out ${quote(out)} </dev/null; status=$?; stty -g > ${quote(after)}; exit $status}`, 'expect "Vault passphrase:"', typeSlow(passphrase), 'expect "Confirm vault passphrase:"', typeSlow(passphrase), "expect eof", "exit [lindex [wait] 3]"].join("\n");
   const result = await execFileAsync("expect", ["-c", script]); assert.match(await readFile(out, "utf8"), /^age-encryption\.org\/v1/); const beforeState = await readFile(before, "utf8"); const afterState = await readFile(after, "utf8"); assert.notEqual(beforeState, ""); assert.notEqual(afterState, ""); assert.equal(beforeState, afterState); assert.doesNotMatch(`${result.stdout}${result.stderr}${await readFile(`${out}.transcript`, "utf8")}`, new RegExp(passphrase));
 }));
 
@@ -247,7 +306,7 @@ test("migrate supports one inherited passphrase FD and one shared controlling-te
   const input = join(dir, "mixed.input"); const out = join(dir, "mixed.age"); const fifo = join(dir, "mixed.fd"); const before = `${out}.before`; const after = `${out}.after`;
   await writeFile(input, await encryptedWrapper("tx-sign-v1.json"));
   await execFileAsync("mkfifo", [fifo]); const writer = writeFile(fifo, passphrase);
-  const script = ["log_user 1", `log_file {${out}.transcript}`, "set timeout 15", `spawn sh -c {stty -g > ${quote(before)}; exec 3<${quote(fifo)}; node ${quote(cli.pathname)} vault migrate --input ${quote(input)} --out ${quote(out)} --input-passphrase-fd 3; status=$?; stty -g > ${quote(after)}; exit $status}`, 'expect "Vault passphrase:"', `send -- "${passphrase}\\r"`, "expect eof", "exit [lindex [wait] 3]"].join("\n");
+  const script = ["log_user 1", `log_file {${out}.transcript}`, "set timeout 15", typeSlowProc, `spawn sh -c {stty -g > ${quote(before)}; exec 3<${quote(fifo)}; node ${quote(cli.pathname)} vault migrate --input ${quote(input)} --out ${quote(out)} --input-passphrase-fd 3; status=$?; stty -g > ${quote(after)}; exit $status}`, 'expect "Vault passphrase:"', typeSlow(passphrase), "expect eof", "exit [lindex [wait] 3]"].join("\n");
   const result = await execFileAsync("expect", ["-c", script]); await writer; assert.match(await readFile(out, "utf8"), /^age-encryption\.org\/v1/); const beforeState = await readFile(before, "utf8"); const afterState = await readFile(after, "utf8"); assert.notEqual(beforeState, ""); assert.notEqual(afterState, ""); assert.equal(beforeState, afterState); assert.doesNotMatch(`${result.stdout}${result.stderr}${await readFile(`${out}.transcript`, "utf8")}`, new RegExp(passphrase)); assert.equal((await run(["vault", "list", "--vault", out, ...fdArgs(0)], `${passphrase}\n`)).code, 0);
 }));
 
@@ -290,6 +349,21 @@ test("vault credential add reads the Blockfrost or Koios credential from a no-ec
   }
 }));
 
+test("a deliberately noncanonical controlling terminal must not truncate the vault credential add passphrase or credential lines, and must restore that exact noncanonical state", async () => withVault(async (dir) => {
+  const out = join(dir, "noncanonical-credential.age");
+  assert.equal((await run(["vault", "create", "--out", out, ...fdArgs(0)], `${passphrase}\n${passphrase}\n`)).code, 0);
+  const credentialValue = "noncanonical-secret-value";
+  const result = await ptyCredentialAddNoncanonical(out, { provider: "blockfrost", id: "noncanonical-entry", label: "Noncanonical", credential: credentialValue });
+  assert.equal(result.code, 0, `${result.stdout}${result.stderr}`);
+  const decrypted = await decryptVault(passphrase, new Uint8Array(await readFile(out)));
+  const entry = decrypted.cardanoSwissKnifeVault.entries.find((item) => item.id === "noncanonical-entry");
+  assert.equal(entry?.value, credentialValue, "a line-aware reader must establish canonical input and consume the complete passphrase and credential lines even when the terminal starts noncanonical");
+  assert.notEqual(result.before, "");
+  assert.notEqual(result.after, "");
+  assert.equal(result.before, result.after, "the deliberately noncanonical pre-prompt state must be restored exactly, not replaced with a generic canonical state");
+  assert.doesNotMatch(`${result.stdout}${result.stderr}`, new RegExp(`${passphrase}|${credentialValue}`));
+}));
+
 test("vault credential add accepts an inherited passphrase descriptor while still reading the credential from the controlling terminal", async () => withVault(async (dir) => {
   const out = join(dir, "fd-credentials.age");
   assert.equal((await run(["vault", "create", "--out", out, ...fdArgs(0)], `${passphrase}\n${passphrase}\n`)).code, 0);
@@ -300,8 +374,9 @@ test("vault credential add accepts an inherited passphrase descriptor while stil
   const credentialValue = "blockfrost-fd-secret-value";
   const script = [
     "log_user 1", `log_file {${out}.fd.transcript}`, "set timeout 15",
+    typeSlowProc,
     `spawn sh -c {stty -g > ${quote(before)}; exec 3<${quote(fifo)}; node ${quote(cli.pathname)} vault credential add --vault ${quote(out)} --provider blockfrost --id fd-entry --label "FD entry" --passphrase-fd 3; status=$?; stty -g > ${quote(after)}; exit $status}`,
-    'expect "Blockfrost project ID:"', `send -- "${credentialValue}\\r"`,
+    'expect "Blockfrost project ID:"', typeSlow(credentialValue),
     "expect eof", "exit [lindex [wait] 3]",
   ].join("\n");
   const result = await execFileAsync("expect", ["-c", script]);
@@ -320,14 +395,30 @@ test("vault credential add rejects a duplicate id and a whitespace-only credenti
   assert.equal((await run(["vault", "create", "--out", out, ...fdArgs(0)], `${passphrase}\n${passphrase}\n`)).code, 0);
   const first = await ptyCredentialAdd(out, { provider: "blockfrost", id: "dup-entry", label: "First", credential: "first-secret-value" });
   assert.equal(first.code, 0, `${first.stdout}${first.stderr}`);
+  assert.equal(first.before, first.after);
   const beforeBytes = await readFile(out);
   const duplicate = await ptyCredentialAdd(out, { provider: "koios", id: "dup-entry", label: "Second", credential: "second-secret-value" });
   assert.notEqual(duplicate.code, 0);
+  assert.notEqual(duplicate.before, "");
+  assert.equal(duplicate.before, duplicate.after);
   assert.deepEqual(await readFile(out), beforeBytes);
   assert.doesNotMatch(`${duplicate.stdout}${duplicate.stderr}`, /first-secret-value|second-secret-value/);
   const whitespace = await ptyCredentialAdd(out, { provider: "blockfrost", id: "whitespace-entry", label: "Whitespace", credential: "   " });
   assert.notEqual(whitespace.code, 0);
+  assert.notEqual(whitespace.before, "");
+  assert.equal(whitespace.before, whitespace.after);
   assert.deepEqual(await readFile(out), beforeBytes);
+}));
+
+test("empty passphrase input at the controlling terminal fails closed and restores exact terminal state", async () => withVault(async (dir) => {
+  const out = join(dir, "empty-passphrase.age");
+  const result = await ptyEmptyPassphrase(out);
+  assert.notEqual(result.code, 0);
+  assert.notEqual(result.before, "");
+  assert.notEqual(result.after, "");
+  assert.equal(result.before, result.after);
+  await assert.rejects(readFile(out));
+  assert.match(`${result.stdout}${result.stderr}`, /Vault passphrase input is invalid\./);
 }));
 
 test("vault credential add never exposes the credential or passphrase through process capture or cleartext temporary artifacts", async () => withVault(async (dir) => {
@@ -342,9 +433,10 @@ test("vault credential add never exposes the credential or passphrase through pr
   const script = [
     "log_user 0",
     "set timeout 15",
+    typeSlowProc,
     `spawn sh -c {stty -g > ${quote(before)}; NODE_OPTIONS=${quote(`--import ${new URL(`file://${guard}`).href}`)} CSK_TEST_CAPTURE=${quote(capture)} node ${quote(cli.pathname)} vault credential add --vault ${quote(out)} --provider blockfrost --id capture-entry --label "Capture entry"; status=$?; stty -g > ${quote(after)}; exit $status}`,
-    'expect "Vault passphrase:"', `send -- "${passphrase}\\r"`,
-    'expect "Blockfrost project ID:"', `send -- "${credentialValue}\\r"`,
+    'expect "Vault passphrase:"', typeSlow(passphrase),
+    'expect "Blockfrost project ID:"', typeSlow(credentialValue),
     "expect eof", "puts -nonewline $expect_out(buffer)", "exit [lindex [wait] 3]",
   ].join("\n");
   let result;
