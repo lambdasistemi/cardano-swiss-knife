@@ -12,10 +12,10 @@
 
 ## Slice 2 — Parity and architecture release gates
 
-- [ ] T004 Add normalized cross-host parity fixture enforcement and negative divergence proof.
-- [ ] T005 Expand architecture-boundary enforcement and negative fixtures for prohibited semantic dependencies, direct engine bypass, and silent fallback.
-- [ ] T006 Wire manifest, parity, and architecture proofs into `just release-gates` and `just ci`.
-- [ ] T007 Record focused and full-gate evidence, obtain navigator verification, and commit as `test(release): enforce cross-host parity boundaries`.
+- [X] T004 Add normalized cross-host parity fixture enforcement and negative divergence proof.
+- [X] T005 Expand architecture-boundary enforcement and negative fixtures for prohibited semantic dependencies, direct engine bypass, and silent fallback.
+- [X] T006 Wire manifest, parity, and architecture proofs into `just release-gates` and `just ci`.
+- [X] T007 Record focused and full-gate evidence, obtain navigator verification, and commit as `test(release): enforce cross-host parity boundaries`.
 
 ## Slice 3 — Portable package and Nix entry points
 

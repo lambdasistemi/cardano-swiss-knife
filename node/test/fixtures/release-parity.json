@@ -1,0 +1,333 @@
+{
+  "schemaVersion": 1,
+  "description": "Reviewed, normalized cross-host parity fixture for the cardano-swiss-knife release gate. Every row names a real parity capability ID from release/capabilities.json, a real proof source, a representative input, and normalized WebUI, CLI, and Node success or typed-failure outcomes. Normalization: a success carries the deep value; a typed failure carries only the stable error code (host-formatted messages are not parity-significant). The host outcomes are independently recorded contract vectors, not aliases derived by this checker. hostEvidence records source provenance for the three host surfaces; in particular it does not claim that this Node fixture executes a live WebUI. requiredCapabilities is the closed, reviewed representative inventory: it retains the offline vectors and adds ledger/RDF-backed fail-hard engine outcomes grounded in existing packaged-host tests.",
+  "requiredCapabilities": [
+    "ADDR-001",
+    "MN-002",
+    "KEY-001",
+    "SCR-001",
+    "PAY-001",
+    "PAY-002",
+    "TX-WITNESS-ATTACH-001",
+    "TX-BOOK-001"
+  ],
+  "hostEvidence": {
+    "webui": {
+      "kind": "source-provenance",
+      "anchor": "docs/inspector/src/Main.purs"
+    },
+    "cli": {
+      "kind": "packaged-cli-contract",
+      "anchor": "cli/csk.mjs"
+    },
+    "node": {
+      "kind": "packaged-node-api-contract",
+      "anchor": "node/src/index.js"
+    }
+  },
+  "rows": [
+    {
+      "capability": "ADDR-001",
+      "proof": "test-vectors/vectors.json",
+      "input": {
+        "address": "addr1vyeq0sedsphv9j4u0rlhakrfh5cf3d7mj0zrej92jw44n6c0fpycd"
+      },
+      "results": {
+        "webui": {
+          "ok": true,
+          "value": {
+            "addressStyle": "Shelley",
+            "addressType": 6,
+            "addressTypeLabel": "Enterprise address (key)",
+            "networkTag": 1,
+            "networkTagLabel": "Mainnet",
+            "stakeReference": "none",
+            "spendingKeyHash": "3207c32d806ec2cabc78ff7ed869bd3098b7db93c43cc8aa93ab59eb",
+            "stakeKeyHash": null,
+            "spendingScriptHash": null,
+            "stakeScriptHash": null,
+            "extraDetails": []
+          }
+        },
+        "cli": {
+          "ok": true,
+          "value": {
+            "addressStyle": "Shelley",
+            "addressType": 6,
+            "addressTypeLabel": "Enterprise address (key)",
+            "networkTag": 1,
+            "networkTagLabel": "Mainnet",
+            "stakeReference": "none",
+            "spendingKeyHash": "3207c32d806ec2cabc78ff7ed869bd3098b7db93c43cc8aa93ab59eb",
+            "stakeKeyHash": null,
+            "spendingScriptHash": null,
+            "stakeScriptHash": null,
+            "extraDetails": []
+          }
+        },
+        "node": {
+          "ok": true,
+          "value": {
+            "addressStyle": "Shelley",
+            "addressType": 6,
+            "addressTypeLabel": "Enterprise address (key)",
+            "networkTag": 1,
+            "networkTagLabel": "Mainnet",
+            "stakeReference": "none",
+            "spendingKeyHash": "3207c32d806ec2cabc78ff7ed869bd3098b7db93c43cc8aa93ab59eb",
+            "stakeKeyHash": null,
+            "spendingScriptHash": null,
+            "stakeScriptHash": null,
+            "extraDetails": []
+          }
+        }
+      }
+    },
+    {
+      "capability": "ADDR-001",
+      "proof": "test-vectors/vectors.json",
+      "input": {
+        "address": "not-an-address"
+      },
+      "results": {
+        "webui": { "ok": false, "code": "DOMAIN_ERROR" },
+        "cli": { "ok": false, "code": "DOMAIN_ERROR" },
+        "node": { "ok": false, "code": "DOMAIN_ERROR" }
+      }
+    },
+    {
+      "capability": "MN-002",
+      "proof": "tests/mnemonic.spec.ts",
+      "input": {
+        "mnemonic": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
+      },
+      "results": {
+        "webui": { "ok": true, "value": true },
+        "cli": { "ok": true, "value": true },
+        "node": { "ok": true, "value": true }
+      }
+    },
+    {
+      "capability": "MN-002",
+      "proof": "tests/mnemonic.spec.ts",
+      "input": {
+        "mnemonic": "foo bar"
+      },
+      "results": {
+        "webui": { "ok": true, "value": false },
+        "cli": { "ok": true, "value": false },
+        "node": { "ok": true, "value": false }
+      }
+    },
+    {
+      "capability": "KEY-001",
+      "proof": "tests/derivation.spec.ts",
+      "input": {
+        "mnemonic": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
+        "accountIndex": 0,
+        "role": "external",
+        "addressIndex": 0
+      },
+      "results": {
+        "webui": {
+          "ok": true,
+          "value": {
+            "rootKeyBech32": "root_xsk1vr88m0krv9hflst7pse90zel8qpn0vdkrg0newt9rthrqecwdafewpqe5gazunjqstgjhau042ryth7gst8w9tn3083tqllgszv2hvs8yvgqs3uycucgrqkmhkc5fxe8qevx78l4e0cn690fkmncc90svu7h838u",
+            "accountKeyBech32": "acct_xsk1cqn0kmzry9dlpvhzzv4dfpfddc450wcfatned654w8u7qmcwdafczu285vl6eteqfynmusz78k7d9cc6hee5kd2dtcduwvta8td9k69sut03v5u9pqzxvjwsum2mx2tf24dz8uh3a0edk2qexkdsmz9azcq5vwx8",
+            "addressKeyBech32": "addr_xsk1zpwjausey9gx2k5jd09fen84utmwf9h049vq2zqe9c0557gwdafaupjjjy54z8gu4jcxvj70qjznlhqq2kj8e3kjcmfq2ynsypmqv55gsj8g4a32y7jhaxpzz46pe84vzlnwgh9l6m4xtg8qmnqrhdmhkggh7mvv",
+            "addressPublicKeyBech32": "addr_xvk106sf5d9whvfunpquwyuhk89tlmzam72sgpff8hhyjm9v9aphfq9g3pyw3tmz5fa906vzy9t5rj02c9lxu3wtl4h2vkswphxq8wmh0vse45n4y",
+            "stakeKeyBech32": "stake_xsk1yprcj85gjd9yyt3l7mh2fj42and8j4eye54l4nu326vfvagwdaf55uz8fpc9u298h45aqztr3twhvlmeccltnjpeerl7pmlskmskwu3skpdkj7qqzh7wuwcqlcrzn3vvfywmzaypys06kzltjftfud9lzc3ya6rt",
+            "stakePublicKeyBech32": "stake_xvk1qyh4msc3tw9q0xq7deg0tfn3utr0hvnv8l77rngaet6q5llg79srpvzmd9uqq90uacasplsx98zccjgak96gzfql4v97hyjknc6t79sx29nct"
+          }
+        },
+        "cli": {
+          "ok": true,
+          "value": {
+            "rootKeyBech32": "root_xsk1vr88m0krv9hflst7pse90zel8qpn0vdkrg0newt9rthrqecwdafewpqe5gazunjqstgjhau042ryth7gst8w9tn3083tqllgszv2hvs8yvgqs3uycucgrqkmhkc5fxe8qevx78l4e0cn690fkmncc90svu7h838u",
+            "accountKeyBech32": "acct_xsk1cqn0kmzry9dlpvhzzv4dfpfddc450wcfatned654w8u7qmcwdafczu285vl6eteqfynmusz78k7d9cc6hee5kd2dtcduwvta8td9k69sut03v5u9pqzxvjwsum2mx2tf24dz8uh3a0edk2qexkdsmz9azcq5vwx8",
+            "addressKeyBech32": "addr_xsk1zpwjausey9gx2k5jd09fen84utmwf9h049vq2zqe9c0557gwdafaupjjjy54z8gu4jcxvj70qjznlhqq2kj8e3kjcmfq2ynsypmqv55gsj8g4a32y7jhaxpzz46pe84vzlnwgh9l6m4xtg8qmnqrhdmhkggh7mvv",
+            "addressPublicKeyBech32": "addr_xvk106sf5d9whvfunpquwyuhk89tlmzam72sgpff8hhyjm9v9aphfq9g3pyw3tmz5fa906vzy9t5rj02c9lxu3wtl4h2vkswphxq8wmh0vse45n4y",
+            "stakeKeyBech32": "stake_xsk1yprcj85gjd9yyt3l7mh2fj42and8j4eye54l4nu326vfvagwdaf55uz8fpc9u298h45aqztr3twhvlmeccltnjpeerl7pmlskmskwu3skpdkj7qqzh7wuwcqlcrzn3vvfywmzaypys06kzltjftfud9lzc3ya6rt",
+            "stakePublicKeyBech32": "stake_xvk1qyh4msc3tw9q0xq7deg0tfn3utr0hvnv8l77rngaet6q5llg79srpvzmd9uqq90uacasplsx98zccjgak96gzfql4v97hyjknc6t79sx29nct"
+          }
+        },
+        "node": {
+          "ok": true,
+          "value": {
+            "rootKeyBech32": "root_xsk1vr88m0krv9hflst7pse90zel8qpn0vdkrg0newt9rthrqecwdafewpqe5gazunjqstgjhau042ryth7gst8w9tn3083tqllgszv2hvs8yvgqs3uycucgrqkmhkc5fxe8qevx78l4e0cn690fkmncc90svu7h838u",
+            "accountKeyBech32": "acct_xsk1cqn0kmzry9dlpvhzzv4dfpfddc450wcfatned654w8u7qmcwdafczu285vl6eteqfynmusz78k7d9cc6hee5kd2dtcduwvta8td9k69sut03v5u9pqzxvjwsum2mx2tf24dz8uh3a0edk2qexkdsmz9azcq5vwx8",
+            "addressKeyBech32": "addr_xsk1zpwjausey9gx2k5jd09fen84utmwf9h049vq2zqe9c0557gwdafaupjjjy54z8gu4jcxvj70qjznlhqq2kj8e3kjcmfq2ynsypmqv55gsj8g4a32y7jhaxpzz46pe84vzlnwgh9l6m4xtg8qmnqrhdmhkggh7mvv",
+            "addressPublicKeyBech32": "addr_xvk106sf5d9whvfunpquwyuhk89tlmzam72sgpff8hhyjm9v9aphfq9g3pyw3tmz5fa906vzy9t5rj02c9lxu3wtl4h2vkswphxq8wmh0vse45n4y",
+            "stakeKeyBech32": "stake_xsk1yprcj85gjd9yyt3l7mh2fj42and8j4eye54l4nu326vfvagwdaf55uz8fpc9u298h45aqztr3twhvlmeccltnjpeerl7pmlskmskwu3skpdkj7qqzh7wuwcqlcrzn3vvfywmzaypys06kzltjftfud9lzc3ya6rt",
+            "stakePublicKeyBech32": "stake_xvk1qyh4msc3tw9q0xq7deg0tfn3utr0hvnv8l77rngaet6q5llg79srpvzmd9uqq90uacasplsx98zccjgak96gzfql4v97hyjknc6t79sx29nct"
+          }
+        }
+      }
+    },
+    {
+      "capability": "SCR-001",
+      "proof": "tests/scripts.spec.ts",
+      "input": {
+        "cborHex": "008200581c3207c32d806ec2cabc78ff7ed869bd3098b7db93c43cc8aa93ab59eb"
+      },
+      "results": {
+        "webui": {
+          "ok": true,
+          "value": {
+            "canonicalCborHex": "008200581c3207c32d806ec2cabc78ff7ed869bd3098b7db93c43cc8aa93ab59eb",
+            "canonicalJson": "\"addr_vkh1xgruxtvqdmpv40rclalds6daxzvt0kuncs7v325n4dv7kz46hgj\"",
+            "scriptType": "Signature",
+            "validationStatus": "valid",
+            "issues": [],
+            "hashHex": "558ba956d2a19cecd37cb49d3f0ddff1985013dd86e695128bc3d996",
+            "hashBech32": "script12k96j4kj5xwwe5mukjwn7rwl7xv9qy7asmnf2y5tc0vevku89av"
+          }
+        },
+        "cli": {
+          "ok": true,
+          "value": {
+            "canonicalCborHex": "008200581c3207c32d806ec2cabc78ff7ed869bd3098b7db93c43cc8aa93ab59eb",
+            "canonicalJson": "\"addr_vkh1xgruxtvqdmpv40rclalds6daxzvt0kuncs7v325n4dv7kz46hgj\"",
+            "scriptType": "Signature",
+            "validationStatus": "valid",
+            "issues": [],
+            "hashHex": "558ba956d2a19cecd37cb49d3f0ddff1985013dd86e695128bc3d996",
+            "hashBech32": "script12k96j4kj5xwwe5mukjwn7rwl7xv9qy7asmnf2y5tc0vevku89av"
+          }
+        },
+        "node": {
+          "ok": true,
+          "value": {
+            "canonicalCborHex": "008200581c3207c32d806ec2cabc78ff7ed869bd3098b7db93c43cc8aa93ab59eb",
+            "canonicalJson": "\"addr_vkh1xgruxtvqdmpv40rclalds6daxzvt0kuncs7v325n4dv7kz46hgj\"",
+            "scriptType": "Signature",
+            "validationStatus": "valid",
+            "issues": [],
+            "hashHex": "558ba956d2a19cecd37cb49d3f0ddff1985013dd86e695128bc3d996",
+            "hashBech32": "script12k96j4kj5xwwe5mukjwn7rwl7xv9qy7asmnf2y5tc0vevku89av"
+          }
+        }
+      }
+    },
+    {
+      "capability": "PAY-001",
+      "proof": "tests/signing.spec.ts",
+      "input": {
+        "payloadMode": "text",
+        "payloadInput": "cardano-addresses-browser signing test",
+        "signingKeyBech32": "root_xsk1qz497hekfxq0ftrzjh7sl0m9vseep44mrnmk2dkzawczwy7ghfgd3ypmaem5k7lcv782p4haa4kcwmdnks4776rkgrx9zn4h8am82dagca203x7fejp4x04ty47he9rztj2lp46fwyzz3ad2yszwadjfnv76n80u"
+      },
+      "results": {
+        "webui": {
+          "ok": true,
+          "value": {
+            "payloadHex": "63617264616e6f2d6164647265737365732d62726f77736572207369676e696e672074657374",
+            "signatureHex": "8d3e7f561d4735bd8ca3e1ae0417bbc35d82a51460ac74257223b56f8031fb7bed69f27938d19249690bb02ffa3777c122cc3b34e7c46a4387819afdb20ffc0e",
+            "verificationKeyBech32": "root_xvk12tysdwfv3at38ffz288zppfmagrmv92mw67xca2lszg9wn2vjdz63365lzdunnyr2vl2kfta0j2xyhy47rt5jugy9r665fqya6mynxccv0hef"
+          }
+        },
+        "cli": {
+          "ok": true,
+          "value": {
+            "payloadHex": "63617264616e6f2d6164647265737365732d62726f77736572207369676e696e672074657374",
+            "signatureHex": "8d3e7f561d4735bd8ca3e1ae0417bbc35d82a51460ac74257223b56f8031fb7bed69f27938d19249690bb02ffa3777c122cc3b34e7c46a4387819afdb20ffc0e",
+            "verificationKeyBech32": "root_xvk12tysdwfv3at38ffz288zppfmagrmv92mw67xca2lszg9wn2vjdz63365lzdunnyr2vl2kfta0j2xyhy47rt5jugy9r665fqya6mynxccv0hef"
+          }
+        },
+        "node": {
+          "ok": true,
+          "value": {
+            "payloadHex": "63617264616e6f2d6164647265737365732d62726f77736572207369676e696e672074657374",
+            "signatureHex": "8d3e7f561d4735bd8ca3e1ae0417bbc35d82a51460ac74257223b56f8031fb7bed69f27938d19249690bb02ffa3777c122cc3b34e7c46a4387819afdb20ffc0e",
+            "verificationKeyBech32": "root_xvk12tysdwfv3at38ffz288zppfmagrmv92mw67xca2lszg9wn2vjdz63365lzdunnyr2vl2kfta0j2xyhy47rt5jugy9r665fqya6mynxccv0hef"
+          }
+        }
+      }
+    },
+    {
+      "capability": "PAY-002",
+      "proof": "tests/signing.spec.ts",
+      "input": {
+        "payloadMode": "text",
+        "payloadInput": "cardano-addresses-browser signing test",
+        "verificationKeyBech32": "root_xvk12tysdwfv3at38ffz288zppfmagrmv92mw67xca2lszg9wn2vjdz63365lzdunnyr2vl2kfta0j2xyhy47rt5jugy9r665fqya6mynxccv0hef",
+        "signatureHex": "8d3e7f561d4735bd8ca3e1ae0417bbc35d82a51460ac74257223b56f8031fb7bed69f27938d19249690bb02ffa3777c122cc3b34e7c46a4387819afdb20ffc0e"
+      },
+      "results": {
+        "webui": { "ok": true, "value": true },
+        "cli": { "ok": true, "value": true },
+        "node": { "ok": true, "value": true }
+      }
+    },
+    {
+      "capability": "TX-WITNESS-ATTACH-001",
+      "proof": "node/test/transaction-witness.test.mjs",
+      "input": {
+        "fixture": "node/test/fixtures/transaction-witnesses.json",
+        "engine": "wasm-tx-inspector.wasm",
+        "scenario": "packaged ledger engine missing during witness attachment"
+      },
+      "results": {
+        "webui": { "ok": false, "code": "ENGINE_NOT_FOUND" },
+        "cli": { "ok": false, "code": "ENGINE_NOT_FOUND" },
+        "node": { "ok": false, "code": "ENGINE_NOT_FOUND" }
+      }
+    },
+    {
+      "capability": "TX-BOOK-001",
+      "proof": "node/test/transaction-books.test.mjs",
+      "input": {
+        "fixture": "node/test/fixtures/transaction-books.json",
+        "engine": "rdf_shapes_wasm_bg.wasm",
+        "scenario": "packaged RDF engine missing during book resolution"
+      },
+      "results": {
+        "webui": { "ok": false, "code": "RDF_ENGINE_NOT_FOUND" },
+        "cli": { "ok": false, "code": "RDF_ENGINE_NOT_FOUND" },
+        "node": { "ok": false, "code": "RDF_ENGINE_NOT_FOUND" }
+      }
+    },
+    {
+      "capability": "TX-BOOK-001",
+      "proof": "node/test/transaction-books.test.mjs",
+      "input": {
+        "fixture": "node/test/fixtures/transaction-books.json",
+        "engine": "rdf_shapes_wasm_bg.wasm",
+        "scenario": "packaged RDF engine incompatible during book resolution"
+      },
+      "results": {
+        "webui": { "ok": false, "code": "RDF_ENGINE_INCOMPATIBLE" },
+        "cli": { "ok": false, "code": "RDF_ENGINE_INCOMPATIBLE" },
+        "node": { "ok": false, "code": "RDF_ENGINE_INCOMPATIBLE" }
+      }
+    },
+    {
+      "capability": "TX-BOOK-001",
+      "proof": "node/test/transaction-books.test.mjs",
+      "input": {
+        "fixture": "node/test/fixtures/transaction-books.json",
+        "engine": "rdf_shapes_wasm.js",
+        "scenario": "packaged RDF engine execution failure during book resolution"
+      },
+      "results": {
+        "webui": { "ok": false, "code": "RDF_ENGINE_EXECUTION" },
+        "cli": { "ok": false, "code": "RDF_ENGINE_EXECUTION" },
+        "node": { "ok": false, "code": "RDF_ENGINE_EXECUTION" }
+      }
+    },
+    {
+      "capability": "TX-BOOK-001",
+      "proof": "node/test/transaction-books.test.mjs",
+      "input": {
+        "fixture": "node/test/fixtures/transaction-books.json",
+        "engine": "rdf_shapes_wasm.js",
+        "scenario": "packaged RDF engine protocol failure during book resolution"
+      },
+      "results": {
+        "webui": { "ok": false, "code": "RDF_ENGINE_PROTOCOL" },
+        "cli": { "ok": false, "code": "RDF_ENGINE_PROTOCOL" },
+        "node": { "ok": false, "code": "RDF_ENGINE_PROTOCOL" }
+      }
+    }
+  ]
+}

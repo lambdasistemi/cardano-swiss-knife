@@ -108,6 +108,53 @@ check_transaction_host_delegation() {
   fi
 }
 
+# Direct engine/protocol bypass: only the two designated engine wrappers
+# (node/src/transaction-engine.js for the ledger inspector and
+# node/src/rdf-engine.js for the RDF engine) may read, compile, or instantiate a
+# WASM engine or import the WASI shim. Any other CLI or Node host file that
+# touches a .wasm artifact, WebAssembly.compile/instantiate, or the WASI shim is
+# a direct engine bypass and must be rejected.
+check_direct_engine_bypass() {
+  local root="$1"
+  local host="$root/cli" node="$root/node/src"
+  local -a allowed=(
+    "$root/node/src/transaction-engine.js"
+    "$root/node/src/rdf-engine.js"
+  )
+  local match
+  while IFS= read -r match; do
+    local skip=0 allowed_file
+    for allowed_file in "${allowed[@]}"; do
+      [[ "$match" == "$allowed_file" ]] && skip=1 && break
+    done
+    [[ "$skip" == "1" ]] && continue
+    fail "CLI/Node host must not bypass the shared engine wrappers with a direct engine/protocol dependency: ${match#"$root"/}"
+  done < <(
+    find "$host" "$node" -type f \( -name '*.js' -o -name '*.mjs' \) -print0 \
+      | xargs -0 -r rg -l -e 'WebAssembly\.(compile|instantiate)' -e 'browser_wasi_shim' -e '\.wasm' \
+      | sort -u
+  )
+}
+
+# Silent-fallback behavior: a host must never turn an engine/provider failure
+# into a semantic success. This is deliberately a behavior-shaped scan, not a
+# prose-marker ban: it rejects a try/catch around an engine/provider operation
+# whose catch returns `{ ok: true, value: ... }`, while cleanup-only catches and
+# catch/rethrow handling remain valid.
+check_silent_fallback() {
+  local root="$1"
+  local -a surfaces=(
+    "$root/cli"
+    "$root/node/src/commands"
+  )
+  local surface
+  for surface in "${surfaces[@]}"; do
+    if rg -n -U -i -P 'try\s*\{[^{}]*\b(?:await\s+)?(?:[[:alnum:]_$.]*(?:engine|provider)[[:alnum:]_$.]*|runTransactionOperation|runLedgerOperation|resolveRdf)\s*\([^{};]*\)[^{}]*\}\s*catch\s*(?:\([^)]*\))?\s*\{[^{}]*\breturn\s+\{\s*ok\s*:\s*true\b' "$surface"; then
+      fail "CLI/Node host must fail hard after an engine/provider failure; silent fallback must not return a semantic success/value: ${surface#"$root"/}"
+    fi
+  done
+}
+
 check_local_provider_context_boundary() {
   local root="$1"
   local cli="$root/cli/csk.mjs" node="$root/node/src/index.js" webui="$root/docs/inspector/src/Provider.purs"
@@ -146,6 +193,8 @@ check_tree() {
   check_semantic_dependencies "$1"
   check_host_ownership "$1"
   check_transaction_host_delegation "$1"
+  check_direct_engine_bypass "$1"
+  check_silent_fallback "$1"
   check_local_provider_context_boundary "$1"
   check_documentation_anchors "$1"
 }
@@ -158,6 +207,8 @@ run_negative_self_tests() {
   mkdir -p "$fixture_root/docs/architecture" "$fixture_root/docs/inspector" "$fixture_root/cli" "$fixture_root/node/src/commands"
   cp -R "$repo_root/lib" "$fixture_root/lib"
   cp -R "$repo_root/docs/inspector/src" "$fixture_root/docs/inspector/src"
+  cp "$repo_root/cli/csk.mjs" "$fixture_root/cli/csk.mjs"
+  cp "$repo_root/node/src/index.js" "$fixture_root/node/src/index.js"
   chmod -R u+w "$fixture_root/lib" "$fixture_root/docs/inspector/src"
   cp "$repo_root/docs/architecture/system.md" "$fixture_root/docs/architecture/system.md"
   cp "$repo_root/package.json" "$fixture_root/package.json"
@@ -246,6 +297,44 @@ run_negative_self_tests() {
     fail "negative fixture emitted the wrong direct-ledger-route diagnostic: $duplicate_output"
   rm "$fixture_root/cli/injected-ledger-route.mjs"
 
+  # Direct engine/protocol bypass: a host file that instantiates a WASM engine
+  # directly (outside the two designated engine wrappers) must be rejected.
+  printf '%s\n' 'import { WASI } from "@bjorn3/browser_wasi_shim"; const m = await WebAssembly.compile(bytes);' > "$fixture_root/node/src/injected-engine-bypass.mjs"
+  if duplicate_output="$(check_tree "$fixture_root" 2>&1)"; then
+    fail "negative fixture unexpectedly accepted a direct host engine bypass"
+  fi
+  [[ "$duplicate_output" == *'direct engine/protocol'* ]] ||
+    fail "negative fixture emitted the wrong engine-bypass diagnostic: $duplicate_output"
+  rm "$fixture_root/node/src/injected-engine-bypass.mjs"
+
+  printf '%s\n' 'const bytes = await readFile(new URL("./cardano-addresses.wasm", import.meta.url));' > "$fixture_root/cli/injected-wasm.mjs"
+  if duplicate_output="$(check_tree "$fixture_root" 2>&1)"; then
+    fail "negative fixture unexpectedly accepted a direct host wasm reference"
+  fi
+  [[ "$duplicate_output" == *'direct engine/protocol'* ]] ||
+    fail "negative fixture emitted the wrong wasm-bypass diagnostic: $duplicate_output"
+  rm "$fixture_root/cli/injected-wasm.mjs"
+
+  # Silent-fallback behavior: an engine catch that returns a semantic success
+  # must be rejected even when it contains no forbidden prose marker.
+  printf '%s\n' 'try { return await engineInspect(tx); } catch { return { ok: true, value: {} }; }' > "$fixture_root/node/src/commands/injected-fallback.mjs"
+  if duplicate_output="$(check_tree "$fixture_root" 2>&1)"; then
+    fail "negative fixture unexpectedly accepted silent-fallback behavior"
+  fi
+  [[ "$duplicate_output" == *'silent fallback'* ]] ||
+    fail "negative fixture emitted the wrong silent-fallback diagnostic: $duplicate_output"
+  rm "$fixture_root/node/src/commands/injected-fallback.mjs"
+
+  # Cleanup-only catches and catch/rethrow handling preserve the engine failure
+  # and must remain accepted; the rule is about semantic substitution, not the
+  # spelling of a catch block.
+  printf '%s\n' 'try { return await engineInspect(tx); } catch (error) { cleanup(error); throw error; }' > "$fixture_root/node/src/commands/accepted-rethrow.mjs"
+  printf '%s\n' 'await closeHandle().catch(() => {});' > "$fixture_root/node/src/commands/accepted-cleanup.mjs"
+  if ! duplicate_output="$(check_tree "$fixture_root" 2>&1)"; then
+    fail "negative fixture incorrectly rejected legitimate cleanup/rethrow handling: $duplicate_output"
+  fi
+  rm "$fixture_root/node/src/commands/accepted-rethrow.mjs" "$fixture_root/node/src/commands/accepted-cleanup.mjs"
+
   printf '%s\n' '    "cbor-x": "fixture-only"' >> "$fixture_root/package.json"
   if dependency_output="$(check_tree "$fixture_root" 2>&1)"; then
     fail "negative fixture unexpectedly accepted forbidden semantic dependency"
@@ -262,6 +351,10 @@ run_negative_self_tests() {
   echo "architecture boundary: negative fixture rejected host Plutus fallback"
   echo "architecture boundary: negative fixture rejected host blake2b fallback"
   echo "architecture boundary: negative fixture rejected direct host ledger routing"
+  echo "architecture boundary: negative fixture rejected direct host engine bypass"
+  echo "architecture boundary: negative fixture rejected direct host wasm reference"
+  echo "architecture boundary: negative fixture rejected semantic success from an engine catch"
+  echo "architecture boundary: negative fixture accepted cleanup-only and catch/rethrow handling"
   echo "architecture boundary: negative fixture rejected forbidden semantic dependency"
 }
 
