@@ -32,6 +32,9 @@ module Cardano.Provider
 
 import Prelude
 
+import Cardano.Address.Bech32 as Bech32
+import Cardano.Address.Hex as Hex
+import Cardano.Codec.Bech32.Prefixes as Prefixes
 import Cardano.Transaction.Entry as Entry
 import Control.Promise (Promise, fromAff, toAffE)
 import Data.Either (Either(..))
@@ -212,7 +215,7 @@ resolveProducerTxContext provider network credential canFetchProducerTxs inspect
 resolveProducerTxContextWith :: Transport -> Provider -> Network -> String -> Boolean -> String -> Aff String
 resolveProducerTxContextWith transport provider network credential canFetchProducerTxs inspectionResponse =
   toAffE
-    ( resolveProducerTxContextImpl
+    ( resolveProducerTxContextWithdrawalsImpl
         (resolutionProvider provider)
         (producerTxSource provider)
         inspectionResponse
@@ -220,7 +223,48 @@ resolveProducerTxContextWith transport provider network credential canFetchProdu
         (fromAff (fetchValidationContextWithTransport transport provider network credential))
         (not (needsKey provider) || credential /= "")
         canFetchProducerTxs
+        (encodeRewardAccountBech32 network)
+        (\stakeAddress -> fromAff (fetchAccountStateWithTransport transport provider network credential stakeAddress))
     )
+
+encodeRewardAccountBech32 :: Network -> String -> { ok :: Boolean, value :: String, error :: String }
+encodeRewardAccountBech32 network rewardAccountHex = case Hex.fromHex rewardAccountHex of
+  Left err -> { ok: false, value: "", error: err }
+  Right bytes -> { ok: true, value: Bech32.encode (stakePrefix network) bytes, error: "" }
+
+stakePrefix :: Network -> String
+stakePrefix = case _ of
+  Mainnet -> Prefixes.stake
+  Preprod -> Prefixes.stake_test
+  Preview -> Prefixes.stake_test
+
+accountRequest :: Provider -> Network -> String -> String -> HttpRequest
+accountRequest provider network credential stakeAddress = case provider of
+  Blockfrost -> { url: blockfrostBase network <> "/accounts/" <> stakeAddress, method: "GET", headers: [ { name: "project_id", value: credential } ], body: Nothing }
+  Koios -> { url: koiosBase network <> "/account_info", method: "POST", headers: koiosHeaders credential, body: Just { encoding: "text", value: "{\"_stake_addresses\":[\"" <> stakeAddress <> "\"]}" } }
+
+fetchAccountStateWithTransport :: Transport -> Provider -> Network -> String -> String -> Aff String
+fetchAccountStateWithTransport transport provider network credential stakeAddress = do
+  response <- runRequest transport provider "account state" credential (accountRequest provider network credential stakeAddress)
+  case response of
+    Left err -> throwProviderError credential err
+    Right httpResponse ->
+      let
+        decoded = decodeAccountStateImpl (resolutionProvider provider) stakeAddress httpResponse.body
+      in
+        if decoded.ok then pure (encodeAccountStateResult decoded.balance)
+        else throwError (error ("[" <> withdrawalErrorCode decoded.status <> "] " <> redactCredential credential decoded.error))
+
+withdrawalErrorCode :: String -> String
+withdrawalErrorCode = case _ of
+  "missing" -> "WITHDRAWAL_MISSING"
+  "unregistered" -> "WITHDRAWAL_UNREGISTERED"
+  "mismatched" -> "WITHDRAWAL_MISMATCHED"
+  "duplicate" -> "WITHDRAWAL_DUPLICATE"
+  _ -> "WITHDRAWAL_MALFORMED"
+
+encodeAccountStateResult :: String -> String
+encodeAccountStateResult balance = "{\"balance_lovelace\":\"" <> balance <> "\"}"
 
 fetchTxCborWithTransport :: Transport -> Provider -> Network -> String -> String -> Aff String
 fetchTxCborWithTransport transport provider network credential txHash = do
@@ -347,4 +391,15 @@ foreign import decodeTxCbor :: String -> { ok :: Boolean, value :: String, error
 foreign import decodeSubmissionReceipt :: String -> { ok :: Boolean, txId :: String, error :: String }
 foreign import decodeValidationContext :: String -> String -> String -> String -> { ok :: Boolean, network :: String, slot :: String, epoch :: String, protocolParameters :: String, source :: String, error :: String }
 foreign import encodeValidationContext :: ValidationContext -> String
-foreign import resolveProducerTxContextImpl :: String -> String -> String -> (String -> Effect (Promise String)) -> Effect (Promise String) -> Boolean -> Boolean -> Effect (Promise String)
+foreign import decodeAccountStateImpl :: String -> String -> String -> { ok :: Boolean, status :: String, balance :: String, error :: String }
+foreign import resolveProducerTxContextWithdrawalsImpl
+  :: String
+  -> String
+  -> String
+  -> (String -> Effect (Promise String))
+  -> Effect (Promise String)
+  -> Boolean
+  -> Boolean
+  -> (String -> { ok :: Boolean, value :: String, error :: String })
+  -> (String -> Effect (Promise String))
+  -> Effect (Promise String)
