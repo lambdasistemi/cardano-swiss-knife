@@ -22,6 +22,9 @@ const transactionCbor = (await readFile(transactionFixture, "utf8").catch((error
 })).trim();
 const textEnvelope = JSON.stringify({ type: "Tx ConwayEra", description: "Ledger Cddl Format", cborHex: transactionCbor });
 const witnessFixture = JSON.parse(await readFile(new URL("./fixtures/transaction-witnesses.json", import.meta.url), "utf8"));
+const amaruBook = await readFile(new URL("./fixtures/tx-review-amaru-book.ttl", import.meta.url), "utf8");
+const amaruGolden = await readFile(new URL("./fixtures/tx-review-amaru.golden.txt", import.meta.url), "utf8");
+const ledgerFixture = JSON.parse(await readFile(new URL("./fixtures/transaction-ledger.json", import.meta.url), "utf8"));
 const runRaw = (args, input = "", inheritedFd, env) => new Promise((resolve) => {
   const child = spawn(process.execPath, [cli.pathname, ...args], { env: { ...process.env, ...env }, stdio: inheritedFd === undefined ? ["pipe", "pipe", "pipe"] : ["pipe", "pipe", "pipe", "pipe"] });
   let stdout = ""; let stderr = "";
@@ -598,6 +601,139 @@ test("migrates an encrypted amaruTreasuryWitnessVault address-xsk identity and a
     assert.equal(guardedAttach.code, 0, guardedAttach.stderr);
     const captured = await readFile(capture, "utf8");
     for (const value of [witnessFixture.signingKey, witnessFixture.nonTargetSigningKey, inputPassphrase, passphrase, secret]) assert.doesNotMatch(captured, new RegExp(value));
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("renders the deterministic offline Amaru transaction review with book resolutions and an incomplete preflight", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "csk-cli-tx-review-"));
+  const raw = join(dir, "transaction.cbor");
+  const book = join(dir, "amaru-book.ttl");
+  const guard = join(dir, "network-denied.mjs");
+  const capture = join(dir, "calls.json");
+  try {
+    await Promise.all([
+      writeFile(raw, `${transactionCbor}\n`),
+      writeFile(book, amaruBook),
+      writeFile(guard, `import { writeFileSync } from "node:fs"; const calls = []; globalThis.fetch = async (url) => { calls.push({ url }); return { status: 401, text: async () => "denied" }; }; process.on("exit", () => writeFileSync(process.env.CSK_TX_REVIEW_CAPTURE, JSON.stringify({ calls })));`),
+    ]);
+    const guarded = { NODE_OPTIONS: `--import ${new URL(`file://${guard}`).href}`, CSK_TX_REVIEW_CAPTURE: capture };
+    const args = ["tx", "review", "--tx-file", raw, "--book", book];
+    const first = await run(args, "", undefined, guarded);
+    assert.equal(first.code, 0, `${first.stderr}${first.stdout}`);
+    assert.equal(first.stdout, amaruGolden);
+    const second = await run(args, "", undefined, guarded);
+    assert.equal(second.code, 0, second.stderr);
+    assert.equal(second.stdout, first.stdout, "two identical offline invocations must render byte-identical stdout");
+    const recorded = JSON.parse(await readFile(capture, "utf8"));
+    assert.deepEqual(recorded.calls, [], "offline tx review must make no provider request");
+    const rejectsJson = await run([...args, "--output", "json"]);
+    assert.equal(rejectsJson.code, 2, "tx review is human-only and must reject --output json");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("enforces tx review's exact --tx-file surface and typed malformed transaction/book failures", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "csk-cli-tx-review-usage-"));
+  const raw = join(dir, "transaction.cbor");
+  const badCbor = join(dir, "bad.cbor");
+  const invalidBook = join(dir, "invalid-book.json");
+  try {
+    await Promise.all([
+      writeFile(raw, `${transactionCbor}\n`),
+      writeFile(badCbor, "not-cbor\n"),
+      writeFile(invalidBook, `${JSON.stringify({ kind: "amaru.book.bundle.v1", books: {} })}\n`),
+    ]);
+    const missingSource = await run(["tx", "review"]);
+    assert.equal(missingSource.code, 2, missingSource.stderr);
+    const duplicateTxFile = await run(["tx", "review", "--tx-file", raw, "--tx-file", raw]);
+    assert.equal(duplicateTxFile.code, 2, "tx review must accept exactly one --tx-file");
+    const cborHexRejected = await run(["tx", "review", "--cbor-hex", transactionCbor]);
+    assert.equal(cborHexRejected.code, 2, "tx review must accept exactly --tx-file, not --cbor-hex");
+    const txHashRejected = await run(["tx", "review", "--tx-hash", "a".repeat(64), "--provider", "blockfrost", "--network", "mainnet"]);
+    assert.equal(txHashRejected.code, 2, "tx review must not accept --tx-hash sources");
+    const badTx = await run(["tx", "review", "--tx-file", badCbor]);
+    assert.equal(badTx.code, 3, badTx.stderr);
+    const missingBook = await run(["tx", "review", "--tx-file", raw, "--book", "/missing/book.ttl"]);
+    assert.equal(missingBook.code, 7, missingBook.stderr);
+    const invalidBookRejected = await run(["tx", "review", "--tx-file", raw, "--book", invalidBook]);
+    assert.equal(invalidBookRejected.code, 7, invalidBookRejected.stderr);
+    assert.match(invalidBookRejected.stderr, /unsupported JSON kind/, "an invalid book document must fail closed as BOOK_IMPORT, not just an unreadable path");
+    const mismatchedProvider = await run(["tx", "review", "--tx-file", raw, "--provider", "blockfrost"]);
+    assert.equal(mismatchedProvider.code, 2, "tx review must require paired --provider and --network");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("composes evidence from repeated --book across two distinct labeled books", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "csk-cli-tx-review-books-"));
+  const raw = join(dir, "transaction.cbor");
+  const bookA = join(dir, "book-a.ttl");
+  const bookB = join(dir, "book-b.ttl");
+  const secondBookTurtle = `@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+<urn:cardano:id:StakeKey:4c7889c658ef4f491a34cf79c35a2e0fe6b0d1b0a856fb9580f2d9c3> rdfs:label "Amaru signer stake key" .
+`;
+  try {
+    await Promise.all([
+      writeFile(raw, `${transactionCbor}\n`),
+      writeFile(bookA, amaruBook),
+      writeFile(bookB, secondBookTurtle),
+    ]);
+    const result = await run(["tx", "review", "--tx-file", raw, "--book", bookA, "--book", bookB]);
+    assert.equal(result.code, 0, result.stderr);
+    assert.match(result.stdout, /Amaru treasury signer/, "first book's resolution must be present");
+    assert.match(result.stdout, /Amaru signer stake key/, "second book's resolution must be present");
+    assert.match(result.stdout, /4c7889c658ef4f491a34cf79c35a2e0fe6b0d1b0a856fb9580f2d9c3/, "raw identifier must remain visible alongside the label");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("proves the provider-backed complete Conway ledger preflight preserves the ledger verdict", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "csk-cli-tx-review-provider-"));
+  const raw = join(dir, "complete-transaction.cbor");
+  const vault = join(dir, "credentials.age");
+  const capture = join(dir, "calls.json");
+  const guard = join(dir, "guard.mjs");
+  const passphrase = "tx review provider vault passphrase";
+  const secret = "CSK_TX_REVIEW_BLOCKFROST_SECRET";
+  try {
+    const ctx = ledgerFixture.complete.options.context;
+    await Promise.all([
+      writeFile(raw, `${ledgerFixture.complete.transactionCbor}\n`),
+      writeFile(vault, await encryptVault(passphrase, { cardanoSwissKnifeVault: { version: 1, entries: [
+        { id: "blockfrost", kind: "blockfrost-project-id", label: "blockfrost", value: secret, createdAt: "2026-07-23T00:00:00.000Z" },
+      ] } })),
+      writeFile(guard, `
+        import { writeFileSync } from "node:fs";
+        const ctx = ${JSON.stringify(ctx)};
+        const calls = [];
+        const respond = (status, body) => ({ status, text: async () => typeof body === "string" ? body : JSON.stringify(body) });
+        globalThis.fetch = async (url) => {
+          calls.push({ url });
+          if (url.includes("/blocks/latest")) return respond(200, { slot: Number(ctx.slot), epoch: Number(ctx.epoch) });
+          if (url.includes("/epochs/latest/parameters")) return respond(200, ctx.protocol_parameters);
+          const match = url.match(/\\/txs\\/([0-9a-f]+)\\/cbor$/);
+          if (match) { const producer = ctx.producer_txs[match[1]]; return producer ? respond(200, { cbor: producer.tx_cbor }) : respond(404, "not found"); }
+          return respond(404, "unhandled");
+        };
+        process.on("exit", () => writeFileSync(process.env.CSK_TX_REVIEW_CAPTURE, JSON.stringify({ calls })));
+      `),
+    ]);
+    const guarded = { NODE_OPTIONS: `--import ${new URL(`file://${guard}`).href}`, CSK_TX_REVIEW_CAPTURE: capture };
+    const args = ["tx", "review", "--tx-file", raw, "--provider", "blockfrost", "--network", "mainnet", "--vault", vault, "--vault-entry", "blockfrost", "--passphrase-fd", "3"];
+    const result = await run(args, "", `${passphrase}\n`, guarded);
+    assert.equal(result.code, 0, `${result.stderr}${result.stdout}`);
+    assert.match(result.stdout, /Ledger preflight: completed/);
+    assert.match(result.stdout, new RegExp(`Verdict: ${ledgerFixture.expected.validationStatuses.valid}`));
+    assert.doesNotMatch(result.stdout, /incomplete/);
+    for (const value of [secret, passphrase]) assert.doesNotMatch(`${result.stdout}${result.stderr}`, new RegExp(value));
+    const recorded = JSON.parse(await readFile(capture, "utf8"));
+    assert.ok(recorded.calls.some((call) => call.url.includes("/blocks/latest")), "provider-backed review must resolve validation context");
+    assert.ok(recorded.calls.filter((call) => call.url.includes("/epochs/latest/parameters")).length === 1, "context must be resolved once and reused across composed operations");
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

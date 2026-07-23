@@ -1,0 +1,48 @@
+Transaction: a213c84030a6ae1c05c9443b07d1b853b48637d769eec188af9ff3258b0713b1
+Inputs: 11 regular / 4 reference
+Outputs: 2
+Fee: 1527153 lovelace
+Validity: none - 192815425
+
+Outputs:
+  [0] recipient/script 3132201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0d32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0d 611069353175 lovelace
+      assets: c48cbb3d5e57ed56e276bc45f99ab39abe94e6cd7ac39fb402da47ad.0014df105553444d=19019421791
+  [1] change 018bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c14c7889c658ef4f491a34cf79c35a2e0fe6b0d1b0a856fb9580f2d9c3 75884469 lovelace
+      assets: none
+
+Collateral: total 2290730 lovelace / return 75120892 lovelace
+
+Required signers:
+  8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1 (Amaru treasury signer) - missing
+
+Metadata claims:
+  reorganize: Treasury reorganize: merge UTxOs into one continuing output
+    Routine treasury maintenance / destination treasury / metadata label 1694 / self-declared
+
+Book resolutions:
+  38c627d45835744a2d6c727124f2b5852e5564aeab3f608e0e84ea6d -> Amaru treasury journal
+  a64d1b9e1aeffe54056034d84977061b45a92691efc282fbee3fc094 -> Amaru treasury script [overlay:Identifier]
+  8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1 -> Amaru treasury signer [overlay:Identifier]
+
+Ledger preflight: incomplete
+  Missing:
+  body.inputs.#0 source_output - Supply producer transaction CBOR for the referenced transaction input.
+  body.inputs.#1 source_output - Supply producer transaction CBOR for the referenced transaction input.
+  body.inputs.#2 source_output - Supply producer transaction CBOR for the referenced transaction input.
+  body.inputs.#3 source_output - Supply producer transaction CBOR for the referenced transaction input.
+  body.inputs.#4 source_output - Supply producer transaction CBOR for the referenced transaction input.
+  body.inputs.#5 source_output - Supply producer transaction CBOR for the referenced transaction input.
+  body.inputs.#6 source_output - Supply producer transaction CBOR for the referenced transaction input.
+  body.inputs.#7 source_output - Supply producer transaction CBOR for the referenced transaction input.
+  body.inputs.#8 source_output - Supply producer transaction CBOR for the referenced transaction input.
+  body.inputs.#9 source_output - Supply producer transaction CBOR for the referenced transaction input.
+  body.inputs.#10 source_output - Supply producer transaction CBOR for the referenced transaction input.
+  body.reference_inputs.#0 source_output - Supply producer transaction CBOR for the referenced transaction input.
+  body.reference_inputs.#1 source_output - Supply producer transaction CBOR for the referenced transaction input.
+  body.reference_inputs.#2 source_output - Supply producer transaction CBOR for the referenced transaction input.
+  body.reference_inputs.#3 source_output - Supply producer transaction CBOR for the referenced transaction input.
+  args.context.network network - Supply the network for ledger validation.
+  args.context.slot slot - Supply the current slot for ledger validation.
+  args.context.epoch epoch - Supply the current epoch for ledger validation.
+  args.context.protocol_parameters protocol_parameters - Supply a complete Conway protocol-parameter object.
+  args.context.cert_state cert_state - Supply account state; rewards entries needed for the listed withdrawals.
