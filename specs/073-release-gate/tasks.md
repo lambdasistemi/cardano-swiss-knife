@@ -6,9 +6,9 @@
 
 ## Slice 1 — Capability and engine manifests
 
-- [ ] T001 Add versioned capability and engine manifest data with all required parity, exclusion, provenance, protocol, responsibility, and embedded-Plutus fields.
-- [ ] T002 Add a focused executable checker with negative tests for schema gaps, missing host/source anchors, duplicate IDs, and flake revision/hash drift.
-- [ ] T003 Record focused and full-gate evidence, obtain navigator verification, and commit as `feat(release): add capability and engine manifests`.
+- [X] T001 Add versioned capability and engine manifest data with all required parity, exclusion, provenance, protocol, responsibility, and embedded-Plutus fields.
+- [X] T002 Add a focused executable checker with negative tests for schema gaps, missing host/source anchors, duplicate IDs, and flake revision/hash drift.
+- [X] T003 Record focused and full-gate evidence, obtain navigator verification, and commit as `feat(release): add capability and engine manifests`.
 
 ## Slice 2 — Parity and architecture release gates
 

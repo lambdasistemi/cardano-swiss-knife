@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 1,
+  "description": "Versioned engine manifest for the cardano-swiss-knife release. Each engine records its provenance, the exact flake.lock pin it must match, its protocol contract, responsibility, packaged artifact path, and fail-hard/no-fallback behavior. The release checker verifies revision and narHash against the top-level flake.lock on every run.",
+  "engines": [
+    {
+      "id": "cardano-addresses",
+      "artifact": "cardano-addresses.wasm",
+      "sourceRepository": "github:paolino/cardano-addresses",
+      "flakeInput": "cardano-addresses",
+      "revision": "7a4f2b572e1aaa735cbcf93e3070f3beeda48b0f",
+      "narHash": "sha256-ZTD/BHZBzJXvVSByGDbNGxhksqclAS0R5MW7N+TiLMc=",
+      "owningLanguage": "Haskell",
+      "protocolContract": "wasm32-wasi reactor; invoked through the Cardano.Address.* PureScript FFI for address, mnemonic, key-derivation, script, and payload signing semantics.",
+      "responsibility": "Address and cryptographic semantics: bech32/base58 address inspection, BIP-39 mnemonic generation/validation, Shelley/Icarus/Byron key derivation and address construction, native-script analysis, and payload signing/verification.",
+      "packagedPath": "node/dist/cardano-addresses.wasm",
+      "failHard": "Engine load, compatibility, execution, and protocol failures surface as typed ENGINE_* errors; no host-side substitute for address/crypto semantics is permitted.",
+      "noFallback": true
+    },
+    {
+      "id": "cardano-ledger-inspector",
+      "artifact": "wasm-tx-inspector.wasm",
+      "sourceRepository": "github:lambdasistemi/cardano-ledger-inspector",
+      "flakeInput": "cardano-ledger-inspector",
+      "revision": "cd346f3577dc243df09bf4b141b91d9470c5ec00",
+      "narHash": "sha256-Bd0BZ+hRN6/A5KUFvuMz7hMcZZ8NC7tG+HwjMOnecFs=",
+      "owningLanguage": "Haskell",
+      "protocolContract": "wasm32-wasi reactor speaking the tx-inspector JSON protocol over stdin/stdout ({ tx_cbor, op, args } -> { stdout, stderr, exitOk }); driven by runInspector/runLedgerOperation for the tx.* operation family.",
+      "responsibility": "Conway ledger semantics: transaction CBOR decoding, inspection/browse/identify/intent, ledger validation, witness planning and attachment, and script evaluation.",
+      "packagedPath": "node/dist/wasm-tx-inspector.wasm",
+      "embeddedPlutus": {
+        "description": "The pinned Haskell build embeds the Plutus evaluator libraries transitively via the pinned cardano-ledger-wasm input (rev 5897e8da1c043eb53cdafa6ada9782b56c74b18e), whose build-depends include plutus-ledger-api together with cardano-ledger-api, cardano-ledger-conway, cardano-ledger-core, cardano-ledger-alonzo, cardano-ledger-shelley, cardano-ledger-mary, and cardano-ledger-binary, resolved from CHaP at the pinned index-state.",
+        "libraries": [
+          "plutus-ledger-api",
+          "cardano-ledger-api",
+          "cardano-ledger-conway",
+          "cardano-ledger-core",
+          "cardano-ledger-alonzo",
+          "cardano-ledger-shelley",
+          "cardano-ledger-mary",
+          "cardano-ledger-binary"
+        ],
+        "separatePlutusWasiArtifact": false,
+        "note": "There is no separate Plutus WASI artifact; Plutus script execution is embedded in wasm-tx-inspector.wasm and no alternate Plutus artifact may be substituted."
+      },
+      "failHard": "Engine load, compatibility, execution, and protocol failures surface as typed ENGINE_* errors; no host-side substitute for ledger/CBOR/validation/Plutus semantics is permitted.",
+      "noFallback": true
+    },
+    {
+      "id": "rdf-shapes-wasm",
+      "artifact": "rdf_shapes_wasm_bg.wasm",
+      "sourceRepository": "github:lambdasistemi/rdf-shapes-wasm",
+      "flakeInput": "rdf-shapes-wasm",
+      "revision": "1240e4e58061836264d955b70c49c7195480f3b4",
+      "narHash": "sha256-/JbsZjn/9fnT6iVlRzh21+/LwWYsT8gHucqyGsi8H/w=",
+      "owningLanguage": "Rust",
+      "protocolContract": "wasm-bindgen ES module (@lambdasistemi/rdf-shapes-wasm, main rdf_shapes_wasm.js) loaded by Cardano.Transaction.Rdf.js / node/src/rdf-engine.js for SPARQL/SHACL resolution.",
+      "responsibility": "RDF/SPARQL/SHACL semantics: transaction RDF graph label resolution, book/blueprint resolution, and SHACL validation.",
+      "packagedPath": "node/dist/rdf_shapes_wasm_bg.wasm",
+      "failHard": "Engine load, compatibility, execution, and protocol failures surface as typed RDF_ENGINE_* errors; no host-side substitute for RDF/SPARQL/SHACL semantics is permitted.",
+      "noFallback": true
+    }
+  ]
+}
