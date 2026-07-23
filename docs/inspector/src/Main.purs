@@ -3,7 +3,7 @@ module Main (main) where
 import Prelude
 
 import Cardano.BookableIdentifier (isBookableIdentifierKind)
-import Cardano.Blueprint.Registry (bundledRegistryJson, isCatalogEntryLoaded, lookupCatalogEntry, parseCatalog)
+import Cardano.Blueprint.Registry (bundledRegistryJson, catalogEntriesForScriptHash, isCatalogEntryLoaded, lookupCatalogEntry, normalizeScriptHash, parseCatalog)
 import Cardano.Provider as SharedProvider
 import Cardano.Transaction.Entry (EntryStatus(..), TxEntry)
 import Cardano.Transaction.Ledger as Ledger
@@ -83,6 +83,7 @@ main = HA.runHalogenAff do
   net  <- liftEffect (Storage.getItem networkKey)
   route <- liftEffect Routing.currentRoute
   routeBase <- liftEffect Routing.currentBasePath
+  scriptHashScope <- liftEffect (normalizeScriptHash <$> Routing.currentScriptHashQuery)
   theme <- liftEffect Shell.initialTheme
   bookStore <- liftEffect BookStore.load
   let initialProv = case prov of
@@ -101,6 +102,7 @@ main = HA.runHalogenAff do
         , network: initialNetwork
         , route
         , routeBase
+        , scriptHashScope
         , theme
         , books: bookStore.books
         }
@@ -291,6 +293,7 @@ type State =
   , providerVaultLabelInput :: String
   , route :: Route
   , routeBase :: String
+  , scriptHashScope :: Maybe String
   , theme :: Theme.Theme
   }
 
@@ -351,6 +354,7 @@ type InitialKeys =
   , network :: Network
   , route :: Route
   , routeBase :: String
+  , scriptHashScope :: Maybe String
   , theme :: Theme.Theme
   , books :: Array BookStore.Book
   }
@@ -589,6 +593,7 @@ inspectorComponent initial =
         , providerVaultLabelInput: ""
         , route: initial.route
         , routeBase: initial.routeBase
+        , scriptHashScope: initial.scriptHashScope
         , theme: initial.theme
         }
     , render
@@ -1653,7 +1658,7 @@ inspectorComponent initial =
           [ classNames [ "panel", "library-catalog-panel" ]
           , mdSurface "books"
           ]
-          [ HH.div
+          ( [ HH.div
               [ classNames [ "panel-heading" ] ]
               [ HH.div_
                   [ HH.h2_ [ HH.text "Curated catalog" ]
@@ -1665,30 +1670,50 @@ inspectorComponent initial =
               , HH.attr (HH.AttrName "role") "alert"
               ]
               [ HH.text ("Failed to load bundled catalog: " <> err) ]
-          ]
+          ] )
       Right catalogEntries ->
-        HH.element (HH.ElemName "md-elevated-card")
+        let
+          scopedEntries = case state.scriptHashScope of
+            Just scriptHash -> catalogEntriesForScriptHash scriptHash catalogEntries
+            Nothing -> catalogEntries
+          scopeNotice = case state.scriptHashScope of
+            Just scriptHash ->
+              [ HH.div
+                  [ classNames [ "library-script-scope" ] ]
+                  [ HH.p_ [ HH.text "Showing blueprints for ", HH.code_ [ HH.text scriptHash ] ]
+                  , if Array.null scopedEntries then
+                      HH.p_ [ HH.text ("No blueprint for " <> scriptHash <> ".") ]
+                    else
+                      HH.text ""
+                  ]
+              ]
+            Nothing -> []
+        in HH.element (HH.ElemName "md-elevated-card")
           [ classNames [ "panel", "library-catalog-panel" ]
           , mdSurface "books"
           ]
-          [ HH.div
+          ( [ HH.div
               [ classNames [ "panel-heading" ] ]
               [ HH.div_
                   [ HH.h2_ [ HH.text "Curated catalog" ]
                   , HH.p_ [ HH.text "Build-pinned protocol blueprints from verified upstream repositories." ]
                   ]
               ]
-          , HH.div
+          ] <> scopeNotice <>
+          [ HH.div
               [ classNames [ "catalog-list" ] ]
-              (map (renderCatalogEntry state) catalogEntries)
-          ]
+              (map (renderCatalogEntry state) scopedEntries)
+          ] )
 
   renderCatalogEntry state entry =
     let
       loaded = isCatalogEntryLoaded entry state.books
+      matchesScope = case state.scriptHashScope of
+        Just scriptHash -> Array.elem scriptHash entry.onChainHashes
+        Nothing -> false
     in
       HH.div
-        [ classNames [ "catalog-entry" ] ]
+        [ classNames ([ "catalog-entry" ] <> if matchesScope then [ "catalog-entry--script-match" ] else []) ]
         [ HH.div
             [ classNames [ "catalog-entry-header" ] ]
             [ HH.h3
@@ -2625,6 +2650,7 @@ inspectorComponent initial =
       hasAddressIdentity = decodedRowHasAddressIdentity row
       resolvedName = decodedRowResolvedName state row
       isResolved = resolvedName /= ""
+      scriptDiscoveryHash = if isResolved then Nothing else decodedRowScriptHash row
       rowClasses =
         [ "decoded-tree-row", "decoded-tree-depth-" <> show row.depth ]
           <> (if hasChildren then [ "decoded-tree-row--group" ] else [])
@@ -2748,6 +2774,7 @@ inspectorComponent initial =
                             [ classNames typeClasses ]
                             [ HH.text row.kind ]
                          ]
+                      <> renderScriptDiscoveryLink state scriptDiscoveryHash
                   )
               , if isResolved || hasAddressIdentity then
                   HH.div
@@ -2888,6 +2915,36 @@ inspectorComponent initial =
     row.kind == "address"
       && row.annotationPredicate == "cardano:bech32"
       && row.annotationValue /= ""
+
+  decodedRowScriptHash row =
+    if row.kind == "script" || row.kind == "script_hash" then
+      firstScriptHash [ row.raw, row.value, row.annotationValue ]
+    else
+      Nothing
+
+  witnessScriptHash row =
+    Array.head (Array.mapMaybe scriptHashFromIdentifier row.identifierCandidates)
+
+  firstScriptHash values =
+    Array.head (Array.mapMaybe normalizeScriptHash values)
+
+  scriptHashFromIdentifier value =
+    let prefix = "urn:cardano:id:script:"
+    in
+      if StringCodeUnits.take (StringCodeUnits.length prefix) value == prefix then
+        normalizeScriptHash (StringCodeUnits.drop (StringCodeUnits.length prefix) value)
+      else
+        Nothing
+
+  renderScriptDiscoveryLink state = case _ of
+    Nothing -> []
+    Just scriptHash ->
+      [ HH.a
+          [ classNames [ "script-discovery-link" ]
+          , HP.href (state.routeBase <> "library?script_hash=" <> scriptHash)
+          ]
+          [ HH.text ("no blueprint for " <> scriptHash) ]
+      ]
 
   decodedTreeKindIcon row =
     if row.kind == "address" then "account_balance"
@@ -5049,6 +5106,7 @@ inspectorComponent initial =
   renderWitnessRowWithCopy state showCopy row =
     let
       resolvedName = resolutionNameForCandidates state row.identifierCandidates
+      scriptHash = if resolvedName == "" then witnessScriptHash row else Nothing
     in
       HH.div
         [ classNames [ "identity-row", "witness-row" ] ]
@@ -5076,7 +5134,7 @@ inspectorComponent initial =
             ]
         , HH.code_ [ HH.text row.value ]
         , if resolvedName == "" then
-            HH.text ""
+            HH.span_ (renderScriptDiscoveryLink state scriptHash)
           else
             HH.strong
               [ classNames [ "witness-resolved-name" ] ]

@@ -57,11 +57,11 @@ Owned files for the driver:
 - `docs/inspector/dist/styles.css`
 - `docs/inspector/tests/tx-identify.spec.mjs`
 
-- [ ] T690 Parse and normalize a valid 56-hex `script_hash` Library scope and ignore invalid values safely.
-- [ ] T691 Link unresolved Structure script/script_hash rows to the base-aware scoped Library and suppress resolved/non-script rows.
-- [ ] T692 Link unresolved Witness script identifier candidates to the same scoped Library and suppress resolved/non-script rows.
-- [ ] T693 Filter/highlight catalog matches and show an explicit no-match state while preserving freeform fallback.
-- [ ] T694 Prove root/subpath routing, Structure/Witness links, scope validation, resolved suppression, build, and browser behavior; commit one bisect-safe slice.
+- [X] T690 Parse and normalize a valid 56-hex `script_hash` Library scope and ignore invalid values safely.
+- [X] T691 Link unresolved Structure script/script_hash rows to the base-aware scoped Library and suppress resolved/non-script rows.
+- [X] T692 Link unresolved Witness script identifier candidates to the same scoped Library and suppress resolved/non-script rows.
+- [X] T693 Filter/highlight catalog matches and show an explicit no-match state while preserving freeform fallback.
+- [X] T694 Prove root/subpath routing, Structure/Witness links, scope validation, resolved suppression, build, and browser behavior; commit one bisect-safe slice.
 
 Forbidden scope: `gate.sh`, `specs/`, `docs/book-interchange.md`, `flake.lock`, Nix/bootstrap files, `FFI.Json`, `.github/`, git configuration, sibling-ticket files, and every file not listed above.
 

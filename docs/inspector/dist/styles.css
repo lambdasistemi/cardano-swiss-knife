@@ -1078,6 +1078,31 @@ summary.library-fallback-summary::-webkit-details-marker {
   border: 1px solid var(--md-sys-color-outline-variant, rgba(255, 255, 255, 0.1));
 }
 
+.catalog-entry--script-match,
+.library-script-scope {
+  border-color: var(--primary);
+}
+
+.library-script-scope {
+  padding: 10px 12px;
+  border: 1px solid;
+  border-radius: 8px;
+  background: var(--md-sys-color-primary-container, rgba(103, 80, 164, 0.16));
+}
+
+.library-script-scope p {
+  margin: 0;
+}
+
+.library-script-scope p + p {
+  margin-top: 6px;
+}
+
+.script-discovery-link {
+  color: var(--primary);
+  font-weight: 600;
+}
+
 .catalog-entry-header {
   display: flex;
   justify-content: space-between;

@@ -4,13 +4,15 @@ module Test.BlueprintRegistry
 
 import Prelude
 
-import Cardano.Blueprint.Registry (isCatalogBookForEntry, isCatalogEntryLoaded, lookupCatalogEntry, parseCatalog, parseCatalogWithMaps)
+import Cardano.Blueprint.Registry (catalogEntriesForScriptHash, isCatalogBookForEntry, isCatalogEntryLoaded, lookupCatalogEntry, normalizeScriptHash, parseCatalog, parseCatalogWithMaps)
 import Data.Array as Array
 import Data.Either (Either(..))
+import Data.Foldable (for_)
 import Data.Maybe (Maybe(..))
 import Effect (Effect)
 import Effect.Exception (throw)
 import Foreign.Object as Object
+import Data.String as String
 
 sampleRegistryJson :: String
 sampleRegistryJson =
@@ -59,6 +61,7 @@ runBlueprintRegistryTests = do
   testParseCatalogMissingJoin
   testParseCatalogMalformedArtifact
   testCatalogLookupAndIdentity
+  testScriptHashNormalizationAndCatalogLookup
 
 testParseCatalogSuccess :: Effect Unit
 testParseCatalogSuccess = do
@@ -245,3 +248,37 @@ testCatalogLookupAndIdentity = do
               case parseCatalog "not-json" of
                 Left _ -> pure unit
                 Right _ -> throw "Expected parseCatalog of invalid json to return Left"
+
+testScriptHashNormalizationAndCatalogLookup :: Effect Unit
+testScriptHashNormalizationAndCatalogLookup = do
+  let
+    scriptHash = "fa6a58bbe2d0ff05534431c8e2f0ef2cbdc1602a8456e4b13c8f3077"
+    pins = Object.singleton "sundaeswap-v3/pin.json" samplePinJson
+    blueprints = Object.singleton "sundaeswap-v3/plutus.json" samplePlutusJson
+    invalidHashes =
+      [ "fa6a58bbe2d0ff05534431c8e2f0ef2cbdc1602a8456e4b13c8f307"
+      , "fa6a58bbe2d0ff05534431c8e2f0ef2cbdc1602a8456e4b13c8f30770"
+      , "gggggggggggggggggggggggggggggggggggggggggggggggggggggggg"
+      ]
+
+  case normalizeScriptHash (String.toUpper scriptHash) of
+    Just normalized -> when (normalized /= scriptHash) do
+      throw "Expected an uppercase 56-hex script hash to normalize to lowercase"
+    Nothing -> throw "Expected an uppercase 56-hex script hash to be accepted"
+
+  for_ invalidHashes \invalidHash ->
+    case normalizeScriptHash invalidHash of
+      Nothing -> pure unit
+      Just _ -> throw ("Expected invalid script hash to be rejected: " <> invalidHash)
+
+  case parseCatalogWithMaps { registryJson: sampleRegistryJson, pins, blueprints } of
+    Left err -> throw ("Failed to parse catalog for script hash lookup test: " <> err)
+    Right entries -> do
+      let matches = catalogEntriesForScriptHash scriptHash entries
+      case matches of
+        [ entry ] -> when (entry.id /= "sundaeswap-v3") do
+          throw "Expected exact on-chain script hash lookup to return sundaeswap-v3"
+        _ -> throw "Expected exact on-chain script hash lookup to return exactly one catalog entry"
+
+      when (not (Array.null (catalogEntriesForScriptHash "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" entries))) do
+        throw "Expected an unknown valid script hash to return no catalog entries"

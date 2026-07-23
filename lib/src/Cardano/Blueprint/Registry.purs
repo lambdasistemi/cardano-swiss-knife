@@ -6,6 +6,8 @@ module Cardano.Blueprint.Registry
   , bundledRegistryJson
   , bundledPinsJson
   , bundledBlueprintsJson
+  , normalizeScriptHash
+  , catalogEntriesForScriptHash
   , lookupCatalogEntry
   , isCatalogBookForEntry
   , isCatalogEntryLoaded
@@ -19,6 +21,8 @@ import Data.Argonaut.Parser (jsonParser)
 import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
+import Data.String.CodeUnits as StringCodeUnits
+import Data.String.Common as String
 import Data.Traversable (traverse)
 import Foreign.Object (Object)
 import Foreign.Object as Object
@@ -153,6 +157,24 @@ extractHash targetBpId itemJson = do
 
 catalogBookId :: String -> String
 catalogBookId entryId = "catalog:" <> entryId
+
+normalizeScriptHash :: String -> Maybe String
+normalizeScriptHash value =
+  let
+    normalized = String.toLower value
+  in
+    if StringCodeUnits.length normalized == 56 && Array.all isHexChar (StringCodeUnits.toCharArray normalized) then
+      Just normalized
+    else
+      Nothing
+
+catalogEntriesForScriptHash :: String -> Array BlueprintCatalogEntry -> Array BlueprintCatalogEntry
+catalogEntriesForScriptHash scriptHash =
+  Array.filter (Array.elem scriptHash <<< _.onChainHashes)
+
+isHexChar :: Char -> Boolean
+isHexChar char =
+  (char >= '0' && char <= '9') || (char >= 'a' && char <= 'f')
 
 lookupCatalogEntry :: String -> Array BlueprintCatalogEntry -> Maybe BlueprintCatalogEntry
 lookupCatalogEntry targetId entries =

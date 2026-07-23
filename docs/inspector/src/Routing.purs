@@ -2,6 +2,7 @@ module Routing
   ( Route(..)
   , currentRoute
   , currentBasePath
+  , currentScriptHashQuery
   , routePath
   , pushRoute
   ) where
@@ -49,9 +50,13 @@ currentRoute = do
 currentBasePath :: Effect String
 currentBasePath = _basePath
 
+currentScriptHashQuery :: Effect String
+currentScriptHashQuery = _scriptHashQuery
+
 pushRoute :: String -> Route -> Effect Unit
 pushRoute basePath = _pushPath basePath <<< routePath
 
 foreign import _routeSuffix :: Effect String
 foreign import _basePath :: Effect String
+foreign import _scriptHashQuery :: Effect String
 foreign import _pushPath :: String -> String -> Effect Unit
