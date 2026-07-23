@@ -233,3 +233,32 @@ test("checker fails when a required capability is removed", () => {
   assert.notEqual(status, 0, "checker did not fail on a missing required capability");
   assert.match(output, /required capability|TX-SUBMIT-001|missing/i);
 });
+
+// The architecture-boundary release gate invokes `rg`. CI runs
+// `nix develop --quiet -c just ci` → `just release-gates` → that script, so the
+// default development shell must declare pkgs.ripgrep. Static inspection of
+// flake.nix is durable; live hermetic proof is the post-GREEN command-v rg.
+test("development shell supplies architecture gate tools", () => {
+  const flake = readFileSync(join(repoRoot, "flake.nix"), "utf8");
+  const boundary = readFileSync(
+    join(repoRoot, "scripts", "check-architecture-boundary.sh"),
+    "utf8",
+  );
+  assert.match(
+    boundary,
+    /^\s*rg\b/m,
+    "architecture boundary must invoke rg (release-gates dependency)",
+  );
+  const defaultShell = flake.match(
+    /devShells\.default\s*=\s*pkgs\.mkShell\s*\{[\s\S]*?packages\s*=\s*\[([\s\S]*?)\]/,
+  );
+  assert.ok(
+    defaultShell,
+    "flake.nix must declare devShells.default packages for nix develop / just ci",
+  );
+  assert.match(
+    defaultShell[1],
+    /^\s*pkgs\.ripgrep\s*$/m,
+    "development shell used by nix develop / just ci must declare pkgs.ripgrep for scripts/check-architecture-boundary.sh",
+  );
+});

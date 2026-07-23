@@ -124,6 +124,7 @@
               pkgs.esbuild
               pkgs.nodejs_22
               pkgs.just
+              pkgs.ripgrep
             ];
           };
         };
