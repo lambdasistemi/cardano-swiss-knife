@@ -31,6 +31,43 @@ Both are grouped by change type (Features, Bug Fixes, Documentation, and so
 on), so you can scan for anything relevant to the pages or workflows you
 rely on.
 
+## Verifying the single version authority
+
+<!-- release-docs:procedure:version-verify -->
+The version of record lives in root `package.json`. Verify the single
+version authority against every published surface:
+
+```bash
+# package.json is the authority
+node -p "require('./package.json').version"
+
+# CLI and Node must report the same value
+csk --version
+node -e "import('@lambdasistemi/cardano-swiss-knife').then(m => console.log(m.version))"
+```
+
+CLI, Node API, WebUI footer, npm package metadata, Nix package metadata,
+the git tag (`vX.Y.Z`), and the GitHub release title must all match. A
+mismatch means you are not on a consistent release — do not trust mixed
+artifacts.
+<!-- /release-docs:procedure:version-verify -->
+
+## Bundle checksum verification
+
+<!-- release-docs:procedure:checksum-verify -->
+Release artifacts include a published `SHA256SUMS` file next to the
+universal bundle on the GitHub release. After download:
+
+```bash
+sha256sum -c SHA256SUMS
+# or on systems without GNU coreutils:
+shasum -a 256 -c SHA256SUMS
+```
+
+Reject any bundle whose checksum does not match. Do not run unsigned or
+unlisted artifacts as if they were a published release.
+<!-- /release-docs:procedure:checksum-verify -->
+
 ## Verifying what is live
 
 Compare the version in the footer against the latest release:

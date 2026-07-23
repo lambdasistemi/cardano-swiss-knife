@@ -9,6 +9,41 @@ nix develop
 npm install
 ```
 
+## npm package (Node 22+)
+
+<!-- release-docs:procedure:npm-install -->
+Install the scoped public package with Node 22+ (see `package.json` `engines.node`):
+
+```bash
+npm install @lambdasistemi/cardano-swiss-knife
+```
+
+The package exposes:
+
+- the public Node API (`import { … } from "@lambdasistemi/cardano-swiss-knife"`)
+- the `csk` CLI binary (`package.json` `bin.csk` → `node/dist/csk.mjs`)
+- packaged WASM engines under `node/dist/`
+
+Prefer the published release tarball over ad-hoc copies of the worktree.
+<!-- /release-docs:procedure:npm-install -->
+
+## Nix package and app
+
+<!-- release-docs:procedure:nix-install -->
+Use the flake package attribute `packages.csk` (build/run selector `.#csk`;
+the conceptual output is `packages.${system}.csk`) and the matching app:
+
+```bash
+nix run .#csk -- --help
+nix build .#csk
+# or, when developing from a checked-out tree:
+nix run .#csk -- address inspect --address ADDR
+```
+
+The Nix package and the npm package share the same Node API surface and the
+same pinned engine artifacts. Do not mix engines from a different revision.
+<!-- /release-docs:procedure:nix-install -->
+
 ## Common commands
 
 ```bash

@@ -93,4 +93,9 @@ release-workflows:
   node --test node/test/release-workflows.test.mjs
   node scripts/check-release-workflows.mjs
 
-ci: check build haskell-quality check-vectors test test-playwright release-gates release-package release-version release-workflows
+release-docs:
+  node --test node/test/release-docs.test.mjs
+  node scripts/check-release-docs.mjs
+  just build-docs
+
+ci: check build haskell-quality check-vectors test test-playwright release-gates release-package release-version release-workflows release-docs

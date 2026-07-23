@@ -1,5 +1,17 @@
 # Releasing
 
+## Operator release path
+
+<!-- release-docs:procedure:release-operation -->
+Tagged publication is driven by release-please. After conventional commits land
+on `main`, the Release workflow opens or updates a release PR. Merging that PR
+creates the `vX.Y.Z` tag and GitHub release; the publish job then runs
+`npm publish` for the scoped package `@lambdasistemi/cardano-swiss-knife` and
+uploads the universal bundle plus `SHA256SUMS` to the GitHub release. The tag
+push also triggers the Pages workflow so the live workbench and manual match
+the same version. Operators do not cut tags by hand.
+<!-- /release-docs:procedure:release-operation -->
+
 ## Overview
 
 The model, in five steps:

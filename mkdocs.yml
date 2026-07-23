@@ -61,6 +61,10 @@ nav:
       - Usage: user/usage.md
       - Offline vault CLI: user/vault.md
       - Versions and releases: user/versions.md
+  - Reference:
+      - Capabilities: reference/capabilities.md
+      - Engines: reference/engines.md
+  - Troubleshooting: troubleshooting.md
   - Developer:
       - Workflows: dev/workflows.md
       - Releasing: dev/releasing.md

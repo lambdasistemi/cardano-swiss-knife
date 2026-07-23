@@ -39,10 +39,10 @@
 
 ## Slice 6 — Operator manual and architectural hazard
 
-- [ ] T019 Publish the generated/reviewed capability and engine reference mapping every parity surface and authoritative artifact.
-- [ ] T020 Document npm/Nix installation, commands/APIs, vault migration and credentials, outputs/errors, versions/checksums, and troubleshooting.
-- [ ] T021 Make host/engine ownership, embedded Plutus, semantic drift, fail-hard incompatibility, and no-fallback behavior conspicuous and executable through a docs contract.
-- [ ] T022 Wire strict docs proof into `just ci`, record focused/full-gate evidence, obtain navigator verification, and commit as `fix(docs): publish the release operator manual`.
+- [X] T019 Publish the generated/reviewed capability and engine reference mapping every parity surface and authoritative artifact.
+- [X] T020 Document npm/Nix installation, commands/APIs, vault migration and credentials, outputs/errors, versions/checksums, and troubleshooting.
+- [X] T021 Make host/engine ownership, embedded Plutus, semantic drift, fail-hard incompatibility, and no-fallback behavior conspicuous and executable through a docs contract.
+- [X] T022 Wire strict docs proof into `just ci`, record focused/full-gate evidence, obtain navigator verification, and commit as `fix(docs): publish the release operator manual`.
 
 ## Finalization — orchestrator-owned
 
