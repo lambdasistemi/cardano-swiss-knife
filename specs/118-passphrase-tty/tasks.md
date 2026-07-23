@@ -19,9 +19,9 @@
 
 ## Slice 2 — Orchestrator finalization
 
-- [ ] T007 Independently review the accepted slice and rerun the full local
+- [X] T007 Independently review the accepted slice and rerun the full local
   gate.
-- [ ] T008 Manually drive the real interactive command with a multi-character
+- [X] T008 Manually drive the real interactive command with a multi-character
   passphrase and record full-value plus before/after `stty -a` evidence.
-- [ ] T009 Refresh the PR body, audit commits and task accounting, drop
+- [X] T009 Refresh the PR body, audit commits and task accounting, drop
   `gate.sh`, push, mark ready, and require fresh remote CI before completion.
