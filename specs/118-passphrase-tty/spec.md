@@ -1,6 +1,6 @@
 # Feature Specification: Reliable Interactive Vault Prompts
 
-**Issue**: [#118](https://github.com/lambdasistemi/cardano-swiss-knife/issues/118)  
+**Issue**: [#118](https://github.com/lambdasistemi/cardano-swiss-knife/issues/118)
 **Priority**: P1
 
 ## User story
