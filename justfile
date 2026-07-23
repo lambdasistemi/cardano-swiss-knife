@@ -89,4 +89,8 @@ release-package:
 release-version:
   node --test node/test/version.test.mjs
 
-ci: check build haskell-quality check-vectors test test-playwright release-gates release-package release-version
+release-workflows:
+  node --test node/test/release-workflows.test.mjs
+  node scripts/check-release-workflows.mjs
+
+ci: check build haskell-quality check-vectors test test-playwright release-gates release-package release-version release-workflows

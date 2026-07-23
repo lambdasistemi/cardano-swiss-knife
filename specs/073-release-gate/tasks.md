@@ -32,10 +32,10 @@
 
 ## Slice 5 — Tagged publication and cross-platform clean install
 
-- [ ] T015 Gate tagged publication on Release Please’s created release and exact tag/package/artifact version agreement.
-- [ ] T016 Publish the scoped npm tarball and attach the universal Node bundle plus checksums to the matching GitHub release.
-- [ ] T017 Make Linux/macOS/Windows Node 22 clean-install smokes consume the exact CI-built tarball without a hard-coded version.
-- [ ] T018 Add a static workflow contract to `just ci`, record focused/full-gate evidence, obtain navigator verification, and commit as `ci(release): publish tagged npm and bundle artifacts`.
+- [X] T015 Gate tagged publication on Release Please’s created release and exact tag/package/artifact version agreement.
+- [X] T016 Publish the scoped npm tarball and attach the universal Node bundle plus checksums to the matching GitHub release.
+- [X] T017 Make Linux/macOS/Windows Node 22 clean-install smokes consume the exact CI-built tarball without a hard-coded version.
+- [X] T018 Add a static workflow contract to `just ci`, record focused/full-gate evidence, obtain navigator verification, and commit as `ci(release): publish tagged npm and bundle artifacts`.
 
 ## Slice 6 — Operator manual and architectural hazard
 

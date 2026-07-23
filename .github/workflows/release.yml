@@ -9,9 +9,10 @@ on:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
+# Least privilege: no workflow-global write/OIDC. Jobs that write use a
+# minted App token; only the hosted publish job needs id-token for npm provenance.
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 concurrency:
   group: release-${{ github.ref }}
@@ -20,6 +21,11 @@ concurrency:
 jobs:
   release-please:
     runs-on: nixos
+    permissions:
+      contents: read
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
     steps:
       - name: Mint App token
         uses: actions/create-github-app-token@v1
@@ -28,8 +34,82 @@ jobs:
           app-id: ${{ vars.CI_APP_ID }}
           private-key: ${{ secrets.CI_APP_PRIVATE_KEY }}
           owner: lambdasistemi
+          permission-contents: write
+          permission-pull-requests: write
 
       - name: Run release-please
+        id: release
         uses: googleapis/release-please-action@v4
         with:
           token: ${{ steps.app-token.outputs.token }}
+
+  # GitHub-hosted runner required for npm provenance (OIDC).
+  # Install Nix + Cachix explicitly, then build the same flake artifacts.
+  publish:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Mint App token
+        uses: actions/create-github-app-token@v1
+        id: app-token
+        with:
+          app-id: ${{ vars.CI_APP_ID }}
+          private-key: ${{ secrets.CI_APP_PRIVATE_KEY }}
+          owner: lambdasistemi
+          permission-contents: write
+
+      - name: Checkout release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release-please.outputs.tag_name }}
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      - name: Setup Nix and Cachix
+        uses: paolino/dev-assets/setup-nix@v0.0.1
+        with:
+          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+
+      - name: Verify tag matches package.json
+        run: node scripts/check-release-version.mjs --tag "${{ needs.release-please.outputs.tag_name }}"
+
+      - name: Build release artifacts
+        run: |
+          nix build .#node-package --out-link node-package
+          nix build .#csk --out-link csk
+          nix build .#release-bundle --out-link release-bundle
+
+      - name: Run package and version release proofs
+        run: |
+          node scripts/check-release-package.mjs \
+            --node-package node-package \
+            --csk csk \
+            --release-bundle release-bundle
+          node scripts/check-release-version.mjs \
+            --tag "${{ needs.release-please.outputs.tag_name }}" \
+            --node-package node-package \
+            --csk csk \
+            --release-bundle release-bundle
+
+      - name: Publish npm tarball
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public --provenance node-package/*.tgz
+
+      - name: Upload bundle and checksums to GitHub release
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          gh release upload "${{ needs.release-please.outputs.tag_name }}" \
+            release-bundle/*.tgz \
+            release-bundle/SHA256SUMS \
+            --clobber
