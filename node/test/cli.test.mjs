@@ -337,6 +337,46 @@ test("enriches every local CLI transaction source through the shared provider co
   }
 });
 
+test("local Blockfrost tx validate reaches the provider boundary with a non-empty credential while capturing only its presence, and fails closed for wrong passphrase or wrong kind", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "csk-cli-validate-blockfrost-"));
+  const raw = join(dir, "transaction.cbor");
+  const vault = join(dir, "credentials.age");
+  const capture = join(dir, "validate-capture.json");
+  const guard = join(dir, "validate-guard.mjs");
+  const passphrase = "validate blockfrost vault passphrase";
+  const blockfrostSecret = "CSK_VALIDATE_BLOCKFROST_SECRET";
+  try {
+    await Promise.all([
+      writeFile(raw, `${transactionCbor}\n`),
+      writeFile(vault, await encryptVault(passphrase, { cardanoSwissKnifeVault: { version: 1, entries: [
+        { id: "blockfrost", kind: "blockfrost-project-id", label: "blockfrost", value: blockfrostSecret, createdAt: "2026-07-23T00:00:00.000Z" },
+        { id: "wrong-kind", kind: "mnemonic", label: "wrong", value: blockfrostSecret, createdAt: "2026-07-23T00:00:00.000Z" },
+      ] } })),
+      writeFile(guard, `import { writeFileSync } from "node:fs"; const calls = []; globalThis.fetch = async (url, options) => { const headers = options?.headers ?? {}; calls.push({ url, hasProjectId: typeof headers.project_id === "string" && headers.project_id.length > 0 }); return { status: 401, text: async () => "provider denied" }; }; process.on("exit", () => writeFileSync(process.env.CSK_VALIDATE_CAPTURE, JSON.stringify({ calls, argv: process.argv, env: process.env })));`),
+    ]);
+    const guarded = { NODE_OPTIONS: `--import ${new URL(`file://${guard}`).href}`, CSK_VALIDATE_CAPTURE: capture };
+    const result = await json(["tx", "validate", "--tx-file", raw, "--provider", "blockfrost", "--network", "mainnet", "--vault", vault, "--vault-entry", "blockfrost", "--passphrase-fd", "3"], "", `${passphrase}\n`, guarded);
+    assert.equal(result.code, 0, result.stderr);
+    const context = JSON.parse(result.stdout).value.context;
+    assert.ok(context.resolution.error_codes.some(({ code }) => code === "PROVIDER_AUTHENTICATION"));
+    const recorded = JSON.parse(await readFile(capture, "utf8"));
+    assert.ok(recorded.calls.length > 0, "the validate command must reach the provider boundary");
+    assert.ok(recorded.calls.every((call) => call.hasProjectId === true), "every Blockfrost request must carry a non-empty project_id header");
+    assert.doesNotMatch(JSON.stringify(recorded), new RegExp(`${blockfrostSecret}|${passphrase}`));
+    const wrongPassphrase = await json(["tx", "validate", "--tx-file", raw, "--provider", "blockfrost", "--network", "mainnet", "--vault", vault, "--vault-entry", "blockfrost", "--passphrase-fd", "3"], "", "wrong passphrase\n", guarded);
+    assert.equal(wrongPassphrase.code, 4);
+    assert.equal(JSON.parse(wrongPassphrase.stdout).error.code, "SECRET_SOURCE");
+    const wrongKind = await json(["tx", "validate", "--tx-file", raw, "--provider", "blockfrost", "--network", "mainnet", "--vault", vault, "--vault-entry", "wrong-kind", "--passphrase-fd", "3"], "", `${passphrase}\n`, guarded);
+    assert.equal(wrongKind.code, 4);
+    assert.equal(JSON.parse(wrongKind.stdout).error.code, "SECRET_SOURCE");
+    for (const value of [blockfrostSecret, passphrase]) {
+      assert.doesNotMatch(`${result.stdout}${result.stderr}${wrongPassphrase.stdout}${wrongPassphrase.stderr}${wrongKind.stdout}${wrongKind.stderr}`, new RegExp(value));
+    }
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("submits only after explicit confirmation and rejects incomplete entries before provider IO", async () => {
   const dir = await mkdtemp(join(tmpdir(), "csk-cli-submit-"));
   const entryFile = join(dir, "entry.json");
