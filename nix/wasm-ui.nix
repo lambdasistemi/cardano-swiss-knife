@@ -74,7 +74,7 @@ let
 in
 pkgs.mkSpagoDerivation {
   pname = "tx-inspector-ui";
-  version = "0.1.0";
+  inherit version;
   inherit src;
   spagoYaml = src + "/spago.yaml";
   spagoLock = src + "/spago.lock";

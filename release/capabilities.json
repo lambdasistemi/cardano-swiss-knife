@@ -1,0 +1,1014 @@
+{
+  "schemaVersion": 1,
+  "description": "Versioned capability manifest for the cardano-swiss-knife release. Every parity row names one shared PureScript implementation (module + symbol + source) and non-empty WebUI, CLI, and Node host mappings plus an authoritative engine set and a fixture/proof anchor. The WebUI mapping names the route, the anchor file, and a symbol the checker proves is present; the CLI mapping names the exact command and the dispatch tokens the checker proves are routed in cli/csk.mjs; the Node mapping names the public export the checker proves is exported. Host-only presentation/storage and other deliberate non-parity surfaces are explicitly classified under exclusions. Preserves the checked #70 offline inventory and adds the provider, transaction, witness, validation, script-evaluation, and submission capabilities that entered parity scope later.",
+  "capabilities": [
+    {
+      "id": "ADDR-001",
+      "operation": "Inspect Cardano address",
+      "parity": true,
+      "implementation": {
+        "module": "Cardano.Address.Inspect",
+        "symbol": "eitherInspectAddress",
+        "source": "lib/src/Cardano/Offline/Address.purs"
+      },
+      "hosts": {
+        "webui": {
+          "route": "RouteInspect",
+          "anchor": "docs/inspector/src/Main.purs",
+          "symbol": "inspectAddressWithSharedWasm"
+        },
+        "cli": {
+          "command": "csk address inspect",
+          "source": "cli/csk.mjs",
+          "tokens": [
+            "family === \"address\" && command === \"inspect\""
+          ]
+        },
+        "node": {
+          "export": "inspectAddress",
+          "source": "node/src/index.js"
+        }
+      },
+      "engines": [
+        "cardano-addresses"
+      ],
+      "proof": {
+        "path": "test-vectors/vectors.json",
+        "note": "address inspection vectors; scripts/check-offline-capability-inventory.sh"
+      }
+    },
+    {
+      "id": "MN-001",
+      "operation": "Generate BIP-39 mnemonic",
+      "parity": true,
+      "implementation": {
+        "module": "Cardano.Mnemonic",
+        "symbol": "generateMnemonic",
+        "source": "lib/src/Cardano/Offline/Mnemonic.purs"
+      },
+      "hosts": {
+        "webui": {
+          "route": "RouteKeys",
+          "anchor": "docs/inspector/src/Main.purs",
+          "symbol": "generateMnemonic"
+        },
+        "cli": {
+          "command": "csk mnemonic generate",
+          "source": "cli/csk.mjs",
+          "tokens": [
+            "family === \"mnemonic\" && command === \"generate\""
+          ]
+        },
+        "node": {
+          "export": "generateMnemonic",
+          "source": "node/src/index.js"
+        }
+      },
+      "engines": [
+        "cardano-addresses"
+      ],
+      "proof": {
+        "path": "tests/mnemonic.spec.ts",
+        "note": "mnemonic generation spec"
+      }
+    },
+    {
+      "id": "MN-002",
+      "operation": "Validate BIP-39 mnemonic",
+      "parity": true,
+      "implementation": {
+        "module": "Cardano.Mnemonic",
+        "symbol": "validateMnemonic",
+        "source": "lib/src/Cardano/Offline/Mnemonic.purs"
+      },
+      "hosts": {
+        "webui": {
+          "route": "RouteKeys",
+          "anchor": "docs/inspector/src/Main.purs",
+          "symbol": "validateMnemonic"
+        },
+        "cli": {
+          "command": "csk mnemonic validate",
+          "source": "cli/csk.mjs",
+          "tokens": [
+            "family === \"mnemonic\" && command === \"validate\""
+          ]
+        },
+        "node": {
+          "export": "validateMnemonic",
+          "source": "node/src/index.js"
+        }
+      },
+      "engines": [
+        "cardano-addresses"
+      ],
+      "proof": {
+        "path": "tests/mnemonic.spec.ts",
+        "note": "mnemonic validation spec"
+      }
+    },
+    {
+      "id": "KEY-001",
+      "operation": "Derive Shelley keys",
+      "parity": true,
+      "implementation": {
+        "module": "Cardano.Address.Derivation",
+        "symbol": "derivePipeline",
+        "source": "lib/src/Cardano/Offline/Key.purs"
+      },
+      "hosts": {
+        "webui": {
+          "route": "RouteKeys",
+          "anchor": "docs/inspector/src/Main.purs",
+          "symbol": "derivePipeline"
+        },
+        "cli": {
+          "command": "csk key derive",
+          "source": "cli/csk.mjs",
+          "tokens": [
+            "family === \"key\" && command === \"derive\""
+          ]
+        },
+        "node": {
+          "export": "deriveKeys",
+          "source": "node/src/index.js"
+        }
+      },
+      "engines": [
+        "cardano-addresses"
+      ],
+      "proof": {
+        "path": "tests/derivation.spec.ts",
+        "note": "key derivation spec"
+      }
+    },
+    {
+      "id": "KEY-002",
+      "operation": "Construct Shelley addresses",
+      "parity": true,
+      "implementation": {
+        "module": "Cardano.Address.Shelley",
+        "symbol": "constructShelleyAddresses",
+        "source": "lib/src/Cardano/Offline/Key.purs"
+      },
+      "hosts": {
+        "webui": {
+          "route": "RouteAddresses",
+          "anchor": "docs/inspector/src/Main.purs",
+          "symbol": "constructShelleyAddresses"
+        },
+        "cli": {
+          "command": "csk key address shelley",
+          "source": "cli/csk.mjs",
+          "tokens": [
+            "family === \"key\" && command === \"address\" && subcommand === \"shelley\""
+          ]
+        },
+        "node": {
+          "export": "constructShelleyAddresses",
+          "source": "node/src/index.js"
+        }
+      },
+      "engines": [
+        "cardano-addresses"
+      ],
+      "proof": {
+        "path": "tests/derivation.spec.ts",
+        "note": "shelley address construction spec"
+      }
+    },
+    {
+      "id": "KEY-003",
+      "operation": "Restore Icarus address",
+      "parity": true,
+      "implementation": {
+        "module": "Cardano.Address.Bootstrap",
+        "symbol": "constructIcarusAddressFromMnemonic",
+        "source": "lib/src/Cardano/Offline/Key.purs"
+      },
+      "hosts": {
+        "webui": {
+          "route": "RouteAddresses",
+          "anchor": "docs/inspector/src/Main.purs",
+          "symbol": "constructIcarusAddressFromMnemonic"
+        },
+        "cli": {
+          "command": "csk key restore icarus",
+          "source": "cli/csk.mjs",
+          "tokens": [
+            "family === \"key\" && command === \"restore\" && subcommand === \"icarus\""
+          ]
+        },
+        "node": {
+          "export": "constructIcarusAddressFromMnemonic",
+          "source": "node/src/index.js"
+        }
+      },
+      "engines": [
+        "cardano-addresses"
+      ],
+      "proof": {
+        "path": "tests/legacy-bootstrap.spec.ts",
+        "note": "icarus restore spec"
+      }
+    },
+    {
+      "id": "KEY-004",
+      "operation": "Restore Byron address",
+      "parity": true,
+      "implementation": {
+        "module": "Cardano.Address.Bootstrap",
+        "symbol": "constructByronAddressFromMnemonic",
+        "source": "lib/src/Cardano/Offline/Key.purs"
+      },
+      "hosts": {
+        "webui": {
+          "route": "RouteAddresses",
+          "anchor": "docs/inspector/src/Main.purs",
+          "symbol": "constructByronAddressFromMnemonic"
+        },
+        "cli": {
+          "command": "csk key restore byron",
+          "source": "cli/csk.mjs",
+          "tokens": [
+            "family === \"key\" && command === \"restore\" && subcommand === \"byron\""
+          ]
+        },
+        "node": {
+          "export": "constructByronAddressFromMnemonic",
+          "source": "node/src/index.js"
+        }
+      },
+      "engines": [
+        "cardano-addresses"
+      ],
+      "proof": {
+        "path": "tests/legacy-bootstrap.spec.ts",
+        "note": "byron restore spec"
+      }
+    },
+    {
+      "id": "KEY-005",
+      "operation": "Construct Icarus address",
+      "parity": true,
+      "implementation": {
+        "module": "Cardano.Address.Bootstrap",
+        "symbol": "constructIcarusAddress",
+        "source": "lib/src/Cardano/Offline/Key.purs"
+      },
+      "hosts": {
+        "webui": {
+          "route": "RouteAddresses",
+          "anchor": "docs/inspector/src/Main.purs",
+          "symbol": "constructIcarusAddress"
+        },
+        "cli": {
+          "command": "csk key address icarus",
+          "source": "cli/csk.mjs",
+          "tokens": [
+            "family === \"key\" && command === \"address\" && subcommand === \"icarus\""
+          ]
+        },
+        "node": {
+          "export": "constructIcarusAddress",
+          "source": "node/src/index.js"
+        }
+      },
+      "engines": [
+        "cardano-addresses"
+      ],
+      "proof": {
+        "path": "tests/legacy-bootstrap.spec.ts",
+        "note": "icarus construct spec"
+      }
+    },
+    {
+      "id": "KEY-006",
+      "operation": "Construct Byron address",
+      "parity": true,
+      "implementation": {
+        "module": "Cardano.Address.Bootstrap",
+        "symbol": "constructByronAddress",
+        "source": "lib/src/Cardano/Offline/Key.purs"
+      },
+      "hosts": {
+        "webui": {
+          "route": "RouteAddresses",
+          "anchor": "docs/inspector/src/Main.purs",
+          "symbol": "constructByronAddress"
+        },
+        "cli": {
+          "command": "csk key address byron",
+          "source": "cli/csk.mjs",
+          "tokens": [
+            "family === \"key\" && command === \"address\" && subcommand === \"byron\""
+          ]
+        },
+        "node": {
+          "export": "constructByronAddress",
+          "source": "node/src/index.js"
+        }
+      },
+      "engines": [
+        "cardano-addresses"
+      ],
+      "proof": {
+        "path": "tests/legacy-bootstrap.spec.ts",
+        "note": "byron construct spec"
+      }
+    },
+    {
+      "id": "PAY-001",
+      "operation": "Sign arbitrary payload",
+      "parity": true,
+      "implementation": {
+        "module": "Cardano.Address.Signing",
+        "symbol": "signPayload",
+        "source": "lib/src/Cardano/Offline/Payload.purs"
+      },
+      "hosts": {
+        "webui": {
+          "route": "RouteKeys",
+          "anchor": "docs/inspector/src/Main.purs",
+          "symbol": "signPayload"
+        },
+        "cli": {
+          "command": "csk payload sign",
+          "source": "cli/csk.mjs",
+          "tokens": [
+            "family === \"payload\" && command === \"sign\""
+          ]
+        },
+        "node": {
+          "export": "signPayload",
+          "source": "node/src/index.js"
+        }
+      },
+      "engines": [
+        "cardano-addresses"
+      ],
+      "proof": {
+        "path": "tests/signing.spec.ts",
+        "note": "payload signing spec"
+      }
+    },
+    {
+      "id": "PAY-002",
+      "operation": "Verify arbitrary payload",
+      "parity": true,
+      "implementation": {
+        "module": "Cardano.Address.Signing",
+        "symbol": "verifySignature",
+        "source": "lib/src/Cardano/Offline/Payload.purs"
+      },
+      "hosts": {
+        "webui": {
+          "route": "RouteKeys",
+          "anchor": "docs/inspector/src/Main.purs",
+          "symbol": "verifySignature"
+        },
+        "cli": {
+          "command": "csk payload verify",
+          "source": "cli/csk.mjs",
+          "tokens": [
+            "family === \"payload\" && command === \"verify\""
+          ]
+        },
+        "node": {
+          "export": "verifySignature",
+          "source": "node/src/index.js"
+        }
+      },
+      "engines": [
+        "cardano-addresses"
+      ],
+      "proof": {
+        "path": "tests/signing.spec.ts",
+        "note": "payload verify spec"
+      }
+    },
+    {
+      "id": "SCR-001",
+      "operation": "Analyze native-script CBOR",
+      "parity": true,
+      "implementation": {
+        "module": "Cardano.Address.Script",
+        "symbol": "analyzeNativeScriptHex",
+        "source": "lib/src/Cardano/Offline/Script.purs"
+      },
+      "hosts": {
+        "webui": {
+          "route": "RouteScripts",
+          "anchor": "docs/inspector/src/Main.purs",
+          "symbol": "analyzeNativeScriptHex"
+        },
+        "cli": {
+          "command": "csk script inspect",
+          "source": "cli/csk.mjs",
+          "tokens": [
+            "family === \"script\" && command === \"inspect\""
+          ]
+        },
+        "node": {
+          "export": "analyzeNativeScriptHex",
+          "source": "node/src/index.js"
+        }
+      },
+      "engines": [
+        "cardano-addresses"
+      ],
+      "proof": {
+        "path": "tests/scripts.spec.ts",
+        "note": "native script CBOR spec; parity-locked to Haskell vectors"
+      }
+    },
+    {
+      "id": "SCR-002",
+      "operation": "Author native script from JSON",
+      "parity": true,
+      "implementation": {
+        "module": "Cardano.Address.Script",
+        "symbol": "analyzeNativeScriptJson",
+        "source": "lib/src/Cardano/Offline/Script.purs"
+      },
+      "hosts": {
+        "webui": {
+          "route": "RouteScripts",
+          "anchor": "docs/inspector/src/Main.purs",
+          "symbol": "analyzeNativeScriptJson"
+        },
+        "cli": {
+          "command": "csk script author",
+          "source": "cli/csk.mjs",
+          "tokens": [
+            "family === \"script\" && command === \"author\""
+          ]
+        },
+        "node": {
+          "export": "analyzeNativeScriptJson",
+          "source": "node/src/index.js"
+        }
+      },
+      "engines": [
+        "cardano-addresses"
+      ],
+      "proof": {
+        "path": "tests/scripts.spec.ts",
+        "note": "native script author spec"
+      }
+    },
+    {
+      "id": "SCR-003",
+      "operation": "Analyze ScriptTemplate",
+      "parity": true,
+      "implementation": {
+        "module": "Cardano.Address.Script",
+        "symbol": "analyzeScriptTemplateJson",
+        "source": "lib/src/Cardano/Offline/Script.purs"
+      },
+      "hosts": {
+        "webui": {
+          "route": "RouteScripts",
+          "anchor": "docs/inspector/src/Main.purs",
+          "symbol": "analyzeScriptTemplateJson"
+        },
+        "cli": {
+          "command": "csk script template",
+          "source": "cli/csk.mjs",
+          "tokens": [
+            "family === \"script\" && command === \"template\""
+          ]
+        },
+        "node": {
+          "export": "analyzeScriptTemplateJson",
+          "source": "node/src/index.js"
+        }
+      },
+      "engines": [
+        "cardano-addresses"
+      ],
+      "proof": {
+        "path": "tests/scripts.spec.ts",
+        "note": "script template spec"
+      }
+    },
+    {
+      "id": "TX-LOAD-001",
+      "operation": "Load provider-backed transaction and resolve validation context",
+      "parity": true,
+      "implementation": {
+        "module": "Cardano.Provider",
+        "symbol": "resolveProducerTxContext",
+        "source": "lib/src/Cardano/Provider.purs"
+      },
+      "hosts": {
+        "webui": {
+          "route": "RouteInspect",
+          "anchor": "docs/inspector/src/Provider.purs",
+          "symbol": "resolveProducerTxContext"
+        },
+        "cli": {
+          "command": "csk tx inspect --tx-hash HASH --provider P --network N",
+          "source": "cli/csk.mjs",
+          "tokens": [
+            "family === \"tx\"",
+            "\"inspect\"",
+            "--tx-hash",
+            "--provider",
+            "--network"
+          ]
+        },
+        "node": {
+          "export": "inspectTransaction",
+          "source": "node/src/index.js"
+        }
+      },
+      "engines": [],
+      "engineNote": "Provider HTTP/context resolution is host-owned shared I/O (Cardano.Provider); no authoritative engine semantics. The loaded transaction is then inspected by cardano-ledger-inspector.",
+      "proof": {
+        "path": "node/test/transaction-provider.test.mjs",
+        "note": "provider context resolution; fixtures node/test/fixtures/provider-failures.json"
+      }
+    },
+    {
+      "id": "TX-INSPECT-001",
+      "operation": "Inspect transaction",
+      "parity": true,
+      "implementation": {
+        "kind": "engine-protocol",
+        "operation": "tx.inspect",
+        "protocolSource": "node/src/transaction-engine.js",
+        "note": "Authoritative engine-protocol operation tx.inspect executed by cardano-ledger-inspector (wasm-tx-inspector.wasm); there is no shared PureScript symbol for this operation. Hosts invoke it through the shared runLedgerOperation/runTransactionOperation wrapper."
+      },
+      "hosts": {
+        "webui": {
+          "route": "RouteInspect",
+          "anchor": "docs/inspector/src/Main.purs",
+          "symbol": "\"tx.inspect\""
+        },
+        "cli": {
+          "command": "csk tx inspect",
+          "source": "cli/csk.mjs",
+          "tokens": [
+            "family === \"tx\"",
+            "\"inspect\""
+          ]
+        },
+        "node": {
+          "export": "inspectTransaction",
+          "source": "node/src/index.js"
+        }
+      },
+      "engines": [
+        "cardano-ledger-inspector"
+      ],
+      "proof": {
+        "path": "node/test/transaction-ledger.test.mjs",
+        "note": "tx inspect; fixtures node/test/fixtures/transaction-ledger.json"
+      }
+    },
+    {
+      "id": "TX-BROWSE-001",
+      "operation": "Browse transaction",
+      "parity": true,
+      "implementation": {
+        "kind": "engine-protocol",
+        "operation": "tx.browse",
+        "protocolSource": "node/src/transaction-engine.js",
+        "note": "Authoritative engine-protocol operation tx.browse executed by cardano-ledger-inspector (wasm-tx-inspector.wasm); there is no shared PureScript symbol for this operation. Hosts invoke it through the shared runLedgerOperation/runTransactionOperation wrapper."
+      },
+      "hosts": {
+        "webui": {
+          "route": "RouteInspect",
+          "anchor": "docs/inspector/src/Main.purs",
+          "symbol": "\"tx.browse\""
+        },
+        "cli": {
+          "command": "csk tx browse",
+          "source": "cli/csk.mjs",
+          "tokens": [
+            "family === \"tx\"",
+            "\"browse\""
+          ]
+        },
+        "node": {
+          "export": "browseTransaction",
+          "source": "node/src/index.js"
+        }
+      },
+      "engines": [
+        "cardano-ledger-inspector"
+      ],
+      "proof": {
+        "path": "node/test/transaction-ledger.test.mjs",
+        "note": "tx browse"
+      }
+    },
+    {
+      "id": "TX-IDENTIFY-001",
+      "operation": "Identify transaction",
+      "parity": true,
+      "implementation": {
+        "kind": "engine-protocol",
+        "operation": "tx.identify",
+        "protocolSource": "node/src/transaction-engine.js",
+        "note": "Authoritative engine-protocol operation tx.identify executed by cardano-ledger-inspector (wasm-tx-inspector.wasm); there is no shared PureScript symbol for this operation. Hosts invoke it through the shared runLedgerOperation/runTransactionOperation wrapper."
+      },
+      "hosts": {
+        "webui": {
+          "route": "RouteInspect",
+          "anchor": "docs/inspector/src/Main.purs",
+          "symbol": "\"tx.identify\""
+        },
+        "cli": {
+          "command": "csk tx identify",
+          "source": "cli/csk.mjs",
+          "tokens": [
+            "family === \"tx\"",
+            "\"identify\""
+          ]
+        },
+        "node": {
+          "export": "identifyTransaction",
+          "source": "node/src/index.js"
+        }
+      },
+      "engines": [
+        "cardano-ledger-inspector"
+      ],
+      "proof": {
+        "path": "node/test/transaction-ledger.test.mjs",
+        "note": "tx identify"
+      }
+    },
+    {
+      "id": "TX-INTENT-001",
+      "operation": "Determine transaction intent",
+      "parity": true,
+      "implementation": {
+        "kind": "engine-protocol",
+        "operation": "tx.intent",
+        "protocolSource": "node/src/transaction-engine.js",
+        "note": "Authoritative engine-protocol operation tx.intent executed by cardano-ledger-inspector (wasm-tx-inspector.wasm); there is no shared PureScript symbol for this operation. Hosts invoke it through the shared runLedgerOperation/runTransactionOperation wrapper."
+      },
+      "hosts": {
+        "webui": {
+          "route": "RouteInspect",
+          "anchor": "docs/inspector/src/Main.purs",
+          "symbol": "\"tx.intent\""
+        },
+        "cli": {
+          "command": "csk tx intent",
+          "source": "cli/csk.mjs",
+          "tokens": [
+            "family === \"tx\"",
+            "\"intent\""
+          ]
+        },
+        "node": {
+          "export": "transactionIntent",
+          "source": "node/src/index.js"
+        }
+      },
+      "engines": [
+        "cardano-ledger-inspector"
+      ],
+      "proof": {
+        "path": "node/test/transaction-ledger.test.mjs",
+        "note": "tx intent"
+      }
+    },
+    {
+      "id": "TX-BOOK-001",
+      "operation": "Resolve transaction inspection books",
+      "parity": true,
+      "implementation": {
+        "module": "Cardano.Transaction.Book",
+        "symbol": "importBooksWithSources",
+        "source": "lib/src/Cardano/Transaction/Book.purs"
+      },
+      "hosts": {
+        "webui": {
+          "route": "RouteLibrary",
+          "anchor": "docs/inspector/src/Main.purs",
+          "symbol": "resolvedLabelsLensFromGraph"
+        },
+        "cli": {
+          "command": "csk tx inspect --book PATH",
+          "source": "cli/csk.mjs",
+          "tokens": [
+            "family === \"tx\"",
+            "\"inspect\"",
+            "--book"
+          ]
+        },
+        "node": {
+          "export": "inspectTransaction",
+          "source": "node/src/index.js"
+        }
+      },
+      "engines": [
+        "cardano-ledger-inspector",
+        "rdf-shapes-wasm"
+      ],
+      "proof": {
+        "path": "node/test/transaction-books.test.mjs",
+        "note": "book import/resolution; fixtures node/test/fixtures/transaction-books.json"
+      }
+    },
+    {
+      "id": "TX-WITNESS-PREPARE-001",
+      "operation": "Prepare detached transaction witness",
+      "parity": true,
+      "implementation": {
+        "module": "Cardano.Transaction.Witness",
+        "symbol": "prepareWitness",
+        "source": "lib/src/Cardano/Transaction/Witness.purs"
+      },
+      "hosts": {
+        "webui": {
+          "route": "RouteInspect",
+          "anchor": "docs/inspector/src/TxSigning.purs",
+          "symbol": "prepareWitness"
+        },
+        "cli": {
+          "command": "csk tx witness attach",
+          "source": "cli/csk.mjs",
+          "tokens": [
+            "family === \"tx\"",
+            "command === \"witness\"",
+            "subcommand === \"attach\""
+          ]
+        },
+        "node": {
+          "export": "prepareTransactionWitness",
+          "source": "node/src/index.js"
+        }
+      },
+      "engines": [
+        "cardano-addresses"
+      ],
+      "engineNote": "Witness preparation signs the transaction body hash via Cardano.Address.Signing (address engine); it does not invoke the ledger engine.",
+      "proof": {
+        "path": "node/test/transaction-witness.test.mjs",
+        "note": "witness preparation; fixtures node/test/fixtures/transaction-witnesses.json"
+      }
+    },
+    {
+      "id": "TX-WITNESS-NORMALISE-001",
+      "operation": "Normalise detached transaction witness",
+      "parity": true,
+      "implementation": {
+        "module": "Cardano.Transaction.Witness",
+        "symbol": "decodeWitnessInput",
+        "source": "lib/src/Cardano/Transaction/Witness.purs"
+      },
+      "hosts": {
+        "webui": {
+          "route": "RouteInspect",
+          "anchor": "docs/inspector/src/TxSigning.purs",
+          "symbol": "attachPastedWitness"
+        },
+        "cli": {
+          "command": "csk tx witness attach --witness-file PATH",
+          "source": "cli/csk.mjs",
+          "tokens": [
+            "family === \"tx\"",
+            "command === \"witness\"",
+            "subcommand === \"attach\"",
+            "--witness-file"
+          ]
+        },
+        "node": {
+          "export": "normaliseTransactionWitness",
+          "source": "node/src/index.js"
+        }
+      },
+      "engines": [],
+      "engineNote": "Witness normalisation (decodeWitnessInput/encodeWitnessTextEnvelope) uses only shared Cardano.TextEnvelope CBOR/JSON helpers; it invokes no authoritative engine.",
+      "proof": {
+        "path": "node/test/transaction-witness.test.mjs",
+        "note": "witness normalisation"
+      }
+    },
+    {
+      "id": "TX-WITNESS-PLAN-001",
+      "operation": "Plan required transaction witnesses",
+      "parity": true,
+      "implementation": {
+        "module": "Cardano.Transaction.Ledger",
+        "symbol": "planTransactionWitnessesOperation",
+        "source": "lib/src/Cardano/Transaction/Ledger.purs"
+      },
+      "hosts": {
+        "webui": {
+          "route": "RouteInspect",
+          "anchor": "docs/inspector/src/TxSigning.purs",
+          "symbol": "planTransactionWitnessesOperation"
+        },
+        "cli": {
+          "command": "csk tx witness plan",
+          "source": "cli/csk.mjs",
+          "tokens": [
+            "family === \"tx\"",
+            "command === \"witness\"",
+            "subcommand === \"plan\""
+          ]
+        },
+        "node": {
+          "export": "planTransactionWitnesses",
+          "source": "node/src/index.js"
+        }
+      },
+      "engines": [
+        "cardano-ledger-inspector"
+      ],
+      "proof": {
+        "path": "node/test/transaction-witness.test.mjs",
+        "note": "witness plan"
+      }
+    },
+    {
+      "id": "TX-WITNESS-ATTACH-001",
+      "operation": "Attach detached transaction witness",
+      "parity": true,
+      "implementation": {
+        "module": "Cardano.Transaction.Ledger",
+        "symbol": "attachTransactionWitnessOperation",
+        "source": "lib/src/Cardano/Transaction/Ledger.purs"
+      },
+      "hosts": {
+        "webui": {
+          "route": "RouteInspect",
+          "anchor": "docs/inspector/src/TxSigning.purs",
+          "symbol": "attachTransactionWitnessOperation"
+        },
+        "cli": {
+          "command": "csk tx witness attach",
+          "source": "cli/csk.mjs",
+          "tokens": [
+            "family === \"tx\"",
+            "command === \"witness\"",
+            "subcommand === \"attach\""
+          ]
+        },
+        "node": {
+          "export": "attachTransactionWitness",
+          "source": "node/src/index.js"
+        }
+      },
+      "engines": [
+        "cardano-ledger-inspector"
+      ],
+      "proof": {
+        "path": "node/test/transaction-witness.test.mjs",
+        "note": "witness attachment"
+      }
+    },
+    {
+      "id": "TX-VALIDATE-001",
+      "operation": "Validate transaction against ledger rules",
+      "parity": true,
+      "implementation": {
+        "module": "Cardano.Transaction.Ledger",
+        "symbol": "validateTransactionOperation",
+        "source": "lib/src/Cardano/Transaction/Ledger.purs"
+      },
+      "hosts": {
+        "webui": {
+          "route": "RouteInspect",
+          "anchor": "docs/inspector/src/Main.purs",
+          "symbol": "validateTransactionOperation"
+        },
+        "cli": {
+          "command": "csk tx validate",
+          "source": "cli/csk.mjs",
+          "tokens": [
+            "family === \"tx\"",
+            "\"validate\""
+          ]
+        },
+        "node": {
+          "export": "validateTransaction",
+          "source": "node/src/index.js"
+        }
+      },
+      "engines": [
+        "cardano-ledger-inspector"
+      ],
+      "proof": {
+        "path": "node/test/transaction-ledger.test.mjs",
+        "note": "ledger validation; fixtures node/test/fixtures/transaction-ledger.json"
+      }
+    },
+    {
+      "id": "TX-EVALUATE-001",
+      "operation": "Evaluate executable transaction scripts",
+      "parity": true,
+      "implementation": {
+        "module": "Cardano.Transaction.Ledger",
+        "symbol": "evaluateTransactionScriptsOperation",
+        "source": "lib/src/Cardano/Transaction/Ledger.purs"
+      },
+      "hosts": {
+        "webui": {
+          "route": "RouteInspect",
+          "anchor": "docs/inspector/src/Main.purs",
+          "symbol": "evaluateTransactionScriptsOperation"
+        },
+        "cli": {
+          "command": "csk tx evaluate-scripts",
+          "source": "cli/csk.mjs",
+          "tokens": [
+            "family === \"tx\"",
+            "evaluate-scripts"
+          ]
+        },
+        "node": {
+          "export": "evaluateTransactionScripts",
+          "source": "node/src/index.js"
+        }
+      },
+      "engines": [
+        "cardano-ledger-inspector"
+      ],
+      "proof": {
+        "path": "node/test/transaction-ledger.test.mjs",
+        "note": "script evaluation via embedded Plutus"
+      }
+    },
+    {
+      "id": "TX-SUBMIT-001",
+      "operation": "Submit signed transaction through a provider",
+      "parity": true,
+      "implementation": {
+        "module": "Cardano.Provider",
+        "symbol": "submitTxEntry",
+        "source": "lib/src/Cardano/Provider.purs"
+      },
+      "hosts": {
+        "webui": {
+          "route": "RouteInspect",
+          "anchor": "docs/inspector/src/Provider.purs",
+          "symbol": "submitTxEntry"
+        },
+        "cli": {
+          "command": "csk tx submit",
+          "source": "cli/csk.mjs",
+          "tokens": [
+            "family === \"tx\"",
+            "firstCommand === \"submit\""
+          ]
+        },
+        "node": {
+          "export": "submitTransactionEntry",
+          "source": "node/src/index.js"
+        }
+      },
+      "engines": [],
+      "engineNote": "Provider submission is host-owned shared I/O (Cardano.Provider); no authoritative engine semantics.",
+      "proof": {
+        "path": "node/test/transaction-provider.test.mjs",
+        "note": "provider submission; fixtures node/test/fixtures/provider-failures.json"
+      }
+    }
+  ],
+  "exclusions": [
+    {
+      "id": "HOST-PRESENTATION-001",
+      "surface": "Reveal/hide/copy/handoff buttons, reactive tab state, routing, theme",
+      "classification": "host-presentation",
+      "reason": "Thin-host presentation behavior, not a domain operation."
+    },
+    {
+      "id": "VAULT-LIFECYCLE-001",
+      "surface": "Vault create/open/export/lock/shelves and migration",
+      "classification": "host-storage-vault-lifecycle",
+      "reason": "Backend-independent but reserved sibling scope; issue #69 owns schema, age crypto, migration, adapters, and the CLI vault surface."
+    },
+    {
+      "id": "HOST-STORAGE-001",
+      "surface": "Browser local storage of library/overlay books and vault entries",
+      "classification": "host-storage",
+      "reason": "Browser persistence is host behavior, not a parity domain operation."
+    },
+    {
+      "id": "BLUEPRINT-CATALOG-001",
+      "surface": "Blueprint catalog and provenance (Cardano.Blueprint.Registry parseCatalog / catalogEntriesForScriptHash)",
+      "classification": "webui-only-non-parity",
+      "reason": "The #68 curated blueprint catalog/provenance is exposed only on the WebUI library route (docs/inspector/src/Main.purs renderLibraryCatalog); it has no CLI command and no public Node export, so it is not a three-host parity capability. RDF semantics remain in the pinned rdf-shapes-wasm engine."
+    },
+    {
+      "id": "LIBRARY-UI-001",
+      "surface": "Library/RDF book CRUD, SPARQL, and SHACL interactive UI beyond parity book resolution",
+      "classification": "separate-product-domain",
+      "reason": "RDF semantics remain in the pinned rdf-shapes-wasm engine; the interactive library UI is not part of the parity deliverable."
+    },
+    {
+      "id": "BACKLOG-001",
+      "surface": "Backlog capabilities not present in the child baseline (#14, #15)",
+      "classification": "unimplemented",
+      "reason": "Explicit issue non-goal."
+    }
+  ]
+}

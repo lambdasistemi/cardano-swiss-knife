@@ -61,6 +61,41 @@ const filesBelow = async (root) => {
   return paths;
 };
 
+// Live inventory matcher: package-relative asset/engine suffixes use `/`
+// (see shipped paths below). Keep this the single path used by inventory
+// assertions so host-separator fixes cannot drift from the smoke checks.
+// Normalize both native `\` and `/` so Windows inventory paths match the
+// POSIX suffixes without weakening exactly-one cardinality checks.
+const matchesAssetSuffix = (filePath, suffix) => {
+  const normalize = (path) => path.replaceAll("\\", "/");
+  return normalize(filePath).endsWith(normalize(suffix));
+};
+
+test("asset suffix matcher accepts POSIX and Windows nested paths", () => {
+  const nested = "sundaeswap-v3/plutus.json";
+  const posix =
+    "/tmp/foreign/node_modules/@lambdasistemi/cardano-swiss-knife/share/sundaeswap-v3/plutus.json";
+  const windows =
+    "D:\\a\\cardano-swiss-knife\\cardano-swiss-knife\\node_modules\\@lambdasistemi\\cardano-swiss-knife\\share\\sundaeswap-v3\\plutus.json";
+  const unrelated =
+    "/tmp/foreign/node_modules/@lambdasistemi/cardano-swiss-knife/share/sundaeswap-v3/pin.json";
+  assert.equal(
+    [posix].filter((path) => matchesAssetSuffix(path, nested)).length,
+    1,
+    "POSIX nested asset paths must match package-relative suffixes",
+  );
+  assert.equal(
+    [windows].filter((path) => matchesAssetSuffix(path, nested)).length,
+    1,
+    "Windows nested asset paths must match package-relative suffixes",
+  );
+  assert.equal(
+    [posix, windows, unrelated].filter((path) => matchesAssetSuffix(path, nested)).length,
+    2,
+    "exactly-one inventory must still distinguish the nested asset from siblings",
+  );
+});
+
 test("installs a prepacked artifact outside the checkout without network, native hooks, or secret leakage", async () => {
   assert.ok(tarball, "CSK_PACKAGE_TARBALL must name the prebuilt npm pack artifact");
   assert.ok(npmExecPath, "npm_execpath must name npm's JavaScript entrypoint; run this smoke through npm run");
@@ -88,7 +123,34 @@ test("installs a prepacked artifact outside the checkout without network, native
       assert.equal(contents.includes(signing.signingKeyBech32), false, `private key leaked into package: ${path}`);
     }
     const packagedFiles = await filesBelow(packageRoot);
-    assert.deepEqual(packagedFiles.filter((path) => path.endsWith("wasm-tx-inspector.wasm")).length, 1, "package must contain exactly one ledger engine");
+    for (const engine of [
+      "cardano-addresses.wasm",
+      "wasm-tx-inspector.wasm",
+      "rdf_shapes_wasm.js",
+      "rdf_shapes_wasm_bg.wasm",
+    ]) {
+      assert.deepEqual(
+        packagedFiles.filter((path) => matchesAssetSuffix(path, engine)).length,
+        1,
+        `package must contain exactly one ${engine}`,
+      );
+    }
+    // Shipped book/blueprint/registry assets must be package-relative (FR-012).
+    for (const asset of [
+      "registry.json",
+      "shapes.ttl",
+      "journal-2026.json",
+      "sundaeswap-v3/plutus.json",
+      "sundaeswap-v3/pin.json",
+      "sundaeswap-treasury-v3/plutus.json",
+      "sundaeswap-treasury-v3/pin.json",
+    ]) {
+      assert.deepEqual(
+        packagedFiles.filter((path) => matchesAssetSuffix(path, asset)).length,
+        1,
+        `package must contain exactly one shipped book/registry asset ${asset}`,
+      );
+    }
     assert.equal(packagedFiles.some((path) => /plutus/i.test(path) && path.endsWith(".wasm")), false, "package must not contain a fallback Plutus engine");
     const installedApi = await import(pathToFileURL(join(packageRoot, "node", "dist", "index.js")).href);
     const witnessTransaction = { cborHex: withRequiredSigner(transactionCbor, witnessFixture.requiredSignerHash) };

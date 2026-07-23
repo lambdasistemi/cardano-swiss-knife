@@ -77,4 +77,25 @@ format:
 check:
   npx purs-tidy check "lib/src/**/*.purs"
 
-ci: check build haskell-quality check-vectors test test-playwright
+release-gates:
+  node scripts/check-release-manifests.mjs
+  node scripts/check-release-parity.mjs
+  bash scripts/check-architecture-boundary.sh
+  node --test node/test/release-manifests.test.mjs node/test/release-parity.test.mjs
+
+release-package:
+  node --test node/test/release-package.test.mjs
+
+release-version:
+  node --test node/test/version.test.mjs
+
+release-workflows:
+  node --test node/test/release-workflows.test.mjs
+  node scripts/check-release-workflows.mjs
+
+release-docs:
+  node --test node/test/release-docs.test.mjs
+  node scripts/check-release-docs.mjs
+  just build-docs
+
+ci: check build haskell-quality check-vectors test test-playwright release-gates release-package release-version release-workflows release-docs

@@ -15,6 +15,7 @@ import * as Maybe from "../../output/Data.Maybe/index.js";
 import { CskError, toCskError } from "./error.js";
 import { runTransactionOperation } from "./transaction-engine.js";
 import { resolveRdf } from "./rdf-engine.js";
+export { version } from "./version.js";
 
 /**
  * A JSON primitive accepted by public API inputs and returned by JSON-shaped

@@ -120,9 +120,17 @@ jobs:
           path: node-package
 
       - name: Smoke packed Node artifact
-        env:
-          CSK_PACKAGE_TARBALL: ${{ github.workspace }}/node-package/lambdasistemi-cardano-swiss-knife-0.1.1.tgz
-        run: npm run test:package
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          tarballs=(node-package/*.tgz)
+          if [ ${#tarballs[@]} -ne 1 ]; then
+            echo "expected exactly one .tgz, found ${#tarballs[@]}" >&2
+            exit 1
+          fi
+          export CSK_PACKAGE_TARBALL="${{ github.workspace }}/${tarballs[0]}"
+          npm run test:package
 
   pr-preview:
     if: github.event_name == 'pull_request' && github.event.action != 'closed'

@@ -1,5 +1,44 @@
 # System Architecture
 
+## Host / engine boundary (release hazards)
+
+<!-- release-docs:hazard:host-engine-boundary -->
+Hosts own presentation, transport, browser storage, vault lifecycle/migration,
+credentials, and orchestration. Authoritative address, ledger/transaction/
+embedded Plutus, and RDF/SPARQL/SHACL semantics remain with their pinned engines.
+WebUI, CLI, and Node are thin hosts over the shared PureScript surface and the
+engine artifacts listed in `release/engines.json`.
+<!-- /release-docs:hazard:host-engine-boundary -->
+
+<!-- release-docs:hazard:semantic-drift -->
+Semantic drift is a release hazard: host code must not restate ledger or crypto
+rules that can diverge from the pinned engine behavior. When documentation or
+host helpers appear to duplicate an engine rule, treat the engine output as
+authoritative and delete the host restatement.
+<!-- /release-docs:hazard:semantic-drift -->
+
+<!-- release-docs:hazard:fail-hard-engines -->
+Missing or incompatible engines fail hard with typed errors. Hosts must not
+mask load, compatibility, execution, or protocol failures. A missing
+`cardano-addresses.wasm`, `wasm-tx-inspector.wasm`, or
+`rdf_shapes_wasm_bg.wasm` is an explicit operator-visible failure, never a
+degraded mode.
+<!-- /release-docs:hazard:fail-hard-engines -->
+
+<!-- release-docs:hazard:no-fallback -->
+Silent fallback and host-side reimplementation of engine semantics are
+prohibited. Prefer an explicit error over a plausible-looking substitute result.
+No second provider, JavaScript CBOR decoder, or alternate Plutus evaluator may
+fill in for a failed engine call.
+<!-- /release-docs:hazard:no-fallback -->
+
+<!-- release-docs:hazard:embedded-plutus -->
+Plutus evaluation is embedded in wasm-tx-inspector; there is no separate Plutus
+WASI artifact and hosts must not ship an alternate evaluator. The libraries
+are listed under the `cardano-ledger-inspector` engine row in
+`release/engines.json` (`embeddedPlutus.libraries`).
+<!-- /release-docs:hazard:embedded-plutus -->
+
 ## Runtime shape
 
 The deployed site is a static bundle:

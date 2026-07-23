@@ -9,6 +9,9 @@
  * @packageDocumentation
  */
 
+/** Release version derived from package.json (sole authored authority). */
+export declare const version: string;
+
 /** A JSON scalar accepted by JSON-oriented API operations. */
 export type JsonPrimitive = string | number | boolean | null;
 /** A recursively JSON-serialisable value. */

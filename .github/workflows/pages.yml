@@ -5,6 +5,11 @@ on:
     tags:
       - "v*"
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to publish (must be v* and match package.json version)"
+        required: true
+        type: string
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
@@ -23,14 +28,41 @@ jobs:
     runs-on: nixos
 
     steps:
-      - name: Checkout
+      # Explicit tag path: push tags use github.ref_name; manual dispatch
+      # requires a v* tag input so default-branch dispatch cannot pass
+      # --tag main or publish stale branch artifacts.
+      - name: Resolve release tag
+        id: release-tag
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ inputs.tag }}"
+          else
+            TAG="${{ github.ref_name }}"
+          fi
+          case "$TAG" in
+            v*)
+              ;;
+            *)
+              echo "pages publish requires a v* release tag; got: ${TAG}" >&2
+              exit 1
+              ;;
+          esac
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout release tag
         uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.release-tag.outputs.tag }}
 
       - name: Setup Cachix
         uses: cachix/cachix-action@v15
         with:
           name: paolino
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+
+      - name: Verify tag matches package.json
+        run: nix develop --quiet -c node scripts/check-release-version.mjs --tag "${{ steps.release-tag.outputs.tag }}"
 
       - name: Build app bundle
         run: nix build .#combined-site --out-link result-dist
