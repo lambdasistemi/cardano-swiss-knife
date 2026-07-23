@@ -15,9 +15,9 @@
 
 ## Finalization — Orchestrator-owned
 
-- [ ] T009 Independently review the implementation diff and navigator handshake, rerun all focused checks and `./gate.sh`, stamp T001–T008 into the implementation commit, and push it.
-- [ ] T010 Update PR #117 with delivered behavior and evidence, pass the commit/task finalization audit, remove `gate.sh`, and stamp T009–T011 in the drop-gate commit.
-- [ ] T011 Mark PR #117 ready and verify fresh remote CI is green before declaring the ticket complete.
+- [X] T009 Independently review the implementation diff and navigator handshake, rerun all focused checks and `./gate.sh`, stamp T001–T008 into the implementation commit, and push it.
+- [X] T010 Update PR #117 with delivered behavior and evidence, pass the commit/task finalization audit, remove `gate.sh`, and stamp T009–T011 in the drop-gate commit.
+- [X] T011 Mark PR #117 ready and verify fresh remote CI is green before declaring the ticket complete.
 
 ## Dependencies and Execution Order
 
