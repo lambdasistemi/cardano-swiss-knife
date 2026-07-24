@@ -26,3 +26,10 @@
 - [x] T016 Synchronize only the inspector `revision` and `narHash` in `release/engines.json` to the exact `flake.lock` values.
 - [x] T017 Extend the temporary gate with `just release-gates`, then pass that proof and the complete `./gate.sh`.
 - [x] T018 Commit exactly `fix(release): sync inspector engine manifest` with the required task trailer.
+
+## Slice 4 — Repair release-reference drift
+
+- [ ] T019 Prove `node --test node/test/release-docs.test.mjs` fails on the final Slice 3 tree because the inspector revision and `narHash` are stale in `docs/reference/engines.md`.
+- [ ] T020 Synchronize only the inspector revision and `narHash` in `docs/reference/engines.md` to the exact `flake.lock` and `release/engines.json` values.
+- [ ] T021 Pass the focused release-docs proof, `just release-gates`, and the complete `./gate.sh`.
+- [ ] T022 Commit exactly `docs(release): sync inspector engine reference` with the required task trailer.
