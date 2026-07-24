@@ -8,6 +8,7 @@ const operations = new Set([
   "tx.identify",
   "tx.intent",
   "tx.rdf",
+  "tx.review",
   "tx.witness.plan",
   "tx.witness.attach",
   "tx.validate",

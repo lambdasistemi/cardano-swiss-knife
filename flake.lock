@@ -344,11 +344,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1784738268,
-        "narHash": "sha256-Bd0BZ+hRN6/A5KUFvuMz7hMcZZ8NC7tG+HwjMOnecFs=",
+        "lastModified": 1784919476,
+        "narHash": "sha256-LGbWmhkKCppfKrCZFCLJmXGGoURYJAqWXQ0uIqv+mKA=",
         "owner": "lambdasistemi",
         "repo": "cardano-ledger-inspector",
-        "rev": "cd346f3577dc243df09bf4b141b91d9470c5ec00",
+        "rev": "b99028af070c85211098cbfee87bb5a80e4639df",
         "type": "github"
       },
       "original": {

@@ -121,6 +121,77 @@ test("raw transaction operations do not attempt outbound network access", async 
   for (const result of results) assert.equal(result.ok, true, JSON.stringify(result));
 });
 
+test("publishes reviewTransaction", async () => {
+  const exports = await runForeignProgram(`
+    import * as api from ${JSON.stringify(packageName)};
+    console.log(JSON.stringify(Object.keys(api)));
+  `);
+
+  assert.ok(exports.includes("reviewTransaction"), "missing reviewTransaction");
+});
+
+test("reviewTransaction returns the canonical tx.review envelope with inspector control fields", async () => {
+  const result = await runForeignProgram(`
+    import * as api from ${JSON.stringify(packageName)};
+    console.log(JSON.stringify(await api.reviewTransaction(${JSON.stringify({ cborHex: transactionCbor })})));
+  `);
+
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.equal(result.value.op, "tx.review");
+  assert.equal(result.value.ledger_functional_layer, "cardano-ledger-functional/v1");
+  const review = result.value.result.review;
+  assert.ok(review, "result.review must be present");
+  assert.equal(review.version, "cardano-tx-review/v1");
+  assert.ok(Array.isArray(review.control_groups), "result.review.control_groups must be an array");
+  assert.ok(Array.isArray(review.high_value_movements), "result.review.high_value_movements must be an array");
+  assert.ok(Array.isArray(review.sources), "result.review.sources must be an array");
+  assert.ok(Array.isArray(review.claims), "result.review.claims must be an array");
+  assert.ok(Array.isArray(review.warnings), "result.review.warnings must be an array");
+  assert.ok(review.net_signer_value, "result.review.net_signer_value must be present");
+  assert.ok(Object.hasOwn(review.net_signer_value, "provable"), "net_signer_value.provable must be present");
+  assert.ok(review.context, "result.review.context must be present");
+  assert.ok(review.context.input_status, "result.review.context.input_status must be present");
+  assert.equal(Object.hasOwn(result.value, "ready_for_witnesses"), false, "must not synthesize readiness");
+  assert.equal(Object.hasOwn(result.value, "fully_valid"), false, "must not synthesize readiness");
+  assert.equal(Object.hasOwn(result.value, "blocked"), false, "must not synthesize readiness");
+});
+
+test("raw CBOR and TextEnvelope review inputs produce equal offline results", async () => {
+  const results = await runForeignProgram(`
+    import * as api from ${JSON.stringify(packageName)};
+    const raw = ${JSON.stringify({ cborHex: transactionCbor })};
+    const envelope = ${JSON.stringify({ textEnvelope })};
+    console.log(JSON.stringify([await api.reviewTransaction(raw), await api.reviewTransaction(envelope)]));
+  `);
+
+  assert.equal(results[0].ok, true, `raw CBOR review failed: ${JSON.stringify(results[0])}`);
+  assert.deepEqual(results[1], results[0], "TextEnvelope review result differs from raw CBOR");
+});
+
+test("reviewTransaction does not attempt outbound network access for offline inputs", async () => {
+  const guard = join(foreignProject, "review-network-denied.mjs");
+  await writeFile(guard, `
+    import net from "node:net";
+    import http from "node:http";
+    import https from "node:https";
+    import tls from "node:tls";
+    import dns from "node:dns";
+    import { syncBuiltinESMExports } from "node:module";
+    const denied = (name) => () => { throw new Error("outbound network attempted via " + name); };
+    net.connect = denied("net.connect"); net.createConnection = denied("net.createConnection");
+    http.request = denied("http.request"); http.get = denied("http.get");
+    https.request = denied("https.request"); https.get = denied("https.get");
+    tls.connect = denied("tls.connect"); dns.lookup = denied("dns.lookup"); dns.resolve = denied("dns.resolve");
+    globalThis.fetch = denied("fetch"); syncBuiltinESMExports();
+  `);
+  const result = await runForeignProgram(`
+    import * as api from ${JSON.stringify(packageName)};
+    console.log(JSON.stringify(await api.reviewTransaction(${JSON.stringify({ cborHex: transactionCbor })})));
+  `, { import: pathToFileURL(guard).href });
+
+  assert.equal(result.ok, true, JSON.stringify(result));
+});
+
 test("reports missing, incompatible, execution, and protocol transaction engines as typed hard failures", async () => {
   const engine = transactionEngine();
   const original = `${engine}.original`;

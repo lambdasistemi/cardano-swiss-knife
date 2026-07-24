@@ -132,3 +132,165 @@ test("reports missing, incompatible, execution, and protocol RDF engines as type
     await rename(originalWasm, wasm);
   }
 });
+
+const reviewBookTtl = (await readFile(new URL("./fixtures/tx-review-amaru-book.ttl", import.meta.url), "utf8"));
+const sentinelTtl = `@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+<urn:cardano:id:PaymentKey:deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef> rdfs:label "Sentinel not in transaction" .
+`;
+const userBookTtl = `@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+<urn:cardano:id:PaymentKey:8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1> rdfs:label "User book signer label" .
+`;
+
+test("reviewTransaction resolves ordered protocol and user book paths with transaction-scoped filtering", async () => {
+  const protocolBookPath = join(foreignProject, "protocol-book.ttl");
+  const userBookPath = join(foreignProject, "user-book.ttl");
+  const sentinelBookPath = join(foreignProject, "sentinel-book.ttl");
+  await writeFile(protocolBookPath, reviewBookTtl);
+  await writeFile(userBookPath, userBookTtl);
+  await writeFile(sentinelBookPath, sentinelTtl);
+
+  const result = await runForeignProgram(`
+    import * as api from ${JSON.stringify(packageName)};
+    console.log(JSON.stringify(await api.reviewTransaction(${JSON.stringify({ cborHex: transactionCbor })}, {
+      protocolBooks: [${JSON.stringify(protocolBookPath)}, ${JSON.stringify(sentinelBookPath)}],
+      userBooks: [${JSON.stringify(userBookPath)}],
+    })));
+  `);
+
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.equal(result.value.op, "tx.review");
+  assert.ok(Array.isArray(result.value.resolutions), "resolutions must be an array when books are supplied");
+  assert.equal(Object.hasOwn(result.value, "books"), false, "reviewTransaction must not return imported books");
+
+  const labels = result.value.resolutions.map((row) => row.label);
+  assert.ok(labels.includes("Amaru treasury signer"), "protocol book label for a transaction signer must resolve");
+  assert.ok(labels.includes("User book signer label"), "user book label for a transaction signer must resolve");
+  assert.equal(labels.includes("Sentinel not in transaction"), false, "off-transaction sentinel label must not appear");
+});
+
+test("reviewTransaction returns typed BOOK_IMPORT failures for unreadable and invalid book paths", async () => {
+  const invalidBookPath = join(foreignProject, "invalid-book.ttl");
+  await writeFile(invalidBookPath, "this is not valid Turtle {{{{");
+
+  const missing = await runForeignProgram(`
+    import * as api from ${JSON.stringify(packageName)};
+    console.log(JSON.stringify(await api.reviewTransaction(${JSON.stringify({ cborHex: transactionCbor })}, {
+      protocolBooks: ["/nonexistent/path/book.ttl"],
+    })));
+  `);
+  assert.equal(missing.ok, false, JSON.stringify(missing));
+  assert.equal(missing.error.code, "BOOK_IMPORT");
+  assert.equal(Object.hasOwn(missing, "value"), false, "failed review must not carry a partial value");
+
+  const invalid = await runForeignProgram(`
+    import * as api from ${JSON.stringify(packageName)};
+    console.log(JSON.stringify(await api.reviewTransaction(${JSON.stringify({ cborHex: transactionCbor })}, {
+      userBooks: [${JSON.stringify(invalidBookPath)}],
+    })));
+  `);
+  assert.equal(invalid.ok, false, JSON.stringify(invalid));
+  assert.equal(invalid.error.code, "BOOK_IMPORT");
+});
+
+test("resolveReviewLabels performs the transaction-term join inside the supplied RDF engine, not in host JavaScript", async () => {
+  const source = await readFile(new URL("../../lib/src/Cardano/Transaction/Rdf.js", import.meta.url), "utf8");
+  const fnStart = source.indexOf("export const resolveReviewLabels");
+  assert.ok(fnStart >= 0, "resolveReviewLabels must be exported from Rdf.js");
+  const fnBody = source.slice(fnStart, source.indexOf("\nexport const", fnStart + 1) === -1 ? undefined : source.indexOf("\nexport const", fnStart + 1));
+
+  assert.ok(fnBody.includes("rdfShapes.query"), "resolveReviewLabels must call query on the supplied engine handle");
+  assert.equal(fnBody.includes("globalThis.rdfShapes"), false, "resolveReviewLabels must not read globalThis.rdfShapes");
+  assert.equal(fnBody.includes(".filter("), false, "resolveReviewLabels must not filter rows in host JavaScript");
+  assert.equal(fnBody.includes("new Set("), false, "resolveReviewLabels must not build a host-side hash set");
+  assert.equal(fnBody.includes("transactionTermHashes"), false, "resolveReviewLabels must not call a separate host-side term-hash stage");
+});
+
+test("transactionInputOutRefs uses a collateral-free engine query on the supplied handle, not host-side derivation", async () => {
+  const source = await readFile(new URL("../../lib/src/Cardano/Transaction/Rdf.js", import.meta.url), "utf8");
+  const fnStart = source.indexOf("export const transactionInputOutRefs");
+  assert.ok(fnStart >= 0, "transactionInputOutRefs must be exported from Rdf.js");
+  const fnBody = source.slice(fnStart, source.indexOf("\nexport const", fnStart + 1) === -1 ? undefined : source.indexOf("\nexport const", fnStart + 1));
+
+  assert.ok(fnBody.includes("rdfShapes.query"), "transactionInputOutRefs must call query on the supplied engine handle");
+  assert.equal(fnBody.includes("globalThis.rdfShapes"), false, "transactionInputOutRefs must not read globalThis.rdfShapes");
+  assert.equal(fnBody.includes("decodedInputsQuery"), false, "transactionInputOutRefs must not reuse the collateral-including decodedInputsQuery");
+
+  const queryStart = source.indexOf("const producerOutRefsQuery");
+  assert.ok(queryStart >= 0, "producerOutRefsQuery must exist");
+  const queryBody = source.slice(queryStart, source.indexOf("export const transactionInputOutRefs"));
+  assert.ok(queryBody.includes("cardano:hasInput"), "producer query must select regular inputs");
+  assert.ok(queryBody.includes("cardano:hasReferenceInput"), "producer query must select reference inputs");
+  assert.equal(queryBody.includes("cardano:hasCollateralInput"), false, "producer query must not select collateral inputs for host-side dropping");
+
+  const outrefFnBody = source.slice(source.indexOf("export const transactionInputOutRefs"));
+  assert.equal(outrefFnBody.includes("continue"), false, "transactionInputOutRefs must not drop rows in host JavaScript");
+
+  const indexSource = await readFile(new URL("../src/index.js", import.meta.url), "utf8");
+  const reviewStart = indexSource.indexOf("export const reviewTransaction");
+  assert.ok(reviewStart >= 0, "reviewTransaction must be exported from index.js");
+  const reviewBody = indexSource.slice(reviewStart);
+  const countOccurrences = (haystack, needle) => haystack.split(needle).length - 1;
+  assert.equal(countOccurrences(reviewBody, 'runTransactionOperation("tx.review"'), 1, "reviewTransaction must dispatch exactly one tx.review");
+  assert.equal(countOccurrences(reviewBody, 'runTransactionOperation("tx.inspect"'), 0, "reviewTransaction must not dispatch tx.inspect");
+  assert.equal(countOccurrences(reviewBody, 'runTransactionOperation("tx.intent"'), 0, "reviewTransaction must not dispatch tx.intent");
+  assert.equal(countOccurrences(reviewBody, 'runTransactionOperation(TransactionLedger.planTransactionWitnessesOperation'), 0, "reviewTransaction must not dispatch tx.witness.plan");
+  assert.equal(countOccurrences(reviewBody, 'runTransactionOperation(TransactionLedger.validateTransactionOperation'), 0, "reviewTransaction must not dispatch tx.validate");
+});
+
+test("reviewTransaction resolves cross-prefix book entities by engine-owned hash join, not host IRI comparison", async () => {
+  const crossPrefixTtl = `@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+<urn:cardano:id:Script:8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1> rdfs:label "Cross-prefix signer label" .
+`;
+  const crossPrefixPath = join(foreignProject, "cross-prefix-book.ttl");
+  await writeFile(crossPrefixPath, crossPrefixTtl);
+
+  const result = await runForeignProgram(`
+    import * as api from ${JSON.stringify(packageName)};
+    console.log(JSON.stringify(await api.reviewTransaction(${JSON.stringify({ cborHex: transactionCbor })}, {
+      userBooks: [${JSON.stringify(crossPrefixPath)}],
+    })));
+  `);
+
+  assert.equal(result.ok, true, JSON.stringify(result));
+  const labels = result.value.resolutions.map((row) => row.label);
+  assert.ok(labels.includes("Cross-prefix signer label"), "engine hash join must match across differing URI prefixes; host IRI comparison would miss this");
+});
+
+test("reviewTransaction preserves exact protocol-then-user book order in resolutions with duplicates and no dedup", async () => {
+  const signerHash = "8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1";
+  const book = (label) => `@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n<urn:cardano:id:PaymentKey:${signerHash}> rdfs:label "${label}" .\n`;
+  const p1Path = join(foreignProject, "order-p1.ttl");
+  const p2Path = join(foreignProject, "order-p2.ttl");
+  const u1Path = join(foreignProject, "order-u1.ttl");
+  const u2Path = join(foreignProject, "order-u2.ttl");
+  await writeFile(p1Path, book("P1"));
+  await writeFile(p2Path, book("P2"));
+  await writeFile(u1Path, book("U1"));
+  await writeFile(u2Path, book("U2"));
+
+  const forward = await runForeignProgram(`
+    import * as api from ${JSON.stringify(packageName)};
+    console.log(JSON.stringify(await api.reviewTransaction(${JSON.stringify({ cborHex: transactionCbor })}, {
+      protocolBooks: [${JSON.stringify(p1Path)}, ${JSON.stringify(p2Path)}],
+      userBooks: [${JSON.stringify(u1Path)}, ${JSON.stringify(u2Path)}],
+    })));
+  `);
+  assert.equal(forward.ok, true, JSON.stringify(forward));
+  const forwardSignerLabels = forward.value.resolutions
+    .filter((row) => row.raw === signerHash)
+    .map((row) => row.label);
+  assert.deepEqual(forwardSignerLabels, ["P1", "P2", "U1", "U2"], "exact resolution sequence must follow protocol-then-user book order with duplicates preserved");
+
+  const reversed = await runForeignProgram(`
+    import * as api from ${JSON.stringify(packageName)};
+    console.log(JSON.stringify(await api.reviewTransaction(${JSON.stringify({ cborHex: transactionCbor })}, {
+      protocolBooks: [${JSON.stringify(u2Path)}, ${JSON.stringify(u1Path)}],
+      userBooks: [${JSON.stringify(p2Path)}, ${JSON.stringify(p1Path)}],
+    })));
+  `);
+  assert.equal(reversed.ok, true, JSON.stringify(reversed));
+  const reversedSignerLabels = reversed.value.resolutions
+    .filter((row) => row.raw === signerHash)
+    .map((row) => row.label);
+  assert.deepEqual(reversedSignerLabels, ["U2", "U1", "P2", "P1"], "reversing caller book order must reverse the exact resolution sequence");
+});
