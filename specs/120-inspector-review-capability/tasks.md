@@ -13,9 +13,9 @@
 
 ## Slice 2 — Replace the legacy review consumer
 
-- [ ] T009 Add RED CLI coverage proving review forwards existing book paths, consumes the canonical envelope, and emits a deterministic raw canonical golden.
-- [ ] T010 Replace `commands/tx.js`'s inspect/intent/witness-plan/validate composition with direct delegation to `reviewTransaction`.
-- [ ] T011 Pass existing review `--book` paths as `userBooks` while preserving current in-memory book handling for non-review commands.
-- [ ] T012 Replace the legacy composite renderer with the authorized raw canonical dump, with no new flags, JSON-output contract, readiness synthesis, or richer #121 rendering.
-- [ ] T013 Prove the CLI result omits a full book dump and secret material while existing review usage/error behavior remains fail closed.
-- [ ] T014 Run `nix run .#ci-node-api` and `./gate.sh`, then commit exactly `refactor(cli): consume canonical transaction review` with the required task trailer.
+- [x] T009 Add RED CLI coverage proving review forwards existing book paths, consumes the canonical envelope, and emits a deterministic raw canonical golden.
+- [x] T010 Replace `commands/tx.js`'s inspect/intent/witness-plan/validate composition with direct delegation to `reviewTransaction`.
+- [x] T011 Pass existing review `--book` paths as `userBooks` while preserving current in-memory book handling for non-review commands.
+- [x] T012 Replace the legacy composite renderer with the authorized raw canonical dump, with no new flags, JSON-output contract, readiness synthesis, or richer #121 rendering.
+- [x] T013 Prove the CLI result omits a full book dump and secret material while existing review usage/error behavior remains fail closed.
+- [x] T014 Run `nix run .#ci-node-api` and `./gate.sh`, then commit exactly `refactor(cli): consume canonical transaction review` with the required task trailer.

@@ -663,6 +663,8 @@ test("renders the deterministic offline Amaru transaction review with book resol
     const first = await run(args, "", undefined, guarded);
     assert.equal(first.code, 0, `${first.stderr}${first.stdout}`);
     assert.equal(first.stdout, amaruGolden);
+    assert.doesNotMatch(first.stdout, /Amaru treasury journal/, "the off-transaction sentinel label must not be emitted");
+    assert.doesNotMatch(first.stdout, /@prefix|rdfs:label|urn:cardano:id/, "full book Turtle content must not be emitted");
     const second = await run(args, "", undefined, guarded);
     assert.equal(second.code, 0, second.stderr);
     assert.equal(second.stdout, first.stdout, "two identical offline invocations must render byte-identical stdout");
@@ -670,6 +672,40 @@ test("renders the deterministic offline Amaru transaction review with book resol
     assert.deepEqual(recorded.calls, [], "offline tx review must make no provider request");
     const rejectsJson = await run([...args, "--output", "json"]);
     assert.equal(rejectsJson.code, 2, "tx review is human-only and must reject --output json");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("dispatches exactly tx.review for an offline no-book CLI review", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "csk-cli-tx-review-dispatch-"));
+  const raw = join(dir, "transaction.cbor");
+  const guard = join(dir, "dispatch-spy.mjs");
+  const capture = join(dir, "calls.json");
+  try {
+    await Promise.all([
+      writeFile(raw, `${transactionCbor}\n`),
+      writeFile(guard, `import { writeFileSync } from "node:fs";
+const dispatchedOps = [];
+const originalStringify = JSON.stringify;
+JSON.stringify = (value, ...rest) => {
+  if (value && typeof value === "object" && !Array.isArray(value) && typeof value.op === "string" && typeof value.tx_cbor === "string") dispatchedOps.push(value.op);
+  return originalStringify(value, ...rest);
+};
+const calls = [];
+globalThis.fetch = async (url) => { calls.push({ url }); return { status: 401, text: async () => "denied" }; };
+process.on("exit", () => writeFileSync(process.env.CSK_TX_REVIEW_CAPTURE, originalStringify({ calls, dispatchedOps })));
+`),
+    ]);
+    const guarded = { NODE_OPTIONS: `--import ${new URL(`file://${guard}`).href}`, CSK_TX_REVIEW_CAPTURE: capture };
+    const result = await run(["tx", "review", "--tx-file", raw], "", undefined, guarded);
+    assert.equal(result.code, 0, `${result.stderr}${result.stdout}`);
+    const rendered = JSON.parse(result.stdout);
+    assert.equal(rendered.op, "tx.review", "no-book review must emit the canonical tx.review envelope");
+    assert.equal(Object.hasOwn(rendered, "resolutions"), false, "no-book review must not synthesize a resolutions field");
+    const recorded = JSON.parse(await readFile(capture, "utf8"));
+    assert.deepEqual(recorded.dispatchedOps, ["tx.review"], "no-book CLI review must dispatch exactly tx.review, not the legacy inspect/intent/witness-plan/validate composition");
+    assert.deepEqual(recorded.calls, [], "offline no-book tx review must make no provider request");
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
@@ -700,7 +736,7 @@ test("enforces tx review's exact --tx-file surface and typed malformed transacti
     assert.equal(missingBook.code, 7, missingBook.stderr);
     const invalidBookRejected = await run(["tx", "review", "--tx-file", raw, "--book", invalidBook]);
     assert.equal(invalidBookRejected.code, 7, invalidBookRejected.stderr);
-    assert.match(invalidBookRejected.stderr, /unsupported JSON kind/, "an invalid book document must fail closed as BOOK_IMPORT, not just an unreadable path");
+    assert.match(invalidBookRejected.stderr, /supplied book path contained invalid Turtle/, "an invalid book supplied as a Turtle path must fail closed as BOOK_IMPORT");
     const mismatchedProvider = await run(["tx", "review", "--tx-file", raw, "--provider", "blockfrost"]);
     assert.equal(mismatchedProvider.code, 2, "tx review must require paired --provider and --network");
   } finally {
@@ -708,13 +744,13 @@ test("enforces tx review's exact --tx-file surface and typed malformed transacti
   }
 });
 
-test("composes evidence from repeated --book across two distinct labeled books", async () => {
+test("forwards repeated --book in argument order through the canonical review envelope", async () => {
   const dir = await mkdtemp(join(tmpdir(), "csk-cli-tx-review-books-"));
   const raw = join(dir, "transaction.cbor");
   const bookA = join(dir, "book-a.ttl");
   const bookB = join(dir, "book-b.ttl");
   const secondBookTurtle = `@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
-<urn:cardano:id:StakeKey:4c7889c658ef4f491a34cf79c35a2e0fe6b0d1b0a856fb9580f2d9c3> rdfs:label "Amaru signer stake key" .
+<urn:cardano:id:PaymentKey:8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1> rdfs:label "Second book signer label" .
 `;
   try {
     await Promise.all([
@@ -724,9 +760,13 @@ test("composes evidence from repeated --book across two distinct labeled books",
     ]);
     const result = await run(["tx", "review", "--tx-file", raw, "--book", bookA, "--book", bookB]);
     assert.equal(result.code, 0, result.stderr);
-    assert.match(result.stdout, /Amaru treasury signer/, "first book's resolution must be present");
-    assert.match(result.stdout, /Amaru signer stake key/, "second book's resolution must be present");
-    assert.match(result.stdout, /4c7889c658ef4f491a34cf79c35a2e0fe6b0d1b0a856fb9580f2d9c3/, "raw identifier must remain visible alongside the label");
+    assert.match(result.stdout, /"op": "tx\.review"/, "review must emit the canonical tx.review envelope, not the legacy composite prose");
+    assert.match(result.stdout, /Amaru treasury signer/, "first --book's label must be present");
+    assert.match(result.stdout, /Second book signer label/, "second --book's label for the same identifier must be present");
+    const firstIndex = result.stdout.indexOf("Amaru treasury signer");
+    const secondIndex = result.stdout.indexOf("Second book signer label");
+    assert.ok(firstIndex !== -1 && secondIndex !== -1 && firstIndex < secondIndex, "repeated --book argument order must be preserved: the first book's label precedes the second book's label");
+    assert.match(result.stdout, /8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1/, "raw identifier must remain visible alongside the label");
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
@@ -767,13 +807,15 @@ test("proves the provider-backed complete Conway ledger preflight preserves the 
     const args = ["tx", "review", "--tx-file", raw, "--provider", "blockfrost", "--network", "mainnet", "--vault", vault, "--vault-entry", "blockfrost", "--passphrase-fd", "3"];
     const result = await run(args, "", `${passphrase}\n`, guarded);
     assert.equal(result.code, 0, `${result.stderr}${result.stdout}`);
-    assert.match(result.stdout, /Ledger preflight: completed/);
-    assert.match(result.stdout, new RegExp(`Verdict: ${ledgerFixture.expected.validationStatuses.valid}`));
-    assert.doesNotMatch(result.stdout, /incomplete/);
+    const envelope = JSON.parse(result.stdout);
+    assert.equal(envelope.op, "tx.review", "provider-backed review must emit the canonical tx.review envelope");
+    assert.equal(envelope.result.review.context.input_status, "complete", "fully resolved producer context must be reported complete");
+    assert.equal(envelope.result.review.net_signer_value.provable, true, "fully resolved producer context must make net signer value provable");
     for (const value of [secret, passphrase]) assert.doesNotMatch(`${result.stdout}${result.stderr}`, new RegExp(value));
     const recorded = JSON.parse(await readFile(capture, "utf8"));
     assert.ok(recorded.calls.some((call) => call.url.includes("/blocks/latest")), "provider-backed review must resolve validation context");
-    assert.ok(recorded.calls.filter((call) => call.url.includes("/epochs/latest/parameters")).length === 1, "context must be resolved once and reused across composed operations");
+    assert.ok(recorded.calls.filter((call) => call.url.includes("/epochs/latest/parameters")).length === 1, "validation context must be resolved once and reused");
+    assert.ok(recorded.calls.some((call) => /\/txs\/[0-9a-f]{64}\/cbor$/.test(call.url)), "provider-backed review must fetch producer transaction CBOR");
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
