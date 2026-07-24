@@ -394,3 +394,16 @@ export declare const planTransactionWitnesses: (input: TransactionInput, options
 export declare const validateTransaction: (input: TransactionInput, options?: TransactionOperationOptions) => Promise<CskResult<TransactionOperationOutput>>;
 /** Evaluates scripts contained in a transaction. */
 export declare const evaluateTransactionScripts: (input: TransactionInput, options?: TransactionOperationOptions) => Promise<CskResult<TransactionOperationOutput>>;
+
+/** Options for the canonical transaction review with ordered book paths. */
+export interface ReviewTransactionOptions {
+  /** Ordered Turtle file paths processed as protocol books. */
+  protocolBooks?: string[];
+  /** Ordered Turtle file paths processed as user books, after protocol books. */
+  userBooks?: string[];
+  /** Additional JSON-compatible operation options. */
+  [field: string]: JsonValue | undefined;
+}
+
+/** Reviews a transaction through the canonical inspector-owned tx.review operation. */
+export declare const reviewTransaction: (input: TransactionInput, options?: ReviewTransactionOptions) => Promise<CskResult<TransactionOperationOutput>>;

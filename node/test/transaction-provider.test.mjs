@@ -389,3 +389,93 @@ globalThis.fetch = async (url, options = {}) => {
   assert.equal(accountRequests[0].method, "POST");
   assert.equal(accountRequests[0].body, koiosAccountBody);
 });
+
+test("reviewTransaction reuses the existing provider context path and redacts credentials", async () => {
+  const ledgerFixture = JSON.parse(await readFile(new URL("./fixtures/transaction-ledger.json", import.meta.url), "utf8"));
+  const reviewSecret = "never-render-this-review-secret";
+  const producerTxs = ledgerFixture.complete.options.context.producer_txs;
+  const validationContext = ledgerFixture.complete.options.context;
+  const result = await runForeignProgram(`
+    const producerTxs = ${JSON.stringify(producerTxs)};
+    const latestBlock = ${JSON.stringify({ slot: Number(validationContext.slot), epoch: Number(validationContext.epoch) })};
+    const epochParameters = ${JSON.stringify(validationContext.protocol_parameters)};
+    const calls = [];
+    const dispatchedOps = [];
+    const dispatchedRequests = [];
+    const originalStringify = JSON.stringify;
+    JSON.stringify = (value, ...rest) => {
+      if (value && typeof value === "object" && !Array.isArray(value) && typeof value.op === "string" && typeof value.tx_cbor === "string") {
+        dispatchedOps.push(value.op);
+        dispatchedRequests.push({ op: value.op, args: value.args ? JSON.parse(originalStringify(value.args)) : {} });
+      }
+      return originalStringify(value, ...rest);
+    };
+    globalThis.fetch = async (url, options) => {
+      calls.push({ url, method: options.method, headers: { ...options.headers }, body: options.body ?? null });
+      const cborMatch = url.match(/\\/txs\\/([0-9a-f]{64})\\/cbor$/);
+      if (cborMatch && producerTxs[cborMatch[1]]) {
+        return { status: 200, text: async () => originalStringify({ cbor: producerTxs[cborMatch[1]].tx_cbor }) };
+      }
+      if (url.endsWith("/blocks/latest")) {
+        return { status: 200, text: async () => originalStringify(latestBlock) };
+      }
+      if (url.endsWith("/epochs/latest/parameters")) {
+        return { status: 200, text: async () => originalStringify(epochParameters) };
+      }
+      return { status: 404, text: async () => "{}" };
+    };
+    const api = await import(${JSON.stringify(packageName)});
+    const input = { cborHex: ${JSON.stringify(ledgerFixture.complete.transactionCbor)}, provider: "blockfrost", network: "mainnet", credential: ${JSON.stringify(reviewSecret)} };
+    const review = await api.reviewTransaction(input);
+    JSON.stringify = originalStringify;
+    console.log(JSON.stringify({ calls, dispatchedOps, dispatchedRequests, review }));
+  `);
+
+  assert.equal(result.review.ok, true, JSON.stringify(result.review));
+  assert.equal(result.review.value.op, "tx.review");
+  const review = result.review.value.result.review;
+  assert.ok(review.context, "provider-selected review must carry the inspector review context");
+  assert.equal(review.context.input_status, "complete", "all producer transactions must resolve from the fixture");
+  assert.equal(review.net_signer_value.provable, true, "fully resolved producer context must make net signer value provable");
+
+  const producerTxCalls = result.calls.filter(({ url }) => /\/txs\/[0-9a-f]{64}\/cbor$/.test(url));
+  const requestedHashes = [...new Set(producerTxCalls.map(({ url }) => url.match(/\/txs\/([0-9a-f]{64})\/cbor$/)[1]))].sort();
+  assert.deepEqual(requestedHashes, Object.keys(producerTxs).sort(), "provider-backed review must request exactly the fixture's producer transaction hashes");
+  assert.equal(producerTxCalls.length, Object.keys(producerTxs).length, "producer request count must equal the fixture hash count (no duplicate requests)");
+  for (const call of producerTxCalls) {
+    assert.equal(call.method, "GET");
+    assert.equal(call.headers.project_id, reviewSecret);
+  }
+
+  const blockCalls = result.calls.filter(({ url }) => url.endsWith("/blocks/latest"));
+  assert.equal(blockCalls.length, 1, "validation context must request /blocks/latest exactly once");
+  assert.equal(blockCalls[0].method, "GET");
+  assert.equal(blockCalls[0].headers.project_id, reviewSecret);
+  const epochCalls = result.calls.filter(({ url }) => url.endsWith("/epochs/latest/parameters"));
+  assert.equal(epochCalls.length, 1, "validation context must request /epochs/latest/parameters exactly once");
+  assert.equal(epochCalls[0].method, "GET");
+  assert.equal(epochCalls[0].headers.project_id, reviewSecret);
+
+  assert.deepEqual(result.dispatchedOps, ["tx.rdf", "tx.review"], "provider-backed review must dispatch exactly tx.rdf then tx.review — no tx.inspect/intent/witness/validate");
+
+  const reviewRequest = result.dispatchedRequests.find((request) => request.op === "tx.review");
+  assert.ok(reviewRequest, "dispatch spy must capture the tx.review request");
+  const reviewContext = reviewRequest.args.context;
+  assert.ok(reviewContext, "tx.review dispatch args must carry resolved context");
+  assert.equal(reviewContext.network, validationContext.network, "dispatch context must carry fixture network");
+  assert.equal(reviewContext.slot, validationContext.slot, "dispatch context must carry fixture slot");
+  assert.equal(reviewContext.epoch, validationContext.epoch, "dispatch context must carry fixture epoch");
+  assert.deepEqual(reviewContext.protocol_parameters, validationContext.protocol_parameters, "dispatch context must carry exact fixture protocol_parameters");
+  assert.equal(reviewContext.resolution.validation_context_source, "blockfrost.blocks.latest+epochs.latest.parameters", "dispatch context must identify the blockfrost validation source");
+  assert.deepEqual(reviewContext.resolution.errors, [], "fully resolved fixture must carry no resolution errors");
+  assert.deepEqual(reviewContext.resolution.error_codes, [], "fully resolved fixture must carry no resolution error_codes");
+
+  const canonicalReviewContext = result.review.value.result.review.context;
+  assert.equal(Object.hasOwn(canonicalReviewContext, "network"), false, "canonical ReviewContext must not own validation network");
+  assert.equal(Object.hasOwn(canonicalReviewContext, "slot"), false, "canonical ReviewContext must not own validation slot");
+  assert.equal(Object.hasOwn(canonicalReviewContext, "epoch"), false, "canonical ReviewContext must not own validation epoch");
+  assert.equal(Object.hasOwn(canonicalReviewContext, "protocol_parameters"), false, "canonical ReviewContext must not own validation protocol_parameters");
+
+  const serialized = JSON.stringify(result.review);
+  assert.doesNotMatch(serialized, new RegExp(reviewSecret), "review result must never leak the provider credential");
+});

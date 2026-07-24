@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import * as Address from "../../output/Cardano.Offline.Address/index.js";
 import * as Key from "../../output/Cardano.Offline.Key/index.js";
 import * as Mnemonic from "../../output/Cardano.Offline.Mnemonic/index.js";
@@ -14,7 +15,7 @@ import * as Either from "../../output/Data.Either/index.js";
 import * as Maybe from "../../output/Data.Maybe/index.js";
 import { CskError, toCskError } from "./error.js";
 import { runTransactionOperation } from "./transaction-engine.js";
-import { resolveRdf } from "./rdf-engine.js";
+import { resolveRdf, resolveReviewRdf, transactionInputRefs } from "./rdf-engine.js";
 export { version } from "./version.js";
 
 /**
@@ -667,3 +668,56 @@ export const validateTransaction = (input, options) => transactionOperation(Tran
  * const result = await evaluateTransactionScripts({ cborHex });
  */
 export const evaluateTransactionScripts = (input, options) => transactionOperation(TransactionLedger.evaluateTransactionScriptsOperation, input, options);
+
+/**
+ * Reviews a transaction through the canonical inspector-owned `tx.review`
+ * operation, optionally decorating the result with operator-book label
+ * resolutions restricted to identifiers present in the transaction.
+ * Resolves rather than throws to a `{ ok: true, value }` / `{ ok: false, error }` `CskResult`; failures use `PROVIDER_*`, `RDF_ENGINE_*`, `BOOK_IMPORT`, `ENGINE_*`, or `DOMAIN_ERROR`.
+ * @param {{ cborHex: string } | { textEnvelope: JsonValue | string } | { txHash: string, provider: "blockfrost" | "koios", network: "mainnet" | "preprod" | "preview", credential?: string }} input Transaction source.
+ * @param {{ protocolBooks?: string[], userBooks?: string[], [key: string]: JsonValue | undefined }} [options] Review options with ordered Turtle file paths.
+ * @returns {Promise<CskResult<JsonValue>>} Canonical review envelope or a coded failure.
+ * @example
+ * const result = await reviewTransaction({ cborHex }, { protocolBooks: ["/path/to/protocol.ttl"], userBooks: ["/path/to/user.ttl"] });
+ */
+export const reviewTransaction = (input, options = {}) => operation(async () => {
+  const protocolBooks = options.protocolBooks ?? [];
+  const userBooks = options.userBooks ?? [];
+  const bookPaths = [...protocolBooks, ...userBooks];
+
+  let bookTurtles = [];
+  if (bookPaths.length > 0) {
+    try {
+      for (const bookPath of bookPaths) {
+        bookTurtles.push(await readFile(bookPath, "utf8"));
+      }
+    } catch (error) {
+      throw new CskError("BOOK_IMPORT", `A supplied book path could not be read: ${error.message}`, error);
+    }
+  }
+
+  const { protocolBooks: _pb, userBooks: _ub, ...engineArgs } = options;
+  const txCbor = await transactionInput(input);
+  const selection = providerContextSelection(input);
+
+  let graph;
+  let reviewArgs = engineArgs;
+  if (selection) {
+    const rdf = await runTransactionOperation("tx.rdf", txCbor, engineArgs);
+    graph = rdf?.result?.rdf?.turtle ?? rdf?.rdf?.turtle ?? rdf?.turtle;
+    if (!graph) throw new CskError("RDF_ENGINE_PROTOCOL", "The ledger-inspector tx.rdf operation returned no Turtle graph.");
+    const inputRefs = await transactionInputRefs(graph);
+    const context = await awaitAff(Provider.resolveProducerTxContext(selection.provider)(selection.network)(selection.credential)(!Provider.needsKey(selection.provider) || selection.credential !== "")(JSON.stringify(inputRefs)));
+    reviewArgs = { ...engineArgs, ...JSON.parse(context) };
+  }
+  const value = await runTransactionOperation("tx.review", txCbor, reviewArgs);
+
+  if (bookPaths.length === 0) return value;
+
+  if (!graph) {
+    const rdf = await runTransactionOperation("tx.rdf", txCbor, engineArgs);
+    graph = rdf?.result?.rdf?.turtle ?? rdf?.rdf?.turtle ?? rdf?.turtle;
+    if (!graph) throw new CskError("RDF_ENGINE_PROTOCOL", "The ledger-inspector tx.rdf operation returned no Turtle graph.");
+  }
+  return { ...value, resolutions: await resolveReviewRdf(graph, bookTurtles) };
+});

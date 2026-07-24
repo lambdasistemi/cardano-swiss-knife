@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { CskError } from "./error.js";
-import { resolveLabels } from "../../lib/src/Cardano/Transaction/Rdf.js";
+import { resolveLabels, resolveReviewLabels, transactionInputOutRefs } from "../../lib/src/Cardano/Transaction/Rdf.js";
 let engine;
 const hard = (code, message, cause) => new CskError(code, message, cause);
 const load = async () => {
@@ -29,4 +29,24 @@ export const resolveRdf = async (graph, books) => {
   }
   if (!Array.isArray(value)) throw hard("RDF_ENGINE_PROTOCOL", "The RDF-shapes engine returned malformed query results.");
   return value.map((row) => ({ raw: row.entity?.split(":").at(-1) ?? "", label: row.label, type: row.typeIri ? `overlay:${row.typeIri.split("#").at(-1)}` : "" }));
+};
+export const resolveReviewRdf = async (graph, bookTurtles) => {
+  const mod = await load();
+  let value;
+  try { value = resolveReviewLabels(mod, graph, bookTurtles); }
+  catch (error) {
+    const protocol = /query did not return|query result missing|Cannot read properties/.test(String(error?.message));
+    if (protocol) throw hard("RDF_ENGINE_PROTOCOL", "The RDF-shapes engine returned malformed query results.", error);
+    throw hard("BOOK_IMPORT", "A supplied book path contained invalid Turtle.", error);
+  }
+  if (!Array.isArray(value)) throw hard("RDF_ENGINE_PROTOCOL", "The RDF-shapes engine returned malformed query results.");
+  return value.map((row) => ({ raw: row.entity?.split(":").at(-1) ?? "", label: row.label, type: row.typeIri ? `overlay:${row.typeIri.split("#").at(-1)}` : "" }));
+};
+export const transactionInputRefs = async (graph) => {
+  const mod = await load();
+  try { return transactionInputOutRefs(mod, graph); }
+  catch (error) {
+    const protocol = /query did not return|query result missing|Cannot read properties/.test(String(error?.message));
+    throw hard(protocol ? "RDF_ENGINE_PROTOCOL" : "RDF_ENGINE_EXECUTION", "The RDF-shapes engine failed while extracting transaction input references.", error);
+  }
 };
