@@ -19,3 +19,10 @@
 - [x] T012 Replace the legacy composite renderer with the authorized raw canonical dump, with no new flags, JSON-output contract, readiness synthesis, or richer #121 rendering.
 - [x] T013 Prove the CLI result omits a full book dump and secret material while existing review usage/error behavior remains fail closed.
 - [x] T014 Run `nix run .#ci-node-api` and `./gate.sh`, then commit exactly `refactor(cli): consume canonical transaction review` with the required task trailer.
+
+## Slice 3 — Repair release-manifest drift
+
+- [ ] T015 Prove `node scripts/check-release-manifests.mjs` fails on the Slice 2 head with the inspector revision and `narHash` drift reported by remote CI.
+- [ ] T016 Synchronize only the inspector `revision` and `narHash` in `release/engines.json` to the exact `flake.lock` values.
+- [ ] T017 Extend the temporary gate with `just release-gates`, then pass that proof and the complete `./gate.sh`.
+- [ ] T018 Commit exactly `fix(release): sync inspector engine manifest` with the required task trailer.
