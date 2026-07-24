@@ -22,7 +22,7 @@
 
 ## Slice 3 — Repair release-manifest drift
 
-- [ ] T015 Prove `node scripts/check-release-manifests.mjs` fails on the Slice 2 head with the inspector revision and `narHash` drift reported by remote CI.
-- [ ] T016 Synchronize only the inspector `revision` and `narHash` in `release/engines.json` to the exact `flake.lock` values.
-- [ ] T017 Extend the temporary gate with `just release-gates`, then pass that proof and the complete `./gate.sh`.
-- [ ] T018 Commit exactly `fix(release): sync inspector engine manifest` with the required task trailer.
+- [x] T015 Prove `node scripts/check-release-manifests.mjs` fails on the Slice 2 head with the inspector revision and `narHash` drift reported by remote CI.
+- [x] T016 Synchronize only the inspector `revision` and `narHash` in `release/engines.json` to the exact `flake.lock` values.
+- [x] T017 Extend the temporary gate with `just release-gates`, then pass that proof and the complete `./gate.sh`.
+- [x] T018 Commit exactly `fix(release): sync inspector engine manifest` with the required task trailer.
