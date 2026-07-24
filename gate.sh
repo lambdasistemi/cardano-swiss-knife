@@ -4,6 +4,7 @@ set -euo pipefail
 git diff --check
 git diff --check origin/main...HEAD
 bash scripts/check-architecture-boundary.sh
+nix run .#ci-node-api
 nix build .#checks.x86_64-linux.test --no-link
 nix run .#ci-check
 nix run .#ci-haskell-quality
