@@ -185,9 +185,21 @@ to a string first. Human mode keeps calling the renderer. Typed failures under
 The call becomes
 `tx.review(input, { protocolBooks: values.protocolBook, userBooks: values.userBook })`.
 `--book` keeps its current meaning (a user book), so existing invocations are unchanged;
-the usage text marks it as a retained compatibility alias for `--user-book`. The three
-flags stay rejected for every non-`review` transaction command, matching today's `--book`
-handling for `review` versus the legacy `books` option used elsewhere.
+the usage text marks it as a retained compatibility alias for `--user-book`.
+
+`--protocol-book` and `--user-book` are **review-only**: supplying either to any other
+transaction command is a usage error, exit 2. `--book` is **not** restricted that way — it
+keeps both of its existing roles unchanged. Under `review` it is the compatibility alias
+above; under every other transaction command it remains the legacy `books` source, as at
+baseline (`cli/csk.mjs:170` consumes `values.book` under exactly `command !== "review"`,
+and `node/test/cli.test.mjs:178-179` drives `inspect`/`browse`/`identify`/`intent` with
+repeated `--book` and asserts the imported books).
+
+Ruling A-002 settled this. An earlier draft of this section and of the Slice 1 brief said
+"all three flags stay rejected for non-`review` commands", which is irreconcilable with the
+unchanged-`--book` requirement and would have broken shipped, passing tests. The navigator
+refused to approve GREEN against the contradiction and escalated; the ruling is recorded in
+`rulings/A-002-book-non-review-contract.md`.
 
 ## Slices
 
