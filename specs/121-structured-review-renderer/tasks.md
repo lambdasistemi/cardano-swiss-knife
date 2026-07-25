@@ -33,14 +33,14 @@ Commit: `feat(cli): accept ordered protocol and user review books`
 
 Commit: `feat(cli): return the structured review through --output json`
 
-- [ ] T006 RED: prove `csk tx review --output json` exits 0 and emits
+- [X] T006 RED: prove `csk tx review --output json` exits 0 and emits
       `{version:1, ok:true, value:<capability result>}` with the result unchanged
       (FR-006, SC-004).
-- [ ] T007 RED: prove a typed failure under `--output json` still emits the JSON error
+- [X] T007 RED: prove a typed failure under `--output json` still emits the JSON error
       envelope with its existing code and exit status (FR-012).
-- [ ] T008 GREEN: stop rejecting `--output` for `review` and stop stringifying the value
+- [X] T008 GREEN: stop rejecting `--output` for `review` and stop stringifying the value
       before the JSON envelope; human mode keeps rendering.
-- [ ] T009 Run `nix run .#ci-node-api` and `./gate.sh`, then commit.
+- [X] T009 Run `nix run .#ci-node-api` and `./gate.sh`, then commit.
 
 ## Slice 3 — `decision-view`
 

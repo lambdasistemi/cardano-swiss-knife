@@ -670,8 +670,12 @@ test("renders the deterministic offline Amaru transaction review with book resol
     assert.equal(second.stdout, first.stdout, "two identical offline invocations must render byte-identical stdout");
     const recorded = JSON.parse(await readFile(capture, "utf8"));
     assert.deepEqual(recorded.calls, [], "offline tx review must make no provider request");
-    const rejectsJson = await run([...args, "--output", "json"]);
-    assert.equal(rejectsJson.code, 2, "tx review is human-only and must reject --output json");
+    const jsonReview = await run([...args, "--output", "json"]);
+    assert.equal(jsonReview.code, 0, jsonReview.stderr);
+    const jsonEnvelope = JSON.parse(jsonReview.stdout);
+    assert.equal(jsonEnvelope.version, 1);
+    assert.equal(jsonEnvelope.ok, true);
+    assert.deepEqual(jsonEnvelope.value, JSON.parse(first.stdout), "--output json must return the same structured result as the human review");
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
@@ -881,6 +885,56 @@ test("proves the provider-backed complete Conway ledger preflight preserves the 
     assert.ok(recorded.calls.some((call) => call.url.includes("/blocks/latest")), "provider-backed review must resolve validation context");
     assert.ok(recorded.calls.filter((call) => call.url.includes("/epochs/latest/parameters")).length === 1, "validation context must be resolved once and reused");
     assert.ok(recorded.calls.some((call) => /\/txs\/[0-9a-f]{64}\/cbor$/.test(call.url)), "provider-backed review must fetch producer transaction CBOR");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("T006: returns the structured review envelope through --output json, identical to the human review result", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "csk-cli-tx-review-json-"));
+  const raw = join(dir, "transaction.cbor");
+  const book = join(dir, "amaru-book.ttl");
+  try {
+    await Promise.all([
+      writeFile(raw, `${transactionCbor}\n`),
+      writeFile(book, amaruBook),
+    ]);
+    const noBookHuman = await run(["tx", "review", "--tx-file", raw]);
+    assert.equal(noBookHuman.code, 0, noBookHuman.stderr);
+    const noBookJson = await run(["tx", "review", "--tx-file", raw, "--output", "json"]);
+    assert.equal(noBookJson.code, 0, noBookJson.stderr);
+    const noBookEnvelope = JSON.parse(noBookJson.stdout);
+    assert.deepEqual(Object.keys(noBookEnvelope).sort(), ["ok", "value", "version"]);
+    assert.equal(noBookEnvelope.version, 1);
+    assert.equal(noBookEnvelope.ok, true);
+    assert.deepEqual(noBookEnvelope.value, JSON.parse(noBookHuman.stdout), "no-book JSON value must be identical to the human review result");
+    assert.equal(Object.hasOwn(noBookEnvelope.value, "resolutions"), false, "no-book JSON review must not synthesize a resolutions field");
+    const withBookHuman = await run(["tx", "review", "--tx-file", raw, "--book", book]);
+    assert.equal(withBookHuman.code, 0, withBookHuman.stderr);
+    const withBookJson = await run(["tx", "review", "--tx-file", raw, "--book", book, "--output", "json"]);
+    assert.equal(withBookJson.code, 0, withBookJson.stderr);
+    const withBookEnvelope = JSON.parse(withBookJson.stdout);
+    assert.deepEqual(Object.keys(withBookEnvelope).sort(), ["ok", "value", "version"]);
+    assert.equal(withBookEnvelope.version, 1);
+    assert.equal(withBookEnvelope.ok, true);
+    assert.deepEqual(withBookEnvelope.value, JSON.parse(withBookHuman.stdout), "with-book JSON value must be identical to the human review result");
+    assert.ok(Array.isArray(withBookEnvelope.value.resolutions), "with-book JSON review must contain resolutions");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("T007: emits the typed JSON error envelope for a malformed transaction under --output json", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "csk-cli-tx-review-json-error-"));
+  const badCbor = join(dir, "bad.cbor");
+  try {
+    await writeFile(badCbor, "not-cbor\n");
+    const result = await run(["tx", "review", "--tx-file", badCbor, "--output", "json"]);
+    assert.equal(result.code, 3, result.stderr);
+    const envelope = JSON.parse(result.stdout);
+    assert.equal(envelope.version, 1);
+    assert.equal(envelope.ok, false);
+    assert.equal(envelope.error.code, "DOMAIN_ERROR");
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
