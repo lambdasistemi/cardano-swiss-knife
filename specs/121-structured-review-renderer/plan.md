@@ -54,6 +54,22 @@ path performs no arithmetic: no rounding, no thousands separators, no ADA conver
 9. **Additional inspector fields** — verbatim passthrough of anything unrecognised
    (FR-010).
 
+### Column alignment rule (normative)
+
+Within any one block of label/value rows, labels are padded to the length of the **longest
+label in that block**, followed by exactly **two spaces**, then the value. Indentation is
+the block's own level (two spaces for top-level sections, four for fields inside a numbered
+group). Blocks align independently of one another.
+
+This rule is normative. The worked example below was written by hand and its inter-column
+spacing is **not** internally consistent — measured separators vary by section (2 in
+Transaction and control groups, 3 in "What is not proven", 7 in Collateral). Where the
+example's padding disagrees with the rule, **the rule wins**; the example is authoritative
+for section order, headings, labels, values, and indentation level only.
+
+Recorded because it nearly caused a false failure: the golden-versus-contract diff at T018
+would have reported a correct renderer as wrong.
+
 ### Worked example
 
 Rendering the canonical envelope currently frozen in
