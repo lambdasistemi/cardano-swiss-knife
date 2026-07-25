@@ -772,6 +772,71 @@ test("forwards repeated --book in argument order through the canonical review en
   }
 });
 
+test("passes protocol books before user books and interleaves --book with --user-book in command-line order", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "csk-cli-tx-review-ordered-books-"));
+  const raw = join(dir, "transaction.cbor");
+  const protocolBook = join(dir, "protocol.ttl");
+  const userBookA = join(dir, "user-a.ttl");
+  const userBookB = join(dir, "user-b.ttl");
+  const protocolTurtle = `@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+<urn:cardano:id:StakeScript:a64d1b9e1aeffe54056034d84977061b45a92691efc282fbee3fc094> rdfs:label "Protocol script label" .
+`;
+  const userTurtleA = `@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+<urn:cardano:id:PaymentKey:8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1> rdfs:label "User signer A" .
+`;
+  const userTurtleB = `@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+<urn:cardano:id:PaymentKey:8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1> rdfs:label "User signer B" .
+`;
+  try {
+    await Promise.all([
+      writeFile(raw, `${transactionCbor}\n`),
+      writeFile(protocolBook, protocolTurtle),
+      writeFile(userBookA, userTurtleA),
+      writeFile(userBookB, userTurtleB),
+    ]);
+    const result = await run(["tx", "review", "--tx-file", raw, "--protocol-book", protocolBook, "--book", userBookA, "--user-book", userBookB]);
+    assert.equal(result.code, 0, result.stderr);
+    const envelope = JSON.parse(result.stdout);
+    const labels = envelope.resolutions.map((r) => r.label);
+    assert.deepEqual(labels, ["Protocol script label", "User signer A", "User signer B"], "protocol book resolutions must precede user book resolutions, and --book/--user-book must interleave in command-line order");
+    const reversed = await run(["tx", "review", "--tx-file", raw, "--user-book", userBookB, "--book", userBookA]);
+    assert.equal(reversed.code, 0, reversed.stderr);
+    const reversedEnvelope = JSON.parse(reversed.stdout);
+    const reversedLabels = reversedEnvelope.resolutions.map((r) => r.label);
+    assert.deepEqual(reversedLabels, ["User signer B", "User signer A"], "--user-book before --book must yield [B, A], proving command-line interleaving");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("renders two resolution rows for one identifier labelled differently by a protocol book and a user book, in caller book order, with no deduplication", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "csk-cli-tx-review-conflicting-books-"));
+  const raw = join(dir, "transaction.cbor");
+  const protocolBook = join(dir, "protocol.ttl");
+  const userBook = join(dir, "user.ttl");
+  const protocolTurtle = `@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+<urn:cardano:id:PaymentKey:8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1> rdfs:label "Protocol signer label" .
+`;
+  const userTurtle = `@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+<urn:cardano:id:PaymentKey:8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1> rdfs:label "User signer label" .
+`;
+  try {
+    await Promise.all([
+      writeFile(raw, `${transactionCbor}\n`),
+      writeFile(protocolBook, protocolTurtle),
+      writeFile(userBook, userTurtle),
+    ]);
+    const result = await run(["tx", "review", "--tx-file", raw, "--protocol-book", protocolBook, "--user-book", userBook]);
+    assert.equal(result.code, 0, result.stderr);
+    const envelope = JSON.parse(result.stdout);
+    const matching = envelope.resolutions.filter((r) => r.raw === "8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1");
+    assert.equal(matching.length, 2, "both conflicting labels must be present as separate resolution rows, with no deduplication");
+    assert.deepEqual(matching.map((r) => r.label), ["Protocol signer label", "User signer label"], "protocol book resolution must precede user book resolution in caller book order");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("proves the provider-backed complete Conway ledger preflight preserves the ledger verdict", async () => {
   const dir = await mkdtemp(join(tmpdir(), "csk-cli-tx-review-provider-"));
   const raw = join(dir, "complete-transaction.cbor");

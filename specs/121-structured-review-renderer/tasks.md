@@ -15,16 +15,19 @@ restated here.
 
 Commit: `feat(cli): accept ordered protocol and user review books`
 
-- [ ] T001 RED: prove protocol books are passed before user books, and that
+- [X] T001 RED: prove protocol books are passed before user books, and that
       `--user-book` and `--book` interleave in command-line order (FR-007, FR-008).
-- [ ] T002 RED: prove one identifier labelled differently by two supplied books yields
+- [X] T002 RED: prove one identifier labelled differently by two supplied books yields
       two resolution rows in caller book order, with no deduplication (FR-009, SC-003).
-- [ ] T003 GREEN: collect `--protocol-book` and `--user-book`/`--book` into the two
+- [X] T003 GREEN: collect `--protocol-book` and `--user-book`/`--book` into the two
       ordered lists and call the capability with `protocolBooks` / `userBooks`; reject
-      all three flags for non-`review` transaction commands as today.
-- [ ] T004 Update `txUsage` so `csk tx review` documents both new flags and marks
+      the two NEW flags for non-`review` transaction commands, leaving `--book`'s
+      existing non-`review` legacy `books` behaviour untouched (ruling A-002 — an
+      earlier draft said "all three", which contradicted the unchanged-`--book`
+      requirement and would have broken shipped tests).
+- [X] T004 Update `txUsage` so `csk tx review` documents both new flags and marks
       `--book` as a retained compatibility alias.
-- [ ] T005 Run `nix run .#ci-node-api` and `./gate.sh`, then commit.
+- [X] T005 Run `nix run .#ci-node-api` and `./gate.sh`, then commit.
 
 ## Slice 2 — `json-output`
 
