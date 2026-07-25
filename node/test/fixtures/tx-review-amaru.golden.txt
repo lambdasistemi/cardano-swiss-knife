@@ -1,138 +1,82 @@
-{
-  "ledger_functional_layer": "cardano-ledger-functional/v1",
-  "op": "tx.review",
-  "result": {
-    "review": {
-      "body_hash": "a213c84030a6ae1c05c9443b07d1b853b48637d769eec188af9ff3258b0713b1",
-      "claims": [
-        {
-          "detail": "Routine treasury maintenance / destination treasury / metadata label 1694 / self-declared",
-          "label": "reorganize",
-          "provenance": "metadata_claim",
-          "self_declared": true,
-          "value": "Treasury reorganize: merge UTxOs into one continuing output"
-        }
-      ],
-      "collateral": {
-        "body_total_lovelace": "2290730",
-        "conditional": true,
-        "input_count": 1,
-        "return_lovelace": "75120892"
-      },
-      "context": {
-        "input_status": "incomplete",
-        "missing_regular_input_count": 11,
-        "regular_input_count": 11,
-        "resolved_regular_input_count": 0
-      },
-      "control_groups": [
-        {
-          "addresses": [
-            "3132201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0d32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0d"
-          ],
-          "asset_class_count": 1,
-          "category": "script",
-          "evidence": [
-            "ledger_proven"
-          ],
-          "lovelace": "611069353175",
-          "output_count": 1,
-          "output_indices": [
-            0
-          ],
-          "role": "script_lock",
-          "role_provenance": "ledger_proven"
-        },
-        {
-          "addresses": [
-            "018bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c14c7889c658ef4f491a34cf79c35a2e0fe6b0d1b0a856fb9580f2d9c3"
-          ],
-          "asset_class_count": 0,
-          "category": "signer_controlled",
-          "evidence": [
-            "ledger_proven",
-            "heuristic"
-          ],
-          "lovelace": "75884469",
-          "output_count": 1,
-          "output_indices": [
-            1
-          ],
-          "role": "signer_change",
-          "role_provenance": "heuristic"
-        }
-      ],
-      "fee": {
-        "lovelace": "1527153"
-      },
-      "high_value_movements": [
-        {
-          "addresses": [
-            "3132201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0d32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0d"
-          ],
-          "asset_class_count": 1,
-          "category": "script",
-          "evidence": [
-            "ledger_proven"
-          ],
-          "lovelace": "611069353175",
-          "output_count": 1,
-          "output_indices": [
-            0
-          ],
-          "role": "script_lock",
-          "role_provenance": "ledger_proven"
-        }
-      ],
-      "net_signer_value": {
-        "lovelace": null,
-        "note": "missing input context, net signer gain/loss unprovable",
-        "provable": false
-      },
-      "sources": [
-        {
-          "count": 11,
-          "kind": "regular_input",
-          "missing_count": 11,
-          "resolved_count": 0,
-          "resolved_lovelace": "0"
-        },
-        {
-          "count": 1,
-          "kind": "withdrawal",
-          "lovelace": "0"
-        },
-        {
-          "body_total_lovelace": "2290730",
-          "conditional": true,
-          "input_count": 1,
-          "kind": "collateral",
-          "return_lovelace": "75120892"
-        },
-        {
-          "count": 4,
-          "kind": "reference_input",
-          "read_only": true
-        }
-      ],
-      "tx_id": "a213c84030a6ae1c05c9443b07d1b853b48637d769eec188af9ff3258b0713b1",
-      "version": "cardano-tx-review/v1",
-      "warnings": [
-        "Metadata describes intent but is self-declared; verify it against the destination addresses and contract policy.",
-        "Declared required signer hashes are absent from the witness set."
-      ]
-    }
-  },
-  "resolutions": [
-    {
-      "raw": "a64d1b9e1aeffe54056034d84977061b45a92691efc282fbee3fc094",
-      "label": "Amaru treasury script",
-      "type": "overlay:Identifier"
-    },
-    {
-      "raw": "8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1",
-      "label": "Amaru treasury signer",
-      "type": "overlay:Identifier"
-    }
-  ]
-}
+csk tx review — cardano-tx-review/v1
+
+Transaction
+  tx id      a213c84030a6ae1c05c9443b07d1b853b48637d769eec188af9ff3258b0713b1
+  body hash  a213c84030a6ae1c05c9443b07d1b853b48637d769eec188af9ff3258b0713b1
+  fee        1527153 lovelace
+
+What is not proven
+  input context status       incomplete
+  regular inputs             11
+  resolved regular inputs    0
+  missing regular inputs     11
+  net signer value provable  no
+  net signer value lovelace  (not reported)
+  net signer value note      missing input context, net signer gain/loss unprovable
+
+Warnings (2)
+  Metadata describes intent but is self-declared; verify it against the destination addresses and contract policy.
+  Declared required signer hashes are absent from the witness set.
+
+Output control groups (2)
+  group 1 of 2
+    category                        script
+    role                            script_lock
+    role provenance                 ledger_proven
+    evidence                        ledger_proven
+    lovelace                        611069353175
+    distinct non-ADA asset classes  1
+    outputs                         1 (indices 0)
+    addresses
+      3132201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0d32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0d
+  group 2 of 2
+    category                        signer_controlled
+    role                            signer_change
+    role provenance                 heuristic
+    evidence                        ledger_proven, heuristic
+    lovelace                        75884469
+    distinct non-ADA asset classes  0
+    outputs                         1 (indices 1)
+    addresses
+      018bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c14c7889c658ef4f491a34cf79c35a2e0fe6b0d1b0a856fb9580f2d9c3
+
+High-value movements (1)
+  movement 1 of 1
+    category                        script
+    role                            script_lock
+    role provenance                 ledger_proven
+    evidence                        ledger_proven
+    lovelace                        611069353175
+    distinct non-ADA asset classes  1
+    outputs                         1 (indices 0)
+    addresses
+      3132201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0d32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0d
+
+Sources (4)
+  regular_input    count 11  resolved 0  missing 11  resolved lovelace 0
+  withdrawal       count 1  lovelace 0
+  collateral       conditional yes  inputs 1  body total lovelace 2290730  return lovelace 75120892
+  reference_input  count 4  read only yes
+
+Collateral
+  conditional          yes
+  input count          1
+  body total lovelace  2290730
+  return lovelace      75120892
+
+Claims (1)
+  claim 1 of 1
+    label          reorganize
+    value          Treasury reorganize: merge UTxOs into one continuing output
+    detail         Routine treasury maintenance / destination treasury / metadata label 1694 / self-declared
+    self declared  yes
+
+Book resolutions (2, in caller book order; duplicates preserved)
+  resolution 1 of 2
+    identifier  a64d1b9e1aeffe54056034d84977061b45a92691efc282fbee3fc094
+    label       Amaru treasury script
+    type        overlay:Identifier
+  resolution 2 of 2
+    identifier  8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1
+    label       Amaru treasury signer
+    type        overlay:Identifier

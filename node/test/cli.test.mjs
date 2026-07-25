@@ -675,7 +675,14 @@ test("renders the deterministic offline Amaru transaction review with book resol
     const jsonEnvelope = JSON.parse(jsonReview.stdout);
     assert.equal(jsonEnvelope.version, 1);
     assert.equal(jsonEnvelope.ok, true);
-    assert.deepEqual(jsonEnvelope.value, JSON.parse(first.stdout), "--output json must return the same structured result as the human review");
+    assert.equal(jsonEnvelope.value.op, "tx.review", "--output json must return the structured capability result");
+    assert.ok(Array.isArray(jsonEnvelope.value.resolutions), "with-book JSON review must carry resolutions");
+    assert.ok(first.stdout.includes(jsonEnvelope.value.result.review.tx_id), "the human decision view renders the same tx id the JSON path returns");
+    assert.ok(first.stdout.includes(`${jsonEnvelope.value.result.review.fee.lovelace} lovelace`), "the human decision view renders the exact fee the JSON path returns");
+    for (const resolution of jsonEnvelope.value.resolutions) {
+      assert.ok(first.stdout.includes(resolution.raw), "the human decision view carries the raw identifier the JSON path resolves");
+      assert.ok(first.stdout.includes(resolution.label), "the human decision view carries the label the JSON path resolves");
+    }
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
@@ -704,9 +711,13 @@ process.on("exit", () => writeFileSync(process.env.CSK_TX_REVIEW_CAPTURE, origin
     const guarded = { NODE_OPTIONS: `--import ${new URL(`file://${guard}`).href}`, CSK_TX_REVIEW_CAPTURE: capture };
     const result = await run(["tx", "review", "--tx-file", raw], "", undefined, guarded);
     assert.equal(result.code, 0, `${result.stderr}${result.stdout}`);
-    const rendered = JSON.parse(result.stdout);
-    assert.equal(rendered.op, "tx.review", "no-book review must emit the canonical tx.review envelope");
-    assert.equal(Object.hasOwn(rendered, "resolutions"), false, "no-book review must not synthesize a resolutions field");
+    assert.match(result.stdout, /^csk tx review — cardano-tx-review\/v1$/m, "no-book review renders the decision view");
+    assert.equal(result.stdout.includes("Book resolutions"), false, "no-book human review must not synthesize a resolutions section");
+    const machine = await run(["tx", "review", "--tx-file", raw, "--output", "json"], "", undefined, guarded);
+    assert.equal(machine.code, 0, machine.stderr);
+    const rendered = JSON.parse(machine.stdout);
+    assert.equal(rendered.value.op, "tx.review", "no-book review must emit the canonical tx.review envelope");
+    assert.equal(Object.hasOwn(rendered.value, "resolutions"), false, "no-book review must not synthesize a resolutions field");
     const recorded = JSON.parse(await readFile(capture, "utf8"));
     assert.deepEqual(recorded.dispatchedOps, ["tx.review"], "no-book CLI review must dispatch exactly tx.review, not the legacy inspect/intent/witness-plan/validate composition");
     assert.deepEqual(recorded.calls, [], "offline no-book tx review must make no provider request");
@@ -764,7 +775,7 @@ test("forwards repeated --book in argument order through the canonical review en
     ]);
     const result = await run(["tx", "review", "--tx-file", raw, "--book", bookA, "--book", bookB]);
     assert.equal(result.code, 0, result.stderr);
-    assert.match(result.stdout, /"op": "tx\.review"/, "review must emit the canonical tx.review envelope, not the legacy composite prose");
+    assert.match(result.stdout, /^Book resolutions \(3, in caller book order; duplicates preserved\)$/m, "review renders the decision view with all three book resolution rows (the duplicate identifier preserved), not the legacy composite prose");
     assert.match(result.stdout, /Amaru treasury signer/, "first --book's label must be present");
     assert.match(result.stdout, /Second book signer label/, "second --book's label for the same identifier must be present");
     const firstIndex = result.stdout.indexOf("Amaru treasury signer");
@@ -798,16 +809,13 @@ test("passes protocol books before user books and interleaves --book with --user
       writeFile(userBookA, userTurtleA),
       writeFile(userBookB, userTurtleB),
     ]);
+    const renderedLabels = (stdout) => stdout.slice(stdout.indexOf("Book resolutions")).match(/^ {4}label[ \t]+(.*)$/gm).map((line) => line.replace(/^ {4}label[ \t]+/, ""));
     const result = await run(["tx", "review", "--tx-file", raw, "--protocol-book", protocolBook, "--book", userBookA, "--user-book", userBookB]);
     assert.equal(result.code, 0, result.stderr);
-    const envelope = JSON.parse(result.stdout);
-    const labels = envelope.resolutions.map((r) => r.label);
-    assert.deepEqual(labels, ["Protocol script label", "User signer A", "User signer B"], "protocol book resolutions must precede user book resolutions, and --book/--user-book must interleave in command-line order");
+    assert.deepEqual(renderedLabels(result.stdout), ["Protocol script label", "User signer A", "User signer B"], "protocol book resolutions must precede user book resolutions, and --book/--user-book must interleave in command-line order");
     const reversed = await run(["tx", "review", "--tx-file", raw, "--user-book", userBookB, "--book", userBookA]);
     assert.equal(reversed.code, 0, reversed.stderr);
-    const reversedEnvelope = JSON.parse(reversed.stdout);
-    const reversedLabels = reversedEnvelope.resolutions.map((r) => r.label);
-    assert.deepEqual(reversedLabels, ["User signer B", "User signer A"], "--user-book before --book must yield [B, A], proving command-line interleaving");
+    assert.deepEqual(renderedLabels(reversed.stdout), ["User signer B", "User signer A"], "--user-book before --book must yield [B, A], proving command-line interleaving");
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
@@ -832,10 +840,10 @@ test("renders two resolution rows for one identifier labelled differently by a p
     ]);
     const result = await run(["tx", "review", "--tx-file", raw, "--protocol-book", protocolBook, "--user-book", userBook]);
     assert.equal(result.code, 0, result.stderr);
-    const envelope = JSON.parse(result.stdout);
-    const matching = envelope.resolutions.filter((r) => r.raw === "8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1");
+    const resolutionsText = result.stdout.slice(result.stdout.indexOf("Book resolutions"));
+    const matching = resolutionsText.split(/^ {2}resolution \d+ of \d+$/m).filter((block) => block.includes("8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1"));
     assert.equal(matching.length, 2, "both conflicting labels must be present as separate resolution rows, with no deduplication");
-    assert.deepEqual(matching.map((r) => r.label), ["Protocol signer label", "User signer label"], "protocol book resolution must precede user book resolution in caller book order");
+    assert.deepEqual(matching.map((block) => block.match(/^ {4}label[ \t]+(.*)$/m)[1]), ["Protocol signer label", "User signer label"], "protocol book resolution must precede user book resolution in caller book order");
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
@@ -873,13 +881,13 @@ test("proves the provider-backed complete Conway ledger preflight preserves the 
       `),
     ]);
     const guarded = { NODE_OPTIONS: `--import ${new URL(`file://${guard}`).href}`, CSK_TX_REVIEW_CAPTURE: capture };
-    const args = ["tx", "review", "--tx-file", raw, "--provider", "blockfrost", "--network", "mainnet", "--vault", vault, "--vault-entry", "blockfrost", "--passphrase-fd", "3"];
+    const args = ["tx", "review", "--tx-file", raw, "--provider", "blockfrost", "--network", "mainnet", "--vault", vault, "--vault-entry", "blockfrost", "--passphrase-fd", "3", "--output", "json"];
     const result = await run(args, "", `${passphrase}\n`, guarded);
     assert.equal(result.code, 0, `${result.stderr}${result.stdout}`);
-    const envelope = JSON.parse(result.stdout);
-    assert.equal(envelope.op, "tx.review", "provider-backed review must emit the canonical tx.review envelope");
-    assert.equal(envelope.result.review.context.input_status, "complete", "fully resolved producer context must be reported complete");
-    assert.equal(envelope.result.review.net_signer_value.provable, true, "fully resolved producer context must make net signer value provable");
+    const machine = JSON.parse(result.stdout);
+    assert.equal(machine.value.op, "tx.review", "provider-backed review must emit the canonical tx.review envelope");
+    assert.equal(machine.value.result.review.context.input_status, "complete", "fully resolved producer context must be reported complete");
+    assert.equal(machine.value.result.review.net_signer_value.provable, true, "fully resolved producer context must make net signer value provable");
     for (const value of [secret, passphrase]) assert.doesNotMatch(`${result.stdout}${result.stderr}`, new RegExp(value));
     const recorded = JSON.parse(await readFile(capture, "utf8"));
     assert.ok(recorded.calls.some((call) => call.url.includes("/blocks/latest")), "provider-backed review must resolve validation context");
@@ -890,7 +898,7 @@ test("proves the provider-backed complete Conway ledger preflight preserves the 
   }
 });
 
-test("T006: returns the structured review envelope through --output json, identical to the human review result", async () => {
+test("T006: returns the unmodified structured review result through --output json while human mode renders the decision view over the same result", async () => {
   const dir = await mkdtemp(join(tmpdir(), "csk-cli-tx-review-json-"));
   const raw = join(dir, "transaction.cbor");
   const book = join(dir, "amaru-book.ttl");
@@ -899,16 +907,24 @@ test("T006: returns the structured review envelope through --output json, identi
       writeFile(raw, `${transactionCbor}\n`),
       writeFile(book, amaruBook),
     ]);
+    const { reviewTransaction } = await import(new URL("../dist/index.js", import.meta.url));
     const noBookHuman = await run(["tx", "review", "--tx-file", raw]);
     assert.equal(noBookHuman.code, 0, noBookHuman.stderr);
+    assert.match(noBookHuman.stdout, /^csk tx review — cardano-tx-review\/v1$/m, "human mode renders the decision view, not the raw envelope");
     const noBookJson = await run(["tx", "review", "--tx-file", raw, "--output", "json"]);
     assert.equal(noBookJson.code, 0, noBookJson.stderr);
     const noBookEnvelope = JSON.parse(noBookJson.stdout);
     assert.deepEqual(Object.keys(noBookEnvelope).sort(), ["ok", "value", "version"]);
     assert.equal(noBookEnvelope.version, 1);
     assert.equal(noBookEnvelope.ok, true);
-    assert.deepEqual(noBookEnvelope.value, JSON.parse(noBookHuman.stdout), "no-book JSON value must be identical to the human review result");
+    const noBookCapability = await reviewTransaction({ cborHex: transactionCbor }, { protocolBooks: [], userBooks: [] });
+    assert.equal(noBookCapability.ok, true, noBookCapability.ok ? undefined : JSON.stringify(noBookCapability.error));
+    assert.deepEqual(noBookEnvelope.value, noBookCapability.value, "the no-book --output json value is byte-equal to what the Node capability returned");
+    assert.equal(noBookEnvelope.value.op, "tx.review");
+    assert.ok(noBookHuman.stdout.includes(noBookEnvelope.value.result.review.tx_id), "the human view renders the same tx id the JSON path returns");
+    assert.ok(noBookHuman.stdout.includes(`${noBookEnvelope.value.result.review.fee.lovelace} lovelace`), "the human view renders the exact fee the JSON path returns");
     assert.equal(Object.hasOwn(noBookEnvelope.value, "resolutions"), false, "no-book JSON review must not synthesize a resolutions field");
+    assert.equal(noBookHuman.stdout.includes("Book resolutions"), false, "no-book human review must not synthesize a resolutions section");
     const withBookHuman = await run(["tx", "review", "--tx-file", raw, "--book", book]);
     assert.equal(withBookHuman.code, 0, withBookHuman.stderr);
     const withBookJson = await run(["tx", "review", "--tx-file", raw, "--book", book, "--output", "json"]);
@@ -917,8 +933,15 @@ test("T006: returns the structured review envelope through --output json, identi
     assert.deepEqual(Object.keys(withBookEnvelope).sort(), ["ok", "value", "version"]);
     assert.equal(withBookEnvelope.version, 1);
     assert.equal(withBookEnvelope.ok, true);
-    assert.deepEqual(withBookEnvelope.value, JSON.parse(withBookHuman.stdout), "with-book JSON value must be identical to the human review result");
+    const withBookCapability = await reviewTransaction({ cborHex: transactionCbor }, { protocolBooks: [], userBooks: [book] });
+    assert.equal(withBookCapability.ok, true, withBookCapability.ok ? undefined : JSON.stringify(withBookCapability.error));
+    assert.deepEqual(withBookEnvelope.value, withBookCapability.value, "the with-book --output json value is byte-equal to what the Node capability returned");
     assert.ok(Array.isArray(withBookEnvelope.value.resolutions), "with-book JSON review must contain resolutions");
+    assert.match(withBookHuman.stdout, /^Book resolutions \(2, in caller book order; duplicates preserved\)$/m, "the human view renders the book resolutions section");
+    for (const resolution of withBookEnvelope.value.resolutions) {
+      assert.ok(withBookHuman.stdout.includes(resolution.raw), "the human view carries the raw identifier the JSON path resolves");
+      assert.ok(withBookHuman.stdout.includes(resolution.label), "the human view carries the label the JSON path resolves");
+    }
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

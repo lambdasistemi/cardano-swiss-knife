@@ -46,32 +46,32 @@ Commit: `feat(cli): return the structured review through --output json`
 
 Commit: `feat(cli): render the signer review as a decision view`
 
-- [ ] T010 Make the renderer unit proof reachable inside the sandboxed check: copy `cli`
+- [X] T010 Make the renderer unit proof reachable inside the sandboxed check: copy `cli`
       into the check's work tree and add the new test file to its `node --test` list.
-- [ ] T011 RED: renderer proof over a canonical review result covering all five control
+- [X] T011 RED: renderer proof over a canonical review result covering all five control
       categories, asserting each renders its own category, role, role provenance,
       evidence list and exact lovelace, and that no two collapse (FR-002, SC-002).
-- [ ] T012 RED: renderer proof that `signer_controlled` change, `external_key` value and
+- [X] T012 RED: renderer proof that `signer_controlled` change, `external_key` value and
       `script`-locked value are three unambiguous rows with exact lovelace, and that the
       asset column is labelled a count of distinct non-ADA asset classes, never an amount
       (FR-004; interim shape per ruling A-001 — asserting exact asset *amounts* is
       Slice 4, blocked on `cardano-ledger-inspector#168`).
-- [ ] T013 RED: renderer proof for `context.input_status`, `net_signer_value` and every
+- [X] T013 RED: renderer proof for `context.input_status`, `net_signer_value` and every
       warning rendering plainly, with no readiness enum anywhere in the output (FR-005).
-- [ ] T014 RED: renderer proof that an unrecognised top-level review field survives into
+- [X] T014 RED: renderer proof that an unrecognised top-level review field survives into
       the rendered document (FR-010, SC-006).
-- [ ] T015 RED: renderer proof of determinism — two renders of one result are byte-equal,
+- [X] T015 RED: renderer proof of determinism — two renders of one result are byte-equal,
       and the output carries no digit grouping, locale formatting or float artefact
       (FR-001, FR-003).
-- [ ] T016 RED: renderer proof of empty-section shapes and full-length addresses
+- [X] T016 RED: renderer proof of empty-section shapes and full-length addresses
       (FR-011), including the no-`resolutions` case versus the empty-`resolutions` case.
-- [ ] T017 GREEN: implement the render contract in `cli/tx-review.mjs`, replacing the
+- [X] T017 GREEN: implement the render contract in `cli/tx-review.mjs`, replacing the
       raw envelope dump.
-- [ ] T018 Rewrite the end-to-end Amaru golden to the decision view and keep its
+- [X] T018 Rewrite the end-to-end Amaru golden to the decision view and keep its
       no-provider-request assertion (SC-005).
-- [ ] T019 Document the decision view and the new flags in the `csk tx review` section
+- [X] T019 Document the decision view and the new flags in the `csk tx review` section
       of `docs/user/usage.md`.
-- [ ] T020 Run `nix run .#ci-node-api` and `./gate.sh`, then commit.
+- [X] T020 Run `nix run .#ci-node-api` and `./gate.sh`, then commit.
 
 ## Slice 4 — `upstream-asset-amounts` (BLOCKED)
 
