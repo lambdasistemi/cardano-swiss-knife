@@ -29,6 +29,7 @@ pkgs.runCommand "cardano-swiss-knife-node-api-check" {
 } ''
   mkdir -p work/node work/scripts work/test-vectors work/fixtures
   cp ${repoRoot}/package.json work/package.json
+  cp -a ${repoRoot}/cli work/cli
   cp -a ${repoRoot}/node/test work/node/
   cp -a ${repoRoot}/node/src work/node/
   cp ${repoRoot}/scripts/check-node-api-exports.mjs work/scripts/
@@ -45,7 +46,8 @@ pkgs.runCommand "cardano-swiss-knife-node-api-check" {
   scripts/node_modules/.bin/eslint --config scripts/eslint.config.js node/src/index.js node/src/error.js
   bash ${repoRoot}/scripts/check-architecture-boundary.sh ${repoRoot}
   node scripts/check-node-api-exports.mjs --runtime ../unpacked-package/package/node/dist/index.js --facade ../unpacked-package/package/node/dist/index.d.ts
-  CSK_PACKAGE_TARBALL="$(echo ${nodePackage}/*.tgz)" node --test node/test/api-contract.test.mjs node/test/api.test.mjs node/test/cli.test.mjs node/test/api-properties.test.mjs node/test/transaction-api.test.mjs node/test/transaction-provider.test.mjs node/test/transaction-books.test.mjs node/test/transaction-ledger.test.mjs node/test/transaction-witness.test.mjs
+  for f in node/test/api-contract.test.mjs node/test/api.test.mjs node/test/cli.test.mjs node/test/api-properties.test.mjs node/test/transaction-api.test.mjs node/test/transaction-provider.test.mjs node/test/transaction-books.test.mjs node/test/transaction-ledger.test.mjs node/test/transaction-witness.test.mjs node/test/tx-review-render.test.mjs; do test -f "$f" || { echo "node-api check: listed test file missing: $f" >&2; exit 1; }; done
+  CSK_PACKAGE_TARBALL="$(echo ${nodePackage}/*.tgz)" node --test node/test/api-contract.test.mjs node/test/api.test.mjs node/test/cli.test.mjs node/test/api-properties.test.mjs node/test/transaction-api.test.mjs node/test/transaction-provider.test.mjs node/test/transaction-books.test.mjs node/test/transaction-ledger.test.mjs node/test/transaction-witness.test.mjs node/test/tx-review-render.test.mjs
   test -f ${purescript.node-api-docs}/index.md
   rg --fixed-strings --quiet 'https://github.com/lambdasistemi/cardano-swiss-knife/blob/main/node/test/api-properties.test.mjs' ${purescript.node-api-docs}/index.md
   mkdir -p $out

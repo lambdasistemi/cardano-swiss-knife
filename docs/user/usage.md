@@ -71,24 +71,32 @@ command; the reference page lists them all.
 
 ## Transaction review (CLI)
 
-`csk tx review --tx-file PATH [--book PATH ...] [--provider blockfrost|koios
---network mainnet|preprod|preview] [--vault PATH --vault-entry ID]` renders a
-deterministic, human-readable summary of a transaction composed from the
-existing inspect, intent, witness-plan, and validate results — payments,
-signer state, book-resolved labels, and a ledger preflight. It is a
-human-only command and rejects `--output json`.
+`csk tx review --tx-file PATH [--protocol-book PATH ...] [--user-book PATH ...]
+[--book PATH ...] [--provider blockfrost|koios --network mainnet|preprod|preview]
+[--vault PATH --vault-entry ID] [--output json]` renders a deterministic
+signer decision view derived entirely from the canonical `tx.review` result:
+the transaction header, what is not proven (input context status, net signer
+value provability, warnings), every output control group with its
+inspector-native category, role, evidence, exact lovelace and per-asset
+policy id, name and exact quantity, high-value movements, sources,
+collateral, self-declared claims, and book-resolved labels.
 
-- Without `--provider`/`--network`, the review stays fully offline and the
-  ledger preflight reports `incomplete`, listing every missing input,
-  reference input, and ledger-context item the engine needs.
-- With an explicit paired `--provider`/`--network` (and vault credential when
-  required), the review resolves the same producer-transaction context once
-  and reuses it across every composed operation; when that context is
-  complete, preflight reports `completed` and preserves the ledger's own
-  verdict (`valid`, `invalid`, or `rejected`).
-- Raw identifiers (signer hashes, addresses, RDF entity ids) are always
-  shown; supplied books add labels alongside them without hiding the raw
-  value.
+- The decision view renders what the inspector reported, in the inspector's
+  own vocabulary. It never synthesises a readiness state: input context
+  status and net signer value provability are shown exactly as reported.
+- `--protocol-book` and `--user-book` are review-only and repeatable;
+  protocol books resolve before user books. `--book` is retained as a
+  compatibility alias for `--user-book`, interleaved in command-line order.
+  Resolutions render in caller book order, duplicates preserved, with raw
+  identifiers shown alongside their labels.
+- `--output json` returns the same structured result unchanged inside the
+  standard `{ "version": 1, "ok": true, "value": ... }` envelope.
+- Without `--provider`/`--network`, the review stays fully offline and
+  reports an incomplete input context; with a paired provider (and vault
+  credential when required), it resolves the producer-transaction context
+  once and, when that context is complete, reports the input context as
+  complete and the net signer value as provable.
+- Addresses and raw identifiers render in full, never truncated.
 
 ## Node API
 
