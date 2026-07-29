@@ -8,8 +8,12 @@ One commit per slice, bisect-safe, `Tasks:` trailer naming the closed tasks.
 
 Commit subject: `feat(webui): consume the shared structured signer review`
 
-- [ ] T101 RED: assert the workbench obtains a `tx.review` result and that it
-      reaches the render layer. Must fail before the call exists.
+- [ ] T101 RED: assert the review parser exists, is exported, and parses a
+      `tx.review` envelope into the typed value using the real field names from
+      `cli/tx-review.mjs`. NARROWED per A-002: a node test of the FFI module
+      cannot prove the workbench actually calls `tx.review` — it would pass with a
+      parser nobody invokes. The end-to-end proof moves to T105a in slice 2, where
+      Playwright has something visible to assert. Moved, not dropped.
 - [ ] T102 GREEN: call `tx.review` via `runLedgerOperation` alongside the
       existing operations, and parse its envelope into a typed value.
 - [ ] T103 GREEN: delete the `IntentSummary`-based derivation of signer-facing
@@ -21,6 +25,9 @@ Commit subject: `feat(webui): consume the shared structured signer review`
 
 Commit subject: `feat(webui): render categories, provenance, readiness and blockers`
 
+- [ ] T105a RED (moved from slice 1 per A-002): assert end-to-end that the
+      workbench calls `tx.review` and the result reaches the render layer —
+      provable here because there is now rendered output to assert against.
 - [ ] T105 RED: assert every blocker the engine reports is rendered — the test
       must fail when one is dropped, not merely when none render.
 - [ ] T106 GREEN: render control categories and evidence provenance.
