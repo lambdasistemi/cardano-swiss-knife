@@ -103,6 +103,13 @@ grep -qE '^[[:space:]]*✘ .*script discovery scopes the Library and links only 
   || { echo "inspector suite: the 2 failures are not the known #131 pair (script discovery missing)" >&2; exit 1; }
 grep -qE '^[[:space:]]*✘ .*keeps signer-critical intent visible in the first viewport' "$inspector_log" \
   || { echo "inspector suite: the 2 failures are not the known #131 pair (signer-critical viewport missing)" >&2; exit 1; }
-grep -qE '^[[:space:]]*103 passed' "$inspector_log" \
-  || { echo "inspector suite: expected 103 passed" >&2; exit 1; }
-echo "inspector suite: 103 passed, exactly the 2 known #131 failures — as pinned"
+inspector_passed="$(sed -nE 's/^[[:space:]]*([0-9]+) passed.*/\1/p' "$inspector_log" | tail -1)"
+# Pin the FAILURES exactly; treat passes as a FLOOR, not an equality. An absolute
+# pass count breaks every time a slice legitimately adds a test, while catching
+# nothing a floor does not: a removed or silently skipped test still drops the
+# count below the baseline.
+if [ -z "$inspector_passed" ] || [ "$inspector_passed" -lt 103 ]; then
+  echo "inspector suite: expected at least 103 passed, got '$inspector_passed'" >&2
+  exit 1
+fi
+echo "inspector suite: $inspector_passed passed (floor 103), exactly the 2 known #131 failures - as pinned"
