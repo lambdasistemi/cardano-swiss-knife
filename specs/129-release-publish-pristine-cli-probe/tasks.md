@@ -5,18 +5,18 @@
 Commit subject: `fix: resolve csk --version without installed or built deps`
 Trailer: `Tasks: T129`
 
-- [ ] T129 RED — add pristine-checkout coverage to `node/test/version.test.mjs`:
+- [X] T129 RED — add pristine-checkout coverage to `node/test/version.test.mjs`:
       build a temp tree from `git ls-files` (working tree, not HEAD), assert
       `csk --version` / `csk -V` exit 0 and print the version there, assert the
       checker exits 0 there with the correct tag, and assert it exits non-zero
       there with a wrong tag (negative control). Watch it fail with
       `ERR_MODULE_NOT_FOUND` before writing any fix.
-- [ ] T129 GREEN — defer the heavy imports in `cli/csk.mjs` so module load needs
+- [X] T129 GREEN — defer the heavy imports in `cli/csk.mjs` so module load needs
       only `node/src/version.js` and Node built-ins; every other command path
       loads what it needs at the point of use. Keep `--version`, `-V`, and
       `version.js` textually present in `cli/csk.mjs` (the checker's
       source-level assertions read for them).
-- [ ] T129 PROOF — `./gate.sh` green end to end.
+- [X] T129 PROOF — `./gate.sh` green end to end.
 
 ## Orchestrator-owned (no slice, no code)
 

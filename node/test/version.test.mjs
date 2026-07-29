@@ -163,6 +163,94 @@ test("packaged-source csk --version and -V print the package version", () => {
   assert.equal(shortForm.stdout.trim(), expectedVersion);
 });
 
+test("release version probe succeeds from a pristine tracked-files checkout", () => {
+  const pristineRoot = mkdtempSync(join(tmpdir(), "csk-version-pristine-"));
+  try {
+    const listed = run("git", ["ls-files", "-z"]);
+    assert.equal(listed.status, 0, `git ls-files failed:\n${listed.output}`);
+    const trackedFiles = listed.stdout.split("\0").filter(Boolean);
+    assert.ok(trackedFiles.length > 0, "git ls-files returned no tracked files");
+    const trackedFileSet = new Set(trackedFiles);
+    for (const required of [
+      "package.json",
+      "package-lock.json",
+      "node/src/version.js",
+      "cli/csk.mjs",
+      "scripts/check-release-version.mjs",
+    ]) {
+      assert.ok(trackedFileSet.has(required), `git ls-files omitted ${required}`);
+    }
+    for (const relative of trackedFiles) {
+      copyWritable(join(repoRoot, relative), join(pristineRoot, relative));
+    }
+
+    assert.ok(!existsSync(join(pristineRoot, "node_modules")));
+    assert.ok(!existsSync(join(pristineRoot, "output")));
+    const dependencies = Object.keys(packageJson.dependencies ?? {});
+    for (
+      let ancestor = pristineRoot;
+      ;
+      ancestor = dirname(ancestor)
+    ) {
+      for (const dependency of dependencies) {
+        const reachable = join(ancestor, "node_modules", dependency);
+        assert.ok(
+          !existsSync(reachable),
+          `pristine checkout can resolve dependency ${dependency} from ${reachable}`,
+        );
+      }
+      if (dirname(ancestor) === ancestor) break;
+    }
+
+    const pristineCli = join(pristineRoot, "cli", "csk.mjs");
+    for (const flag of ["--version", "-V"]) {
+      const probe = run(process.execPath, [pristineCli, flag], { cwd: pristineRoot });
+      assert.equal(probe.status, 0, `pristine csk ${flag} failed:\n${probe.output}`);
+      assert.equal(probe.stdout.trim(), expectedVersion);
+    }
+
+    const pristineChecker = join(
+      pristineRoot,
+      "scripts",
+      "check-release-version.mjs",
+    );
+    const correctTag = run(
+      process.execPath,
+      [
+        pristineChecker,
+        "--repo-root",
+        pristineRoot,
+        "--tag",
+        expectedTag,
+      ],
+      { cwd: pristineRoot },
+    );
+    assert.equal(
+      correctTag.status,
+      0,
+      `checker failed in pristine checkout:\n${correctTag.output}`,
+    );
+    assert.match(correctTag.output, /ok: release-version check passed/);
+
+    const wrongTag = run(
+      process.execPath,
+      [
+        pristineChecker,
+        "--repo-root",
+        pristineRoot,
+        "--tag",
+        "v0.0.0",
+      ],
+      { cwd: pristineRoot },
+    );
+    assert.notEqual(wrongTag.status, 0, "checker accepted v0.0.0");
+    assert.match(wrongTag.output, /tag/i);
+    assert.doesNotMatch(wrongTag.output, /ERR_MODULE_NOT_FOUND/);
+  } finally {
+    rmSync(pristineRoot, { recursive: true, force: true });
+  }
+});
+
 test("checker passes on the real tree with built artifacts", async () => {
   const nodePackage = buildAttr("node-package");
   assert.equal(nodePackage.status, 0, `node-package build failed:\n${nodePackage.output}`);
