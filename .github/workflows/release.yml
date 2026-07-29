@@ -103,7 +103,7 @@ jobs:
       - name: Publish npm tarball
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm publish --access public --provenance node-package/*.tgz
+        run: npm publish --access public --provenance ./node-package/*.tgz
 
       - name: Upload bundle and checksums to GitHub release
         env:

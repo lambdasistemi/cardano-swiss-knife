@@ -295,6 +295,64 @@ const allStepIndexesWhere = (steps, predicate) => {
   return indexes;
 };
 
+const npmPublishValueFlags = new Set([
+  "--access",
+  "--auth-type",
+  "--otp",
+  "--registry",
+  "--tag",
+  "--userconfig",
+  "--workspace",
+  "--workspaces",
+]);
+
+const stripShellQuotes = (token) => {
+  if (
+    (token.startsWith('"') && token.endsWith('"')) ||
+    (token.startsWith("'") && token.endsWith("'"))
+  ) {
+    return token.slice(1, -1);
+  }
+  return token;
+};
+
+const npmPublishPositionals = (run) => {
+  const normalized = String(run ?? "").replace(/\\\r?\n/g, " ");
+  const command = normalized
+    .split(/\r?\n|&&|;|\|\|/)
+    .find((part) => /(?:^|\s)npm\s+publish(?:\s|$)/.test(part));
+  if (command === undefined) return [];
+
+  const tokens =
+    command
+      .match(/"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^\s]+/g)
+      ?.map(stripShellQuotes) ?? [];
+  const npmIdx = tokens.findIndex(
+    (token, index) => token === "npm" && tokens[index + 1] === "publish",
+  );
+  if (npmIdx < 0) return [];
+
+  const positionals = [];
+  for (let index = npmIdx + 2; index < tokens.length; index += 1) {
+    const token = tokens[index];
+    if (token === "--") {
+      positionals.push(...tokens.slice(index + 1));
+      break;
+    }
+    if (token.startsWith("--")) {
+      const [flag] = token.split("=", 1);
+      if (!token.includes("=") && npmPublishValueFlags.has(flag)) index += 1;
+      continue;
+    }
+    if (token.startsWith("-")) continue;
+    positionals.push(token);
+  }
+  return positionals;
+};
+
+const isPathShaped = (argument) =>
+  /^(?:\.{1,2}\/|\/|~\/|[A-Za-z]:[\\/])/.test(argument);
+
 const isGithubHostedRunner = (runsOn) => {
   const values = asArray(runsOn).map(String);
   if (values.length === 0) return false;
@@ -619,6 +677,7 @@ const checkReleaseWorkflow = (doc) => {
       fail(`publication job ${id} must publish the scoped npm tarball`);
     } else {
       const npmText = stepText(steps[npmIdx]);
+      const publishArguments = npmPublishPositionals(steps[npmIdx].run);
       if (!/--access\s+public|access.*public/.test(npmText)) {
         fail(`publication job ${id} must publish with public access`);
       }
@@ -627,6 +686,19 @@ const checkReleaseWorkflow = (doc) => {
       }
       if (!/NODE_AUTH_TOKEN|NPM_TOKEN/.test(npmText)) {
         fail(`publication job ${id} must use the repository npm secret`);
+      }
+      if (publishArguments.length === 0) {
+        fail(
+          `publication job ${id} npm publish argument must be path-shaped (got no positional argument)`,
+        );
+      } else {
+        for (const argument of publishArguments) {
+          if (!isPathShaped(argument)) {
+            fail(
+              `publication job ${id} npm publish argument must be path-shaped (got ${argument})`,
+            );
+          }
+        }
       }
     }
 
