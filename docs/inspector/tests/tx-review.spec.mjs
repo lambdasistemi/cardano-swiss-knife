@@ -1,7 +1,17 @@
 import { expect, test } from "@playwright/test";
+import { readFile } from "node:fs/promises";
 
 const transactionCbor =
   "84a300d901028001800200a0f5d90103a100a5001b0020000000000001014200ff026568656c6c6f038220666e657374656404a341aa8101616401616402";
+
+// Slice 3 decorates the review with book resolutions resolved against the REAL
+// transaction RDF graph, so it decodes the genuine treasury-reorganize fixture
+// (the same tx behind node/test/fixtures/tx-review-amaru.golden.txt), not the
+// synthetic constant above, which has empty inputs/outputs and carries none of
+// the identifiers the books name.
+const treasuryReorganizeCbor = (
+  await readFile(new URL("./fixtures/treasury-reorganize-unsigned-tx.hex", import.meta.url), "utf8")
+).trim();
 
 const reviewFixture = {
   version: "cardano-tx-review/v1",
@@ -127,9 +137,9 @@ async function installReviewFixture(page, envelope) {
   }, envelope);
 }
 
-async function decodeTransaction(page) {
+async function decodeTransaction(page, cborHex = transactionCbor) {
   await page.getByRole("tab", { name: "Paste CBOR" }).click();
-  await page.getByPlaceholder("Paste Conway transaction CBOR hex").fill(transactionCbor);
+  await page.getByPlaceholder("Paste Conway transaction CBOR hex").fill(cborHex);
   await page.getByRole("button", { name: "Decode", exact: true }).click();
   await expect(page.getByRole("button", { name: "Change input" })).toBeVisible({
     timeout: 30_000,
@@ -312,4 +322,159 @@ test("review hides additional-fields section when no unmapped keys exist", async
   const panel = page.locator(".review-panel");
   await expect(panel).toBeVisible({ timeout: 20_000 });
   await expect(panel.locator(".review-additional-fields")).toHaveCount(0);
+});
+
+// --- Slice 3 (book-decoration) -------------------------------------------
+// Resolutions are produced by the REAL transaction-scoped query: the workbench
+// runs tx.rdf on the decoded transaction and feeds the selected books' Turtle
+// through the same inner-join restriction the node host uses (resolveReviewLabels
+// in lib/src/Cardano/Transaction/Rdf.js). The books below are genuine overlay
+// Turtle seeded into the workbench book store, not a pre-filtered fixture, so an
+// identifier absent from the transaction really could reach the DOM if the
+// restriction broke.
+
+const localBookStoreKey = "cardano-ledger-inspector.books.v1";
+
+// 8bd03209... is a payment-key hash present in treasuryReorganizeCbor; deadbeef...
+// is a sentinel that is NOT in the transaction and must be withheld by the inner
+// join. Both books label the SAME present identifier with differing labels, and the
+// first book's label ("Zulu...") sorts AFTER the second's ("Alpha..."), so caller
+// book order (first book first) CONTRADICTS global alphabetical order — a renderer
+// that sorted globally would emit Alpha first and fail Test A. Every asserted
+// identifier/label/type/order value is node-sourced (driver STATUS, ORACLE D).
+const callerFirstBookTtl = `@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+<urn:cardano:id:PaymentKey:8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1> rdfs:label "Zulu signer overlay" .
+<urn:cardano:id:PaymentKey:deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef> rdfs:label "Sentinel not in transaction" .
+`;
+
+const callerSecondBookTtl = `@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+<urn:cardano:id:PaymentKey:8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1> rdfs:label "Alpha signer overlay" .
+`;
+
+const sentinelOnlyBookTtl = `@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+<urn:cardano:id:PaymentKey:deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef> rdfs:label "Sentinel not in transaction" .
+`;
+
+// Genuine failure input: unparseable Turtle. The node host reports the same input
+// as BOOK_IMPORT "A supplied book path contained invalid Turtle."; the workbench
+// must surface the failure too, not downgrade it to a confident "(none)".
+const invalidBookTtl = "this is not valid Turtle {{{{";
+
+const bookRecord = (id, name, turtle, selected) => ({
+  id,
+  name,
+  source: `local/${id}.ttl`,
+  upstreamSource: "",
+  upstreamRef: "",
+  raw: turtle,
+  parts: [{ id: `${id}-p1`, label: "Part 1", kind: "overlay", turtle, plutusJson: "" }],
+  turtle,
+  selected,
+  seed: false,
+});
+
+async function seedBooks(page, books) {
+  const store = JSON.stringify({ kind: localBookStoreKey, books });
+  await page.addInitScript(
+    ({ key, value }) => {
+      window.localStorage.setItem(key, value);
+    },
+    { key: localBookStoreKey, value: store },
+  );
+}
+
+test("review decorates with transaction-scoped book resolutions in caller order with differing-label duplicates", async ({
+  page,
+}) => {
+  await seedBooks(page, [
+    bookRecord("caller-first", "Caller-first book", callerFirstBookTtl, true),
+    bookRecord("caller-second", "Caller-second book", callerSecondBookTtl, true),
+  ]);
+  await gotoWorkbench(page);
+  await installReviewFixture(page, reviewEnvelope);
+  await decodeTransaction(page, treasuryReorganizeCbor);
+
+  const panel = page.locator(".review-panel");
+  await expect(panel).toBeVisible({ timeout: 20_000 });
+
+  const resolutions = panel.locator(".review-resolutions");
+  await expect(resolutions).toBeVisible({ timeout: 20_000 });
+  await expect(resolutions.locator(".review-resolutions-title")).toContainText(
+    "Book resolutions (2, in caller book order; duplicates preserved)",
+  );
+
+  const rows = resolutions.locator(".review-resolution");
+  await expect(rows).toHaveCount(2);
+
+  // Caller book order ACROSS books: the first book's "Zulu..." label sorts AFTER
+  // the second book's "Alpha..." label, so this order CONTRADICTS a global
+  // alphabetical sort — proving rows are concatenated per book (caller order), not
+  // re-sorted. Differing labels on the same identifier prove row identity, not
+  // merely that two rows appeared.
+  await expect(fieldValue(rows.nth(0), "identifier")).toHaveText(
+    "8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1",
+  );
+  await expect(fieldValue(rows.nth(0), "label")).toHaveText("Zulu signer overlay");
+  await expect(fieldValue(rows.nth(0), "type")).toHaveText("overlay:Identifier");
+
+  await expect(fieldValue(rows.nth(1), "identifier")).toHaveText(
+    "8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1",
+  );
+  await expect(fieldValue(rows.nth(1), "label")).toHaveText("Alpha signer overlay");
+  await expect(fieldValue(rows.nth(1), "type")).toHaveText("overlay:Identifier");
+
+  // The genuinely-absent sentinel is withheld by the real inner join.
+  await expect(panel).not.toContainText("Sentinel not in transaction");
+});
+
+test("review omits book resolutions section when no books are selected", async ({ page }) => {
+  await seedBooks(page, [bookRecord("deselected", "Deselected book", callerSecondBookTtl, false)]);
+  await gotoWorkbench(page);
+  await installReviewFixture(page, reviewEnvelope);
+  await decodeTransaction(page, treasuryReorganizeCbor);
+
+  const panel = page.locator(".review-panel");
+  await expect(panel).toBeVisible({ timeout: 20_000 });
+  await expect(panel.locator(".review-resolutions")).toHaveCount(0);
+});
+
+test("review renders present-but-empty book resolutions when selected books match nothing", async ({
+  page,
+}) => {
+  await seedBooks(page, [bookRecord("sentinel-only", "Sentinel-only book", sentinelOnlyBookTtl, true)]);
+  await gotoWorkbench(page);
+  await installReviewFixture(page, reviewEnvelope);
+  await decodeTransaction(page, treasuryReorganizeCbor);
+
+  const panel = page.locator(".review-panel");
+  await expect(panel).toBeVisible({ timeout: 20_000 });
+
+  const resolutions = panel.locator(".review-resolutions");
+  await expect(resolutions).toBeVisible({ timeout: 20_000 });
+  await expect(resolutions.locator(".review-resolutions-title")).toContainText(
+    "Book resolutions (0, in caller book order; duplicates preserved)",
+  );
+  await expect(resolutions).toContainText("(none)");
+  await expect(resolutions.locator(".review-resolution")).toHaveCount(0);
+});
+
+test("review surfaces a book-resolution failure distinctly from present-but-empty", async ({
+  page,
+}) => {
+  // A selected book whose Turtle does not parse drives a REAL query failure through
+  // the pipeline (the node host reports this exact input as BOOK_IMPORT). The panel
+  // must show an explicit error, not a false successful "(none)".
+  await seedBooks(page, [bookRecord("invalid-book", "Invalid book", invalidBookTtl, true)]);
+  await gotoWorkbench(page);
+  await installReviewFixture(page, reviewEnvelope);
+  await decodeTransaction(page, treasuryReorganizeCbor);
+
+  const panel = page.locator(".review-panel");
+  await expect(panel).toBeVisible({ timeout: 20_000 });
+
+  const resolutions = panel.locator(".review-resolutions");
+  await expect(resolutions).toBeVisible({ timeout: 20_000 });
+  await expect(resolutions.locator(".review-resolutions-error")).toBeVisible();
+  await expect(resolutions.locator(".review-resolution-none")).toHaveCount(0);
+  await expect(resolutions.locator(".review-resolution")).toHaveCount(0);
 });
