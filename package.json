@@ -2,6 +2,10 @@
   "name": "@lambdasistemi/cardano-swiss-knife",
   "version": "0.1.4",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lambdasistemi/cardano-swiss-knife.git"
+  },
   "engines": {
     "node": ">=22"
   },

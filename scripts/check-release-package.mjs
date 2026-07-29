@@ -169,6 +169,42 @@ const main = () => {
     }
   }
 
+  if (unpackRoot) {
+    const packageJsonPath = join(unpackRoot, "package", "package.json");
+    if (!existsSync(packageJsonPath)) {
+      fail("npm tarball missing package.json repository.url");
+    } else {
+      const packageJson = JSON.parse(readFileSync(packageJsonPath, "utf8"));
+      const nameMatch =
+        typeof packageJson.name === "string"
+          ? packageJson.name.match(/^@([^/]+)\/([^/]+)$/)
+          : null;
+      if (!nameMatch) {
+        fail(`packaged package.json name must be scoped: ${JSON.stringify(packageJson.name)}`);
+      } else {
+        // This assumes npm scope == GitHub organization and package name == repository.
+        // A coordinated rename of both values would not be caught by this derivation.
+        const expectedRepositoryUrl = `https://github.com/${nameMatch[1]}/${nameMatch[2]}`;
+        const repositoryUrl =
+          typeof packageJson.repository === "object" && packageJson.repository !== null
+            ? packageJson.repository.url
+            : undefined;
+        const normalizedRepositoryUrl =
+          typeof repositoryUrl === "string"
+            ? repositoryUrl.replace(/^git\+/, "").replace(/\.git$/, "")
+            : "";
+        if (
+          normalizedRepositoryUrl === "" ||
+          normalizedRepositoryUrl !== expectedRepositoryUrl
+        ) {
+          fail(
+            `packaged package.json repository.url is ${JSON.stringify(repositoryUrl)}, expected ${JSON.stringify(expectedRepositoryUrl)}`,
+          );
+        }
+      }
+    }
+  }
+
   const bundleFiles = readdirSync(releaseBundleDir);
   const archives = bundleFiles.filter(
     (name) => name.endsWith(".tgz") || name.endsWith(".tar.gz") || name.includes("universal"),
