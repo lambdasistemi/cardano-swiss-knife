@@ -73,13 +73,13 @@ Commit: `feat(cli): render the signer review as a decision view`
       of `docs/user/usage.md`.
 - [X] T020 Run `nix run .#ci-node-api` and `./gate.sh`, then commit.
 
-## Slice 4 — `upstream-asset-amounts` (BLOCKED)
+## Slice 4 — `upstream-asset-amounts`
 
 Blocked on https://github.com/lambdasistemi/cardano-ledger-inspector/issues/168. Not
 dispatchable in this control turn; see `spec.md` "Blocked acceptance" and ruling A-001.
 
-- [ ] T021 When #168 lands: render exact per-asset policy id, asset name and quantity.
-- [ ] T022 When #168 lands: upgrade the three-category regression proof to assert exact
+- [X] T021 When #168 lands: render exact per-asset policy id, asset name and quantity.
+- [X] T022 When #168 lands: upgrade the three-category regression proof to assert exact
       asset amounts, satisfying #121's literal acceptance bullet.
 
 ## Finalization (orchestrator-owned)
@@ -87,4 +87,17 @@ dispatchable in this control turn; see `spec.md` "Blocked acceptance" and ruling
 - [ ] T023 Refresh the PR body against delivered behaviour.
 - [ ] T024 Run the finalization audit over every commit on the branch.
 - [ ] T025 Drop `gate.sh`.
-- [ ] T026 Mark PR #125 ready — **gated on T021/T022, i.e. on #168, per ruling A-001**.
+- [ ] T026 Mark PR #125 ready. The A-001 gate on T021/T022 (i.e. on cardano-ledger-inspector#168) is DISCHARGED: #168 merged as 007251ea, #121 Slice 4 landed as 8ee2f61.
+
+## Slice 5 — `engines-manifest-sync`
+
+Added after the Slice 4 gate run. `./gate.sh` failed at `check-release-manifests`:
+this repo records the inspector pin in TWO more places besides `flake.lock`, and
+they still held the pre-#168 revision. The Slice 4 brief's owned-files list did
+not know about them — an orchestrator planning gap the gate caught.
+
+- [X] T027 Sync `release/engines.json` and `docs/reference/engines.md` to the
+      inspector revision and narHash now in `flake.lock`
+      (`007251eaaf3d5b75df2bd0902b4f01081c0df0a1`). Historical references to the
+      old revision in `specs/**` are records of what was true then and must not
+      be rewritten.
