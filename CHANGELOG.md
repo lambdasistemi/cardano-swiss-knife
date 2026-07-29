@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.3](https://github.com/lambdasistemi/cardano-swiss-knife/compare/v0.1.2...v0.1.3) (2026-07-29)
+
+
+### Bug Fixes
+
+* resolve csk --version without installed or built deps ([382bea3](https://github.com/lambdasistemi/cardano-swiss-knife/commit/382bea32b746a7286b9e99db7e867cec27340300))
+
+
+### Documentation
+
+* specify the pristine-tag-checkout publish failure ([3e20115](https://github.com/lambdasistemi/cardano-swiss-knife/commit/3e20115688d7cb698796eceaaf3de90fa75a1936))
+
 ## [0.1.2](https://github.com/lambdasistemi/cardano-swiss-knife/compare/v0.1.1...v0.1.2) (2026-07-29)
 
 
