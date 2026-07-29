@@ -43,12 +43,21 @@ Commit subject: `feat(webui): render categories, provenance, readiness and block
 
 Commit subject: `feat(webui): decorate the review with operator book labels`
 
-- [ ] T109 RED: assert a book identifier ABSENT from the transaction is not
+- [X] T109 RED: assert a book identifier ABSENT from the transaction is not
       shown. This criterion is about what is withheld, so the test must exercise
       the absent case.
-- [ ] T110 GREEN: decorate the engine result with book labels, restricted to
+- [X] T110 GREEN: decorate the engine result with book labels, restricted to
       identifiers present in the transaction.
-- [ ] T111 Proof: `nix run .#ci-inspector-playwright` green.
+- [X] T111 Proof: `nix run .#ci-inspector-playwright` green.
+- [X] T111a (added mid-slice, orchestrator NOTE-006 + navigator Q-002): a FAILED
+      resolution query must render an explicit error, distinguishable from the
+      present-but-empty `(none)` state. The first GREEN collapsed `Left` into a
+      successful empty result, so an unparseable book made the panel state that
+      the operator's books matched nothing — a false claim about the transaction,
+      shown to the person deciding whether to sign, and the exact CLI/WebUI
+      divergence this ticket exists to remove (the node host reports the same
+      input as `BOOK_IMPORT`). Proven by a test seeding genuinely unparseable
+      Turtle through the real pipeline, not a stubbed `Left`.
 
 ## Slice 4 — `value-emphasis`
 
@@ -57,6 +66,19 @@ selects by class attribute and PureScript `classNames` emits classes without
 stylesheet entries, so slice 2's proofs were style-independent. This slice
 therefore owns STYLING the review-panel classes slice 2 introduced, not merely
 adding emphasis to already-styled elements.
+
+Slice 3 adds further review-panel classes that likewise have no stylesheet
+entries and are therefore also this slice's to style: `.review-resolutions`,
+`.review-resolution` (with its identifier/label/type fields),
+`.review-resolution-none` and `.review-resolutions-error`. The error class in
+particular must not read as ordinary body text — it reports that the panel could
+not resolve the operator's books at all.
+
+Carried from slice 3, where the orchestrator and navigator agreed it was
+non-blocking: in the error state the section title still reads `Book resolutions
+(0, in caller book order; duplicates preserved)`, because it counts rendered
+rows. That is factually true but reads oddly beside an error message; this slice
+owns the presentation fix.
 
 Commit subject: `feat(webui): distinguish high-value and signer-controlled value`
 
