@@ -1,0 +1,74 @@
+# Tasks — WebUI Structured Signer Review
+
+Issue: https://github.com/lambdasistemi/cardano-swiss-knife/issues/122
+
+One commit per slice, bisect-safe, `Tasks:` trailer naming the closed tasks.
+
+## Slice 1 — `consume-tx-review`
+
+Commit subject: `feat(webui): consume the shared structured signer review`
+
+- [ ] T101 RED: assert the workbench obtains a `tx.review` result and that it
+      reaches the render layer. Must fail before the call exists.
+- [ ] T102 GREEN: call `tx.review` via `runLedgerOperation` alongside the
+      existing operations, and parse its envelope into a typed value.
+- [ ] T103 GREEN: delete the `IntentSummary`-based derivation of signer-facing
+      meaning. Deletion is the deliverable — an orphaned-but-present derivation
+      does not satisfy FR-002. `tx.intent` itself stays where other views need it.
+- [ ] T104 Proof: `just check` and `nix run .#ci-build` green.
+
+## Slice 2 — `render-review-document`
+
+Commit subject: `feat(webui): render categories, provenance, readiness and blockers`
+
+- [ ] T105 RED: assert every blocker the engine reports is rendered — the test
+      must fail when one is dropped, not merely when none render.
+- [ ] T106 GREEN: render control categories and evidence provenance.
+- [ ] T107 GREEN: render readiness state and every blocker.
+- [ ] T108 Proof: `nix run .#ci-playwright` green with the blockers visible in a
+      browser, not only typechecked.
+
+## Slice 3 — `book-decoration`
+
+Commit subject: `feat(webui): decorate the review with operator book labels`
+
+- [ ] T109 RED: assert a book identifier ABSENT from the transaction is not
+      shown. This criterion is about what is withheld, so the test must exercise
+      the absent case.
+- [ ] T110 GREEN: decorate the engine result with book labels, restricted to
+      identifiers present in the transaction.
+- [ ] T111 Proof: `nix run .#ci-playwright` green.
+
+## Slice 4 — `value-emphasis`
+
+Commit subject: `feat(webui): distinguish high-value and signer-controlled value`
+
+- [ ] T112 RED: assert high-value movements and signer-controlled change are
+      rendered distinguishably from external-key and script-locked value.
+- [ ] T113 GREEN: implement the distinction within the existing design system —
+      no new one (explicit non-goal).
+- [ ] T114 Proof: `nix run .#ci-playwright` green; distinctness is a rendered
+      property and cannot be claimed from a build.
+
+## Slice 5 — `per-asset-amounts`
+
+Commit subject: `feat(webui): render exact per-asset amounts in the review`
+
+Added by acceptance amendment 2026-07-29 so the WebUI reaches parity with the
+CLI behaviour landed in #121.
+
+- [ ] T115 RED: assert exact policy id, asset name and decimal quantity for a
+      control group holding assets, and clean rendering for one holding none.
+      Assertions compare exact values — a test that still passes on a wrong
+      quantity proves nothing.
+- [ ] T116 GREEN: render per-asset detail per control group, keeping
+      `asset_class_count` independent — neither derived from the other, matching
+      the upstream contract and the CLI.
+- [ ] T117 Proof: `nix run .#ci-playwright` green.
+
+## Orchestrator-owned
+
+- [ ] T118 Final: full `./gate.sh` green at HEAD, PR body refreshed against
+      delivered behaviour, finalization audit over every branch commit, drop
+      `gate.sh`, mark ready. Merge is pre-authorized once CI is green — CI, not
+      local gates alone.
