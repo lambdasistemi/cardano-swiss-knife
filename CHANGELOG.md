@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.4](https://github.com/lambdasistemi/cardano-swiss-knife/compare/v0.1.3...v0.1.4) (2026-07-29)
+
+
+### Bug Fixes
+
+* publish the built npm tarball by path, not repo shorthand ([fe9d9da](https://github.com/lambdasistemi/cardano-swiss-knife/commit/fe9d9dabba7e6ac75790fb0e10b68b47d775c244))
+
+
+### Documentation
+
+* specify the npm publish path-spec defect ([37ce378](https://github.com/lambdasistemi/cardano-swiss-knife/commit/37ce378ce90a509b08af18bd896c3c81f0ad4134))
+
 ## [0.1.3](https://github.com/lambdasistemi/cardano-swiss-knife/compare/v0.1.2...v0.1.3) (2026-07-29)
 
 
