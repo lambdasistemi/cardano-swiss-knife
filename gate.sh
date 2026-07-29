@@ -68,6 +68,15 @@ branch_commit_gate
 bash scripts/check-architecture-boundary.sh
 nix run .#ci-node-api
 just release-gates
+
+# mkdocs runs with --strict and scans docs/ recursively WITHOUT honouring
+# .gitignore. Any inspector build or Playwright run populates the gitignored
+# docs/inspector/node_modules, and mkdocs then parses dependency READMEs and
+# aborts on their broken anchors — 20 warnings, none of them ours. This is why
+# running the workbench suite and the docs build in one worktree currently
+# conflicts. Filed as #132; the proper fix is an mkdocs exclusion. Removing it
+# here is safe: it is gitignored build state and regenerates on next build.
+rm -rf docs/inspector/node_modules
 just release-docs
 nix build .#checks.x86_64-linux.test --no-link
 nix run .#ci-check
