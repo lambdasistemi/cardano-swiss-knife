@@ -24,3 +24,12 @@ nix develop --quiet -c just release-workflows
 
 # Manifest/parity contracts that also read package.json.
 nix develop --quiet -c just release-gates
+
+# Slice B edits docs/dev/releasing.md, which is under a machine contract:
+# check-release-docs.mjs requires the release-operation section to name
+# "release-please" and "npm publish". That contract is enforced by
+# `just release-docs`, which lives in `just ci` but was NOT in this gate — so a
+# docs regression would have passed ./gate.sh and failed in CI after push.
+# That is this ticket chain's own failure mode (a check that does not run where
+# it matters), so it is closed here rather than accepted.
+nix develop --quiet -c just release-docs
