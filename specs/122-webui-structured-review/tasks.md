@@ -36,7 +36,7 @@ Commit subject: `feat(webui): render categories, provenance, readiness and block
       preserves these in the parsed value; rendering them is this slice.
 - [X] T106 GREEN: render control categories and evidence provenance.
 - [X] T107 GREEN: render readiness state and every blocker.
-- [X] T108 Proof: `nix run .#ci-playwright` green with the blockers visible in a
+- [X] T108 Proof: `nix run .#ci-inspector-playwright` green with the blockers visible in a
       browser, not only typechecked.
 
 ## Slice 3 — `book-decoration`
@@ -48,7 +48,7 @@ Commit subject: `feat(webui): decorate the review with operator book labels`
       the absent case.
 - [ ] T110 GREEN: decorate the engine result with book labels, restricted to
       identifiers present in the transaction.
-- [ ] T111 Proof: `nix run .#ci-playwright` green.
+- [ ] T111 Proof: `nix run .#ci-inspector-playwright` green.
 
 ## Slice 4 — `value-emphasis`
 
@@ -64,7 +64,7 @@ Commit subject: `feat(webui): distinguish high-value and signer-controlled value
       rendered distinguishably from external-key and script-locked value.
 - [ ] T113 GREEN: implement the distinction within the existing design system —
       no new one (explicit non-goal).
-- [ ] T114 Proof: `nix run .#ci-playwright` green; distinctness is a rendered
+- [ ] T114 Proof: `nix run .#ci-inspector-playwright` green; distinctness is a rendered
       property and cannot be claimed from a build.
 
 ## Slice 5 — `per-asset-amounts`
@@ -81,7 +81,7 @@ CLI behaviour landed in #121.
 - [ ] T116 GREEN: render per-asset detail per control group, keeping
       `asset_class_count` independent — neither derived from the other, matching
       the upstream contract and the CLI.
-- [ ] T117 Proof: `nix run .#ci-playwright` green.
+- [ ] T117 Proof: `nix run .#ci-inspector-playwright` green.
 
 ## Orchestrator-owned
 

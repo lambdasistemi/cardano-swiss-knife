@@ -12,7 +12,7 @@
   CLI (`cli/tx-review.mjs`) and the node API. The engine work is done; this is a
   consumption change.
 - Proofs: `just check` (purs-tidy), `nix run .#ci-build`, and — load-bearing here
-  — `nix run .#ci-playwright` for browser-level evidence.
+  — `nix run .#ci-inspector-playwright` for browser-level evidence.
 
 ## Design
 
@@ -76,7 +76,7 @@ asserting it is not shown — the criterion is about what is *withheld*.
 Make high-value movements and signer-controlled change visually distinct from
 external-key and script-locked value.
 
-Proof is browser-level (`ci-playwright`): distinctness is a rendered property,
+Proof is browser-level (`ci-inspector-playwright`): distinctness is a rendered property,
 not a typed one.
 
 ### Slice 5 — `per-asset-amounts`
