@@ -8,18 +8,18 @@ One commit per slice, bisect-safe, `Tasks:` trailer naming the closed tasks.
 
 Commit subject: `feat(webui): consume the shared structured signer review`
 
-- [ ] T101 RED: assert the review parser exists, is exported, and parses a
+- [X] T101 RED: assert the review parser exists, is exported, and parses a
       `tx.review` envelope into the typed value using the real field names from
       `cli/tx-review.mjs`. NARROWED per A-002: a node test of the FFI module
       cannot prove the workbench actually calls `tx.review` — it would pass with a
       parser nobody invokes. The end-to-end proof moves to T105a in slice 2, where
       Playwright has something visible to assert. Moved, not dropped.
-- [ ] T102 GREEN: call `tx.review` via `runLedgerOperation` alongside the
+- [X] T102 GREEN: call `tx.review` via `runLedgerOperation` alongside the
       existing operations, and parse its envelope into a typed value.
-- [ ] T103 GREEN: delete the `IntentSummary`-based derivation of signer-facing
+- [X] T103 GREEN: delete the `IntentSummary`-based derivation of signer-facing
       meaning. Deletion is the deliverable — an orphaned-but-present derivation
       does not satisfy FR-002. `tx.intent` itself stays where other views need it.
-- [ ] T104 Proof: `just check` and `nix run .#ci-build` green.
+- [X] T104 Proof: `just check` and `nix run .#ci-build` green.
 
 ## Slice 2 — `render-review-document`
 

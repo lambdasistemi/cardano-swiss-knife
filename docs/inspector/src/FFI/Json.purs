@@ -4,19 +4,23 @@ module FFI.Json
   , BrowserRow
   , Identification
   , IdentificationRow
-  , IntentClaim
   , MetadataEntry
   , MetadataMapEntry
   , MetadataValue(..)
-  , IntentSummary
   , Inspection
   , EntrySeed
   , Metric
   , MintRow
   , OutputRow
   , RdfGraph
+  , ReviewAdditionalField
+  , ReviewAsset
+  , ReviewClaim
+  , ReviewControlGroup
+  , ReviewSource
   , ScriptEvaluation
   , ScriptRedeemer
+  , TransactionReview
   , Validation
   , WitnessPlan
   , WitnessPlanRow
@@ -25,8 +29,9 @@ module FFI.Json
   , inspect
   , operationBrowser
   , operationIdentification
-  , operationIntentSummary
+  , operationIntentMetadata
   , operationInspection
+  , operationTransactionReview
   , operationValidation
   , operationWitnessPlan
   , operationRdfGraph
@@ -40,9 +45,6 @@ module FFI.Json
 
 import Prelude
 
-import Cardano.Address.Bech32 as Bech32
-import Cardano.Address.Hex as Hex
-import Cardano.Bytes as Bytes
 import Control.Monad.Except (runExcept)
 import Data.Array as Array
 import Data.Either (Either(..))
@@ -61,6 +63,7 @@ foreign import operationValidationImpl :: String -> Validation
 foreign import operationWitnessPlanImpl :: String -> WitnessPlan
 foreign import operationRdfGraphImpl :: String -> RdfGraph
 foreign import operationScriptEvaluationImpl :: String -> ScriptEvaluation
+foreign import operationTransactionReviewImpl :: String -> TransactionReview
 foreign import operationEntrySeedImpl :: String -> String -> String -> Nullable EntrySeed
 foreign import operationArgsMergedImpl :: String -> String -> String
 foreign import providerResolutionErrorArgsImpl :: String -> String -> String
@@ -143,10 +146,76 @@ type Identification =
   , witnesses :: Array IdentificationRow
   }
 
-type IntentClaim =
+type ReviewAsset =
+  { policyId :: String
+  , assetName :: String
+  , quantity :: String
+  }
+
+type ReviewControlGroup =
+  { category :: String
+  , role :: String
+  , roleProvenance :: String
+  , evidence :: Array String
+  , lovelace :: String
+  , assetClassCount :: String
+  , outputCount :: String
+  , outputIndices :: Array String
+  , addresses :: Array String
+  , assets :: Array ReviewAsset
+  }
+
+type ReviewClaim =
   { label :: String
   , value :: String
   , detail :: String
+  , selfDeclared :: Boolean
+  }
+
+type ReviewSource =
+  { kind :: String
+  , count :: String
+  , resolvedCount :: String
+  , missingCount :: String
+  , resolvedLovelace :: String
+  , lovelace :: String
+  , conditional :: String
+  , inputCount :: String
+  , bodyTotalLovelace :: String
+  , returnLovelace :: String
+  , readOnly :: String
+  }
+
+type ReviewAdditionalField =
+  { key :: String
+  , value :: String
+  }
+
+type TransactionReview =
+  { valid :: Boolean
+  , title :: String
+  , subtitle :: String
+  , version :: String
+  , txId :: String
+  , bodyHash :: String
+  , feeLovelace :: String
+  , inputStatus :: String
+  , regularInputCount :: String
+  , resolvedRegularInputCount :: String
+  , missingRegularInputCount :: String
+  , netSignerValueProvable :: Boolean
+  , netSignerValueLovelace :: String
+  , netSignerValueNote :: String
+  , warnings :: Array String
+  , controlGroups :: Array ReviewControlGroup
+  , highValueMovements :: Array ReviewControlGroup
+  , claims :: Array ReviewClaim
+  , collateralConditional :: Boolean
+  , collateralInputCount :: String
+  , collateralBodyTotalLovelace :: String
+  , collateralReturnLovelace :: String
+  , sources :: Array ReviewSource
+  , additionalFields :: Array ReviewAdditionalField
   }
 
 type MetadataEntry =
@@ -180,17 +249,6 @@ type WitnessPlanSection =
   { title :: String
   , empty :: String
   , rows :: Array WitnessPlanRow
-  }
-
-type IntentSummary =
-  { valid :: Boolean
-  , title :: String
-  , subtitle :: String
-  , metrics :: Array Metric
-  , claims :: Array IntentClaim
-  , metadata :: Array MetadataEntry
-  , sections :: Array WitnessPlanSection
-  , warnings :: Array String
   }
 
 type WitnessPlan =
@@ -270,10 +328,12 @@ operationBrowser = operationBrowserImpl
 operationIdentification :: String -> Identification
 operationIdentification = operationIdentificationImpl
 
-operationIntentSummary :: String -> IntentSummary
-operationIntentSummary raw =
-  parseJsonImpl raw normalizeIntentRoot
-    (invalidIntentSummary "Signing summary" "Ledger operation response was not JSON.")
+operationTransactionReview :: String -> TransactionReview
+operationTransactionReview = operationTransactionReviewImpl
+
+operationIntentMetadata :: String -> Array MetadataEntry
+operationIntentMetadata raw =
+  parseJsonImpl raw normalizeIntentMetadataRoot []
 
 operationValidation :: String -> Validation
 operationValidation = operationValidationImpl
@@ -297,52 +357,15 @@ operationArgsMerged = operationArgsMergedImpl
 providerResolutionErrorArgs :: String -> String -> String
 providerResolutionErrorArgs = providerResolutionErrorArgsImpl
 
-invalidIntentSummary :: String -> String -> IntentSummary
-invalidIntentSummary title subtitle =
-  { valid: false
-  , title
-  , subtitle
-  , metrics: []
-  , claims: []
-  , metadata: []
-  , sections: []
-  , warnings: []
-  }
-
-normalizeIntentRoot :: Foreign -> IntentSummary
-normalizeIntentRoot root =
+normalizeIntentMetadataRoot :: Foreign -> Array MetadataEntry
+normalizeIntentMetadataRoot root =
   case field "intent" (operationResultValue root) of
-    Just intent -> readIntentSummary intent
-    Nothing ->
-      invalidIntentSummary "Signing summary" "Ledger operation response missing intent."
+    Just intent -> intentMetadataEntries intent
+    Nothing -> []
 
 operationResultValue :: Foreign -> Foreign
 operationResultValue root =
   fromMaybe root (field "result" root)
-
-readIntentSummary :: Foreign -> IntentSummary
-readIntentSummary intent =
-  let
-    outputRows = Array.mapWithIndex readIntentOutputRow (intentOutputValues intent)
-    sections = map readWitnessSection (arrayField "sections" intent)
-    sectionsWithOutputs =
-      if Array.null outputRows then sections
-      else
-        Array.snoc sections
-          { title: "Outputs"
-          , empty: "No outputs."
-          , rows: outputRows
-          }
-  in
-    { valid: true
-    , title: stringField "title" "Signing summary" intent
-    , subtitle: stringField "subtitle" "" intent
-    , metrics: map readMetric (arrayField "metrics" intent)
-    , claims: map readIntentClaim (arrayField "claims" intent)
-    , metadata: intentMetadataEntries intent
-    , sections: sectionsWithOutputs
-    , warnings: map readStringDefault (arrayField "warnings" intent)
-    }
 
 intentMetadataEntries :: Foreign -> Array MetadataEntry
 intentMetadataEntries intent =
@@ -370,67 +393,6 @@ readMetadataMapEntry :: Foreign -> MetadataMapEntry
 readMetadataMapEntry value =
   { key: fromMaybe MetadataMalformed (field "key" value <#> readMetadataValue)
   , value: fromMaybe MetadataMalformed (field "value" value <#> readMetadataValue)
-  }
-
-intentOutputValues :: Foreign -> Array Foreign
-intentOutputValues intent =
-  case field "value" intent of
-    Just value -> arrayField "outputs" value
-    Nothing -> []
-
-readIntentOutputRow :: Int -> Foreign -> WitnessPlanRow
-readIntentOutputRow index value =
-  let
-    addressHex = stringField "address_hex" "" value
-  in
-    { label: "Output #" <> show index
-    , value: addressHex
-    , copyValue: addressHex
-    , path: "[\"intent\",\"value\",\"outputs\",\"#" <> show index <> "\",\"address_hex\"]"
-    , detail: stringField "bucket" "" value
-    , identifierCandidates: addressIdentifierCandidates addressHex
-    }
-
-addressIdentifierCandidates :: String -> Array String
-addressIdentifierCandidates addressHex =
-  case Hex.fromHex addressHex of
-    Right bytes | Bytes.byteLength bytes > 0 ->
-      let
-        networkTag = mod (Bytes.unsafeIndex bytes 0) 16
-        prefix = if networkTag == 1 then "addr" else "addr_test"
-      in
-        [ addressHex, Bech32.encode prefix bytes ]
-    _ ->
-      if addressHex == "" then [] else [ addressHex ]
-
-readMetric :: Foreign -> Metric
-readMetric value =
-  { label: stringField "label" "" value
-  , value: stringField "value" "" value
-  }
-
-readIntentClaim :: Foreign -> IntentClaim
-readIntentClaim value =
-  { label: stringField "label" "" value
-  , value: stringField "value" "" value
-  , detail: stringField "detail" "" value
-  }
-
-readWitnessSection :: Foreign -> WitnessPlanSection
-readWitnessSection value =
-  { title: stringField "title" "" value
-  , empty: stringField "empty" "" value
-  , rows: map readWitnessRow (arrayField "rows" value)
-  }
-
-readWitnessRow :: Foreign -> WitnessPlanRow
-readWitnessRow value =
-  { label: stringField "label" "" value
-  , value: stringField "value" "" value
-  , copyValue: stringField "copyValue" "" value
-  , path: stringField "path" "" value
-  , detail: stringField "detail" "" value
-  , identifierCandidates: map readStringDefault (arrayField "identifierCandidates" value)
   }
 
 stringField :: String -> String -> Foreign -> String

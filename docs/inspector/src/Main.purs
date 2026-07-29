@@ -36,7 +36,7 @@ import FFI.BookStore as BookStore
 import FFI.Clipboard (copy) as Clipboard
 import FFI.EntryStore as EntryStore
 import FFI.Inspector (InspectorResult, runLedgerOperation)
-import FFI.Json (Browser, Identification, IntentSummary, MetadataValue(..), RdfGraph, ScriptEvaluation, Validation, WitnessPlan, inspect, operationArgsMerged, operationArgsWithPath, operationBrowser, operationEntrySeed, operationIdentification, operationInspection, operationIntentSummary, operationRdfGraph, operationScriptEvaluation, operationValidation, operationWitnessPlan, pretty, providerResolutionErrorArgs) as Json
+import FFI.Json (Browser, Identification, MetadataEntry, MetadataValue(..), RdfGraph, ScriptEvaluation, TransactionReview, Validation, WitnessPlan, inspect, operationArgsMerged, operationArgsWithPath, operationBrowser, operationEntrySeed, operationIdentification, operationInspection, operationIntentMetadata, operationRdfGraph, operationScriptEvaluation, operationTransactionReview, operationValidation, operationWitnessPlan, pretty, providerResolutionErrorArgs) as Json
 import FFI.OverlayBook as OverlayBook
 import FFI.RdfShapes as RdfShapes
 import FFI.Storage as Storage
@@ -201,7 +201,8 @@ type State =
   , operationArgs :: String
   , browser :: Maybe Json.Browser
   , identification :: Maybe Json.Identification
-  , intent :: Maybe Json.IntentSummary
+  , review :: Maybe Json.TransactionReview
+  , intentMetadata :: Array Json.MetadataEntry
   , witnessPlan :: Maybe Json.WitnessPlan
   , workbenchCandidate :: Maybe TxEntry
   , workbenchCandidateMessage :: Maybe String
@@ -501,7 +502,8 @@ inspectorComponent initial =
         , operationArgs: "{}"
         , browser: Nothing
         , identification: Nothing
-        , intent: Nothing
+        , review: Nothing
+        , intentMetadata: []
         , witnessPlan: Nothing
         , workbenchCandidate: Nothing
         , workbenchCandidateMessage: Nothing
@@ -2361,23 +2363,22 @@ inspectorComponent initial =
     in HH.section [ classNames [ "decoded-screen" ] ] children
 
   renderDeclaredMetadata state =
-    case state.intent of
-      Just intent | intent.valid && not (Array.null intent.metadata) ->
-        [ HH.section
-            [ classNames [ "declared-metadata-panel", "identity-panel" ]
-            , mdSurface "decoded"
-            ]
-            [ HH.div
-                [ classNames [ "identity-heading" ] ]
-                [ HH.div_
-                    [ HH.h3_ [ HH.text "Self-declared transaction metadata" ]
-                    , HH.p_ [ HH.text "This is transaction-supplied metadata, not independently verified information." ]
-                    ]
-                ]
-            , HH.div [ classNames [ "declared-metadata-entries" ] ] (map renderMetadataEntry intent.metadata)
-            ]
-        ]
-      _ -> []
+    if Array.null state.intentMetadata then []
+    else
+      [ HH.section
+          [ classNames [ "declared-metadata-panel", "identity-panel" ]
+          , mdSurface "decoded"
+          ]
+          [ HH.div
+              [ classNames [ "identity-heading" ] ]
+              [ HH.div_
+                  [ HH.h3_ [ HH.text "Self-declared transaction metadata" ]
+                  , HH.p_ [ HH.text "This is transaction-supplied metadata, not independently verified information." ]
+                  ]
+              ]
+          , HH.div [ classNames [ "declared-metadata-entries" ] ] (map renderMetadataEntry state.intentMetadata)
+          ]
+      ]
 
   renderMetadataEntry entry =
     HH.div
@@ -3764,13 +3765,6 @@ inspectorComponent initial =
                     <> renderStderr r.stderr
                 )
 
-  renderIntentMaybe state =
-    case state.intent of
-      Just intent ->
-        if intent.valid then [ renderIntentSummary state intent ]
-        else []
-      Nothing -> []
-
   renderIdentificationMaybe state =
     case state.identification of
       Just identification ->
@@ -3839,17 +3833,10 @@ inspectorComponent initial =
           [ HH.h3_ [ HH.text identification.title ]
           , HH.p_ [ HH.text identification.subtitle ]
           ]
-      _ -> case state.intent of
-        Just intent | intent.valid ->
-          HH.div
-            [ classNames [ "result-summary-title" ] ]
-            [ HH.h3_ [ HH.text intent.title ]
-            , HH.p_ [ HH.text intent.subtitle ]
-            ]
-        _ ->
-          HH.div
-            [ classNames [ "result-summary-title" ] ]
-            [ HH.h3_ [ HH.text summary.title ] ]
+      _ ->
+        HH.div
+          [ classNames [ "result-summary-title" ] ]
+          [ HH.h3_ [ HH.text summary.title ] ]
 
   renderSummaryIdentity state =
     case state.identification of
@@ -3863,15 +3850,9 @@ inspectorComponent initial =
       Nothing -> []
 
   renderSummaryWarnings state =
-    [ renderIntentWarnings state.intent
-    , renderWitnessPlanWarnings state.witnessPlan
+    [ renderWitnessPlanWarnings state.witnessPlan
     , renderValidationWarnings state.validation
     ]
-
-  renderIntentWarnings intent =
-    case intent of
-      Just value | value.valid -> renderWitnessWarnings value.warnings
-      _ -> HH.text ""
 
   renderWitnessPlanWarnings witnessPlan =
     case witnessPlan of
@@ -3922,8 +3903,7 @@ inspectorComponent initial =
             [ renderDecodedStructure state ]
               <> renderCompactIdentificationMaybe state
           WitnessTab ->
-            renderIntentMaybe state
-              <> renderWitnessPlanMaybe state
+            renderWitnessPlanMaybe state
           ValidationTab ->
             renderValidationMaybe state
               <> renderShaclConformanceMaybe state state.shaclConformance
@@ -3982,67 +3962,6 @@ inspectorComponent initial =
             (map renderMetric summary.metrics)
         ]
     ]
-
-  renderIntentSummary state intent =
-    HH.div
-      [ classNames [ "intent-panel" ]
-      , mdSurface "decoded"
-      ]
-      [ HH.div
-          [ classNames [ "identity-heading" ] ]
-          [ HH.div_
-              [ HH.h3_ [ HH.text intent.title ]
-              , HH.p_ [ HH.text intent.subtitle ]
-              ]
-          ]
-      , HH.div
-          [ classNames [ "metric-grid", "intent-metrics" ] ]
-          (map renderMetric intent.metrics)
-      , renderIntentClaims intent.claims
-      , renderWitnessWarnings intent.warnings
-      , HH.div_
-          (map (renderIntentSection state) intent.sections)
-      ]
-
-  renderIntentClaims claims =
-    if Array.null claims then
-      HH.text ""
-    else
-      HH.div
-        [ classNames [ "intent-claims" ] ]
-        (map renderIntentClaim claims)
-
-  renderIntentClaim claim =
-    HH.div
-      [ classNames [ "intent-claim" ] ]
-      [ HH.span
-          [ classNames [ "identity-section-title" ] ]
-          [ HH.text claim.label ]
-      , HH.strong_ [ HH.text claim.value ]
-      , if claim.detail == "" then
-          HH.text ""
-        else
-          HH.p_ [ HH.text claim.detail ]
-      ]
-
-  renderIntentSection state section =
-    HH.div
-      [ classNames [ "witness-section" ] ]
-      [ HH.div
-          [ classNames [ "identity-section-title" ] ]
-          [ HH.text section.title ]
-      , if Array.null section.rows then
-          HH.div
-            [ classNames [ "witness-empty" ] ]
-            [ HH.text section.empty ]
-        else
-          HH.div
-            [ classNames [ "witness-row-list" ] ]
-            ( map
-                (\row -> renderWitnessRowWithCopy state (not (Array.null row.identifierCandidates)) row)
-                section.rows
-            )
-      ]
 
   renderIdentification state identification =
     HH.div
@@ -6142,7 +6061,8 @@ inspectorComponent initial =
           , operationArgs = "{}"
           , browser = Nothing
           , identification = Nothing
-          , intent = Nothing
+          , review = Nothing
+          , intentMetadata = []
           , witnessPlan = Nothing
           , workbenchCandidate = Nothing
           , workbenchCandidateMessage = Nothing
@@ -6222,6 +6142,7 @@ inspectorComponent initial =
             else pure "{}"
           identifyResult <- H.liftAff (runLedgerOperation h "tx.identify" inputContextArgs)
           intentResult <- H.liftAff (runLedgerOperation h "tx.intent" inputContextArgs)
+          reviewResult <- H.liftAff (runLedgerOperation h "tx.review" inputContextArgs)
           witnessPlanResult <- H.liftAff (runLedgerOperation h Ledger.planTransactionWitnessesOperation inputContextArgs)
           validationResult <- H.liftAff (runLedgerOperation h Ledger.validateTransactionOperation inputContextArgs)
           scriptEvaluationResult <- H.liftAff (runLedgerOperation h Ledger.evaluateTransactionScriptsOperation inputContextArgs)
@@ -6231,7 +6152,8 @@ inspectorComponent initial =
             inspectionResult = operationResult { stdout = Json.operationInspection operationResult.stdout }
             browser = Json.operationBrowser operationResult.stdout
             identification = Json.operationIdentification identifyResult.stdout
-            intent = Json.operationIntentSummary intentResult.stdout
+            review = Json.operationTransactionReview reviewResult.stdout
+            intentMetadata = Json.operationIntentMetadata intentResult.stdout
             witnessPlan = Json.operationWitnessPlan witnessPlanResult.stdout
             entrySeed =
               if operationResult.exitOk && identifyResult.exitOk && witnessPlanResult.exitOk then
@@ -6279,9 +6201,10 @@ inspectorComponent initial =
               , identification =
                   if identifyResult.exitOk && identification.valid then Just identification
                   else Nothing
-              , intent =
-                  if intentResult.exitOk && intent.valid then Just intent
+              , review =
+                  if reviewResult.exitOk && review.valid then Just review
                   else Nothing
+              , intentMetadata = intentMetadata
               , witnessPlan =
                   if witnessPlanResult.exitOk && witnessPlan.valid then Just witnessPlan
                   else Nothing
