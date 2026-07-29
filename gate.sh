@@ -11,9 +11,15 @@ set -euo pipefail
 # it. Kept here for the same reason.
 #
 # What matters MORE for this ticket: this is the first lane to change the
-# Halogen workbench, so `nix run .#ci-playwright` and `nix run .#ci-build`
-# are the load-bearing proofs. A PureScript renderer can typecheck, pass
-# purs-tidy and still render nothing in a browser.
+# Halogen workbench, so a BROWSER proof is load-bearing — a PureScript
+# renderer can typecheck, pass purs-tidy and still render nothing.
+#
+# CAREFUL: there are two Playwright suites and they test different apps.
+#   ci-playwright            -> tests/*.spec.ts, the cardano-addresses web UI
+#   ci-inspector-playwright  -> docs/inspector/tests/*.spec.mjs, THE WORKBENCH
+# The inherited #121 gate ran only the former. For a workbench ticket that
+# would pass without ever exercising what is being built, so this gate adds
+# the inspector suite below.
 
 commit_gate() {
   local sha="${1:?usage: commit_gate <sha>}"
@@ -70,3 +76,4 @@ nix run .#ci-check-vectors
 nix run .#ci-build
 nix run .#ci-test
 nix run .#ci-playwright
+nix run .#ci-inspector-playwright
