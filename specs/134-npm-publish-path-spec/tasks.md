@@ -5,21 +5,21 @@
 Commit subject: `fix: publish the built npm tarball by path, not repo shorthand`
 Trailer: `Tasks: T134`
 
-- [ ] T134 RED — in `node/test/release-workflows.test.mjs`, seed a workflow
+- [X] T134 RED — in `node/test/release-workflows.test.mjs`, seed a workflow
       document whose publish step carries the old bare argument
       (`npm publish --access public --provenance node-package/*.tgz`) and assert
       the checker rejects it, naming the publish argument in its message. Watch
       it fail against the current checker before writing the guard.
-- [ ] T134 GREEN — add the path-shaped-argument guard to
+- [X] T134 GREEN — add the path-shaped-argument guard to
       `scripts/check-release-workflows.mjs` (assert positively that the argument
       is path-shaped; do not blacklist the single bad form), and fix
       `.github/workflows/release.yml` so the publish argument is path-shaped.
-- [ ] T134 PROOF — `./gate.sh` green, and the seeded control observed red before
+- [X] T134 PROOF — `./gate.sh` green, and the seeded control observed red before
       the guard and green after.
 
 ## Optional within this slice (desirable, not contractual)
 
-- [ ] T134 REHEARSAL — if it stays a small addition to the existing
+- [X] T134 REHEARSAL — if it stays a small addition to the existing
       `node-package-artifact` job in `ci.yml`, add an `npm publish --dry-run`
       against the built tarball. Drop it and log the reason in `WIP.md` if it
       grows beyond that.

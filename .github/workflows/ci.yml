@@ -88,6 +88,9 @@ jobs:
       - name: Build packed Node artifact
         run: nix build .#node-package --out-link node-package
 
+      - name: Rehearse npm publish argument shape
+        run: nix develop --quiet -c npm publish --dry-run ./node-package/*.tgz
+
       - name: Upload packed Node artifact
         uses: actions/upload-artifact@v4
         with:

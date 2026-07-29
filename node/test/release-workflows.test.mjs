@@ -51,6 +51,8 @@ const goodReleaseYaml = (opts = {}) => {
     broadGlobalPermissions = false,
     omitPublishOidc = false,
     unscopedAppTokens = false,
+    npmPublishArg = "./node-package/*.tgz",
+    npmPublishArgBeforeFlags = false,
   } = opts;
 
   const runsOn = selfHostedPublish ? "nixos" : "ubuntu-latest";
@@ -96,12 +98,16 @@ const goodReleaseYaml = (opts = {}) => {
         run: node scripts/check-release-version.mjs --tag "\${{ needs.release-please.outputs.tag_name }}" --node-package node-package --csk csk --release-bundle release-bundle
 `;
 
+  const npmPublishCommand = npmPublishArgBeforeFlags
+    ? `npm publish ${npmPublishArg} --access public --provenance`
+    : `npm publish --access public --provenance${npmPublishArg ? ` ${npmPublishArg}` : ""}`;
+
   const npmPublish = omitPublish
     ? ""
     : `      - name: Publish npm
         env:
           NODE_AUTH_TOKEN: \${{ secrets.NPM_TOKEN }}
-        run: npm publish --access public --provenance node-package/*.tgz
+        run: ${npmPublishCommand}
 `;
 
   let upload = "";
@@ -516,6 +522,77 @@ test("negative: missing npm or GitHub publication fails", () => {
   assert.notEqual(status, 0, "checker accepted missing npm/GitHub publication");
   assert.match(output, /npm publish|gh release|publish/i);
 });
+
+const invalidNpmPublishArguments = [
+  ["historical bare tarball path", "node-package/*.tgz"],
+  ["missing positional argument", ""],
+  ["bare package name", "lambdasistemi-cardano-swiss-knife"],
+  ["scoped package name", "@lambdasistemi/cardano-swiss-knife"],
+  [
+    "git package spec",
+    "git+https://github.com/lambdasistemi/cardano-swiss-knife.git",
+  ],
+  [
+    "path-shaped flag value with bare positional",
+    "--userconfig ./.npmrc node-package/*.tgz",
+    "node-package/*.tgz",
+  ],
+];
+
+for (const [
+  label,
+  npmPublishArg,
+  expectedNamed = npmPublishArg,
+] of invalidNpmPublishArguments) {
+  test(`negative: npm publish rejects ${label}`, () => {
+    const root = withGoodTree(({ releasePath, write }) => {
+      write(releasePath, goodReleaseYaml({ npmPublishArg }));
+    });
+    const { status, output } = runChecker(root);
+    assert.notEqual(
+      status,
+      0,
+      `checker accepted a non-path npm publish argument: ${npmPublishArg || "<missing>"}`,
+    );
+    assert.match(output, /npm publish argument must be path-shaped/i);
+    if (expectedNamed) {
+      assert.ok(
+        output.includes(expectedNamed),
+        `failure must name the publish argument ${expectedNamed}:\n${output}`,
+      );
+    } else {
+      assert.match(output, /got (?:none|no positional argument)/i);
+    }
+    assert.match(output, /check-release-workflows: 1 error\(s\)/);
+  });
+}
+
+const acceptedNpmPublishArguments = [
+  ["relative parent path", "../node-package/package.tgz", false],
+  ["absolute path", "/tmp/node-package/package.tgz", false],
+  ["argument before flags", "./node-package/*.tgz", true],
+];
+
+for (const [
+  label,
+  npmPublishArg,
+  npmPublishArgBeforeFlags,
+] of acceptedNpmPublishArguments) {
+  test(`npm publish accepts ${label}`, () => {
+    const root = withGoodTree(({ releasePath, write }) => {
+      write(
+        releasePath,
+        goodReleaseYaml({ npmPublishArg, npmPublishArgBeforeFlags }),
+      );
+    });
+    const { status, output } = runChecker(root);
+    assert.equal(
+      status,
+      0,
+      `checker rejected a path-shaped npm publish argument:\n${output}`,
+    );
+  });
+}
 
 test("negative: missing checksum artifacts fails", () => {
   const root = withGoodTree(({ releasePath, write }) => {
