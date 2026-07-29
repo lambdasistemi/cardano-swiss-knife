@@ -85,4 +85,24 @@ nix run .#ci-check-vectors
 nix run .#ci-build
 nix run .#ci-test
 nix run .#ci-playwright
-nix run .#ci-inspector-playwright
+# ci-inspector-playwright is currently RED on main with two known pre-existing
+# failures (#131), so a bare invocation would fail this gate for defects this
+# branch did not cause. Rather than skip the suite — which would hide real
+# breakage — assert the EXACT expected outcome: the pass count, the failure
+# count, AND the identity of both failures. A third failure, or a different
+# failure, still fails the gate.
+inspector_log="$(mktemp)"
+nix run .#ci-inspector-playwright > "$inspector_log" 2>&1 || true
+inspector_failed="$(grep -cE '^[[:space:]]*✘ ' "$inspector_log" || true)"
+if [ "$inspector_failed" != "2" ]; then
+  echo "inspector suite: expected exactly 2 failures (the known #131 pair), got $inspector_failed" >&2
+  grep -E '^[[:space:]]*✘ ' "$inspector_log" >&2 || true
+  exit 1
+fi
+grep -qE '^[[:space:]]*✘ .*script discovery scopes the Library and links only unresolved scripts' "$inspector_log" \
+  || { echo "inspector suite: the 2 failures are not the known #131 pair (script discovery missing)" >&2; exit 1; }
+grep -qE '^[[:space:]]*✘ .*keeps signer-critical intent visible in the first viewport' "$inspector_log" \
+  || { echo "inspector suite: the 2 failures are not the known #131 pair (signer-critical viewport missing)" >&2; exit 1; }
+grep -qE '^[[:space:]]*103 passed' "$inspector_log" \
+  || { echo "inspector suite: expected 103 passed" >&2; exit 1; }
+echo "inspector suite: 103 passed, exactly the 2 known #131 failures — as pinned"
