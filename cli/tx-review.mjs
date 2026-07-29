@@ -4,6 +4,18 @@ const fieldLines = (rows, indent) => {
   return rows.map(([label, value]) => `${" ".repeat(indent)}${label.padEnd(width)}  ${value}`);
 };
 const listLines = (items, indent) => (items.length === 0 ? [`${" ".repeat(indent)}(none)`] : items.map((item) => `${" ".repeat(indent)}${item}`));
+const assetEntries = (assets) => {
+  if (!assets || typeof assets !== "object") return [];
+  const entries = [];
+  for (const policyId of Object.keys(assets).sort()) {
+    const names = assets[policyId];
+    if (!names || typeof names !== "object") continue;
+    for (const assetName of Object.keys(names).sort()) {
+      entries.push([`${policyId}/${assetName === "" ? "(empty asset name)" : assetName}`, scalar(names[assetName])]);
+    }
+  }
+  return entries;
+};
 const groupLines = (group, name, index, total) => {
   const evidence = Array.isArray(group.evidence) ? group.evidence : [];
   const indices = Array.isArray(group.output_indices) ? group.output_indices : [];
@@ -17,10 +29,12 @@ const groupLines = (group, name, index, total) => {
     ["distinct non-ADA asset classes", scalar(group.asset_class_count)],
     ["outputs", `${scalar(group.output_count)} (indices ${indices.join(", ")})`],
   ];
+  const assets = assetEntries(group.assets);
   const width = Math.max(...rows.map(([label]) => label.length), "addresses".length);
   return [
     `  ${name} ${index + 1} of ${total}`,
     ...rows.map(([label, value]) => `    ${label.padEnd(width)}  ${value}`),
+    ...(assets.length > 0 ? ["    assets", ...fieldLines(assets, 6)] : []),
     "    addresses",
     ...listLines(addresses, 6),
   ];

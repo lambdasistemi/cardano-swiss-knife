@@ -77,9 +77,9 @@ command; the reference page lists them all.
 signer decision view derived entirely from the canonical `tx.review` result:
 the transaction header, what is not proven (input context status, net signer
 value provability, warnings), every output control group with its
-inspector-native category, role, evidence and exact lovelace, high-value
-movements, sources, collateral, self-declared claims, and book-resolved
-labels.
+inspector-native category, role, evidence, exact lovelace and per-asset
+policy id, name and exact quantity, high-value movements, sources,
+collateral, self-declared claims, and book-resolved labels.
 
 - The decision view renders what the inspector reported, in the inspector's
   own vocabulary. It never synthesises a readiness state: input context

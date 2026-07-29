@@ -31,9 +31,9 @@ test("T011 (FR-002): renders all five control categories as distinct rows with t
     control_groups: [
       { category: "signer_controlled", role: "signer_change", role_provenance: "heuristic", evidence: ["ledger_proven", "heuristic"], lovelace: "75884469", asset_class_count: 0, output_count: 1, output_indices: [1], addresses: ["018bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c14c7889c658ef4f491a34cf79c35a2e0fe6b0d1b0a856fb9580f2d9c3"] },
       { category: "external_key", role: "external_key_value", role_provenance: "ledger_proven", evidence: ["ledger_proven"], lovelace: "5000000", asset_class_count: 0, output_count: 1, output_indices: [2], addresses: ["610340b4a8592836dab8a26e02e22812f71521b67f39293ac1a3d4699a4c8d2e1f"] },
-      { category: "script", role: "script_lock", role_provenance: "ledger_proven", evidence: ["ledger_proven"], lovelace: "611069353175", asset_class_count: 1, output_count: 1, output_indices: [0], addresses: ["3132201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0d32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0d"] },
-      { category: "bootstrap", role: "bootstrap_era", role_provenance: "ledger_proven", evidence: ["context_proven"], lovelace: "1234567", asset_class_count: 0, output_count: 1, output_indices: [3], addresses: ["02038b77a93f33a415154b41f3e47a4239a4a51b8b29a26f4a5a43a5b6c7d8e9f0"] },
-      { category: "unknown", role: "unclassified", role_provenance: "heuristic", evidence: ["heuristic"], lovelace: "999999999", asset_class_count: 2, output_count: 1, output_indices: [4], addresses: ["03a9f0b62d2a63716b04a09f16b0a0e14a0f9e0c0a6d0e2b7a7f6e5d4c3b2a1908"] },
+      { category: "script", role: "script_lock", role_provenance: "ledger_proven", evidence: ["ledger_proven"], lovelace: "611069353175", asset_class_count: 1, output_count: 1, output_indices: [0], addresses: ["3132201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0d32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0d"], assets: { "8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1": { "414d415255": "500000000" } } },
+      { category: "bootstrap", role: "bootstrap_era", role_provenance: "ledger_proven", evidence: ["context_proven"], lovelace: "1234567", asset_class_count: 0, output_count: 1, output_indices: [3], addresses: ["02038b77a93f33a415154b41f3e47a4239a4a51b8b29a26f4a5a43a5b6c7d8e9f0"], assets: {} },
+      { category: "unknown", role: "unclassified", role_provenance: "heuristic", evidence: ["heuristic"], lovelace: "999999999", asset_class_count: 2, output_count: 1, output_indices: [4], addresses: ["03a9f0b62d2a63716b04a09f16b0a0e14a0f9e0c0a6d0e2b7a7f6e5d4c3b2a1908"], assets: { "c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8": { "54455354": "100", "": "200" } } },
     ],
     high_value_movements: [],
     sources: [],
@@ -72,7 +72,7 @@ test("T011 (FR-002): renders all five control categories as distinct rows with t
   }
 });
 
-test("T012 (FR-004, ruling A-001): signer change, external key value and script lock stay three unambiguous rows with exact lovelace, and the asset column reads as a class count, never an amount", () => {
+test("T012, T022 (FR-004, ruling A-001): signer change, external key value and script lock stay three unambiguous rows with exact lovelace and exact per-asset amounts, and the asset column reads as a class count, never an amount", () => {
   const review = {
     version: "cardano-tx-review/v1",
     tx_id: "a213c84030a6ae1c05c9443b07d1b853b48637d769eec188af9ff3258b0713b1",
@@ -82,9 +82,10 @@ test("T012 (FR-004, ruling A-001): signer change, external key value and script 
     net_signer_value: { provable: true, lovelace: "-7000000", note: "signer net flow proven from resolved inputs" },
     warnings: [],
     control_groups: [
-      { category: "signer_controlled", role: "signer_change", role_provenance: "heuristic", evidence: ["ledger_proven", "heuristic"], lovelace: "75884469", asset_class_count: 0, output_count: 1, output_indices: [1], addresses: ["018bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c14c7889c658ef4f491a34cf79c35a2e0fe6b0d1b0a856fb9580f2d9c3"] },
-      { category: "external_key", role: "external_key_value", role_provenance: "ledger_proven", evidence: ["ledger_proven"], lovelace: "5000000", asset_class_count: 0, output_count: 1, output_indices: [2], addresses: ["610340b4a8592836dab8a26e02e22812f71521b67f39293ac1a3d4699a4c8d2e1f"] },
-      { category: "script", role: "script_lock", role_provenance: "ledger_proven", evidence: ["ledger_proven"], lovelace: "611069353175", asset_class_count: 1, output_count: 1, output_indices: [0], addresses: ["3132201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0d32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0d"] },
+      { category: "signer_controlled", role: "signer_change", role_provenance: "heuristic", evidence: ["ledger_proven", "heuristic"], lovelace: "75884469", asset_class_count: 0, output_count: 1, output_indices: [1], addresses: ["018bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c14c7889c658ef4f491a34cf79c35a2e0fe6b0d1b0a856fb9580f2d9c3"], assets: {} },
+      { category: "external_key", role: "external_key_value", role_provenance: "ledger_proven", evidence: ["ledger_proven"], lovelace: "5000000", asset_class_count: 0, output_count: 1, output_indices: [2], addresses: ["610340b4a8592836dab8a26e02e22812f71521b67f39293ac1a3d4699a4c8d2e1f"], assets: {} },
+      { category: "script", role: "script_lock", role_provenance: "ledger_proven", evidence: ["ledger_proven"], lovelace: "611069353175", asset_class_count: 3, output_count: 1, output_indices: [0], addresses: ["3132201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0d32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0d"], assets: { f43a62fdc3965df486de8a0d32fe800963589c41b38946602a8b0a45: { "41474958": "999999999", "": "1" }, a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7: { "544f4b454e": "42000000" } } },
+      { category: "bootstrap", role: "bootstrap_era", role_provenance: "ledger_proven", evidence: ["context_proven"], lovelace: "1234567", asset_class_count: 0, output_count: 1, output_indices: [3], addresses: ["02038b77a93f33a415154b41f3e47a4239a4a51b8b29a26f4a5a43a5b6c7d8e9f0"] },
     ],
     high_value_movements: [],
     sources: [],
@@ -92,14 +93,15 @@ test("T012 (FR-004, ruling A-001): signer change, external key value and script 
     claims: [],
   };
   const output = renderTransactionReview({ ledger_functional_layer: "cardano-ledger-functional/v1", op: "tx.review", result: { review } });
-  assert.match(output, /^Output control groups \(3\)$/m);
+  assert.match(output, /^Output control groups \(4\)$/m);
   const rows = [
     { category: "signer_controlled", role: "signer_change", lovelace: "75884469", assetClasses: "0" },
     { category: "external_key", role: "external_key_value", lovelace: "5000000", assetClasses: "0" },
-    { category: "script", role: "script_lock", lovelace: "611069353175", assetClasses: "1" },
+    { category: "script", role: "script_lock", lovelace: "611069353175", assetClasses: "3" },
+    { category: "bootstrap", role: "bootstrap_era", lovelace: "1234567", assetClasses: "0" },
   ];
-  const markers = rows.map((row, index) => output.indexOf(`group ${index + 1} of 3`));
-  for (const [index, marker] of markers.entries()) assert.notEqual(marker, -1, `group ${index + 1} of 3 must be present`);
+  const markers = rows.map((row, index) => output.indexOf(`group ${index + 1} of 4`));
+  for (const [index, marker] of markers.entries()) assert.notEqual(marker, -1, `group ${index + 1} of 4 must be present`);
   const lastMarker = markers[markers.length - 1];
   const nextHeading = output.slice(lastMarker).search(/\n\S/);
   const groupsEnd = nextHeading === -1 ? output.length : lastMarker + nextHeading + 1;
@@ -112,9 +114,25 @@ test("T012 (FR-004, ruling A-001): signer change, external key value and script 
     assert.match(block, new RegExp(`^ {4}lovelace[ \t]+${row.lovelace}$`, "m"), `${row.category} block must carry its own exact lovelace`);
     assert.match(block, new RegExp(`^ {4}distinct non-ADA asset classes[ \t]+${row.assetClasses}$`, "m"), `${row.category} block must label its asset column as a count of distinct non-ADA asset classes`);
   }
+  const scriptBlock = blocks[2];
+  assert.match(scriptBlock, /^ {4}assets$/m, "the script group must carry an assets header");
+  assert.match(scriptBlock, /^ {6}a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7\/544f4b454e[ \t]+42000000$/m, "exact policy id, exact asset name, exact decimal quantity for the first sorted asset");
+  assert.match(scriptBlock, /^ {6}f43a62fdc3965df486de8a0d32fe800963589c41b38946602a8b0a45\/\(empty asset name\)[ \t]+1$/m, "empty asset name key renders as a readable non-blank label with its exact quantity");
+  assert.match(scriptBlock, /^ {6}f43a62fdc3965df486de8a0d32fe800963589c41b38946602a8b0a45\/41474958[ \t]+999999999$/m, "exact policy id, exact asset name, exact decimal quantity for the third sorted asset");
+  const assetLines = scriptBlock.split("\n").filter((line) => /^ {6}\S/.test(line) && !line.startsWith("      3132201d"));
+  const assetRows = assetLines.filter((line) => line.includes("/"));
+  assert.equal(assetRows.length, 3, "exactly three per-asset rows in the multi-class script group");
+  const firstPolicy = assetRows[0].indexOf("a0b1c2d3");
+  const secondPolicy = assetRows[1].indexOf("f43a62fd");
+  const thirdPolicy = assetRows[2].indexOf("f43a62fd");
+  assert.ok(firstPolicy !== -1 && secondPolicy !== -1 && thirdPolicy !== -1, "all three asset rows carry their exact policy id");
+  assert.ok(assetRows[1].includes("(empty asset name)") && assetRows[2].includes("41474958"), "within one policy the empty asset name sorts before the hex-named asset");
+  assert.doesNotMatch(blocks[0], /^ {4}assets$/m, "the asset-free signer_controlled group must not render an assets header");
+  assert.doesNotMatch(blocks[1], /^ {4}assets$/m, "the asset-free external_key group must not render an assets header");
+  assert.doesNotMatch(blocks[3], /^ {4}assets$/m, "a group whose assets key is absent entirely (non-conforming producer) must not crash or emit an assets header");
   assert.doesNotMatch(output, /asset amount/i, "the asset column must never read as an amount");
   assert.doesNotMatch(output, /asset value/i, "the asset column must never read as a value");
-  assert.doesNotMatch(output, /\bassets\b/i, "the asset column must never read as a quantity of assets");
+  assert.doesNotMatch(output, /^ {4}assets[ \t]+\d/m, "the class count row must never be labelled just 'assets' with a bare number");
   assert.doesNotMatch(output, /\bworth\b/i, "the asset column must never read as worth");
   assert.doesNotMatch(output, /distinct non-ADA asset classes[ \t]+\d+[ \t]+lovelace/, "the class count must never carry a lovelace unit");
 });
@@ -178,7 +196,7 @@ test("T014 (FR-010): an unrecognised top-level review field survives verbatim in
 });
 
 test("T015 (FR-001, FR-003): two renders of one result are byte-equal, with no digit grouping, locale formatting or float artefact", () => {
-  const scriptGroup = { category: "script", role: "script_lock", role_provenance: "ledger_proven", evidence: ["ledger_proven"], lovelace: "611069353175", asset_class_count: 1, output_count: 1, output_indices: [0], addresses: ["3132201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0d32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0d"] };
+  const scriptGroup = { category: "script", role: "script_lock", role_provenance: "ledger_proven", evidence: ["ledger_proven"], lovelace: "611069353175", asset_class_count: 1, output_count: 1, output_indices: [0], addresses: ["3132201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0d32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0d"], assets: { "8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1": { "414d415255": "500000000" } } };
   const review = {
     version: "cardano-tx-review/v1",
     tx_id: "a213c84030a6ae1c05c9443b07d1b853b48637d769eec188af9ff3258b0713b1",
@@ -257,7 +275,7 @@ test("T016 (FR-011): empty sections render (none), addresses render in full with
   assert.match(emptyResolutionsOutput, /Book resolutions \(0, in caller book order; duplicates preserved\)\n {2}\(none\)/, "a present-but-empty resolutions key renders the heading with (none)");
   const scriptAddress = "3132201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0d32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0d";
   const signerAddress = "018bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c14c7889c658ef4f491a34cf79c35a2e0fe6b0d1b0a856fb9580f2d9c3";
-  const addressedReview = { ...emptyReview, control_groups: [{ category: "script", role: "script_lock", role_provenance: "ledger_proven", evidence: ["ledger_proven"], lovelace: "611069353175", asset_class_count: 1, output_count: 2, output_indices: [0, 1], addresses: [scriptAddress, signerAddress] }] };
+  const addressedReview = { ...emptyReview, control_groups: [{ category: "script", role: "script_lock", role_provenance: "ledger_proven", evidence: ["ledger_proven"], lovelace: "611069353175", asset_class_count: 1, output_count: 2, output_indices: [0, 1], addresses: [scriptAddress, signerAddress], assets: { "8bd03209d227956aaf9670751e0aa2057b51c1537a43f155b24fb1c1": { "414d415255": "500000000" } } }] };
   const addressedOutput = renderTransactionReview({ ledger_functional_layer: "cardano-ledger-functional/v1", op: "tx.review", result: { review: addressedReview } });
   assert.match(addressedOutput, new RegExp(`^ {6}${scriptAddress}$`, "m"), "the full-length script address renders in full on its own line");
   assert.match(addressedOutput, new RegExp(`^ {6}${signerAddress}$`, "m"), "the full-length signer address renders in full on its own line");

@@ -27,6 +27,8 @@ Output control groups (2)
     lovelace                        611069353175
     distinct non-ADA asset classes  1
     outputs                         1 (indices 0)
+    assets
+      c48cbb3d5e57ed56e276bc45f99ab39abe94e6cd7ac39fb402da47ad/0014df105553444d  19019421791
     addresses
       3132201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0d32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0d
   group 2 of 2
@@ -49,6 +51,8 @@ High-value movements (1)
     lovelace                        611069353175
     distinct non-ADA asset classes  1
     outputs                         1 (indices 0)
+    assets
+      c48cbb3d5e57ed56e276bc45f99ab39abe94e6cd7ac39fb402da47ad/0014df105553444d  19019421791
     addresses
       3132201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0d32201dc1e82708364c6c42a53f89f675314bb9ad5da2734aa10baa0d
 
