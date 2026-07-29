@@ -84,10 +84,10 @@ dispatchable in this control turn; see `spec.md` "Blocked acceptance" and ruling
 
 ## Finalization (orchestrator-owned)
 
-- [ ] T023 Refresh the PR body against delivered behaviour.
-- [ ] T024 Run the finalization audit over every commit on the branch.
-- [ ] T025 Drop `gate.sh`.
-- [ ] T026 Mark PR #125 ready. The A-001 gate on T021/T022 (i.e. on cardano-ledger-inspector#168) is DISCHARGED: #168 merged as 007251ea, #121 Slice 4 landed as 8ee2f61.
+- [X] T023 Refresh the PR body against delivered behaviour.
+- [X] T024 Run the finalization audit over every commit on the branch.
+- [X] T025 Drop `gate.sh`.
+- [X] T026 Mark PR #125 ready. The A-001 gate on T021/T022 (i.e. on cardano-ledger-inspector#168) is DISCHARGED: #168 merged as 007251ea, #121 Slice 4 landed as 8ee2f61.
 
 ## Slice 5 — `engines-manifest-sync`
 
