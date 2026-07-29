@@ -388,6 +388,111 @@ const mutateTarballAsset = (nodePackageOut, mutate) => {
   return scratch;
 };
 
+test("root package manifest declares the provenance repository", () => {
+  const packageJson = JSON.parse(readFileSync(join(repoRoot, "package.json"), "utf8"));
+  assert.deepEqual(packageJson.repository, {
+    type: "git",
+    url: "git+https://github.com/lambdasistemi/cardano-swiss-knife.git",
+  });
+});
+
+test("checker enforces the packaged repository.url provenance contract", async (t) => {
+  const nodePackage = buildAttr("node-package");
+  assert.equal(nodePackage.status, 0, nodePackage.output);
+  const csk = buildAttr("csk");
+  assert.equal(csk.status, 0, csk.output);
+  const bundle = buildAttr("release-bundle");
+  assert.equal(bundle.status, 0, bundle.output);
+
+  const cases = [
+    {
+      name: "rejects an absent repository",
+      repository: undefined,
+      accepted: false,
+    },
+    {
+      name: "rejects an empty repository.url",
+      repository: { type: "git", url: "" },
+      accepted: false,
+    },
+    {
+      name: "rejects a different repository under the same organization",
+      repository: {
+        type: "git",
+        url: "git+https://github.com/lambdasistemi/some-other-repo.git",
+      },
+      accepted: false,
+    },
+    {
+      name: "accepts the normalized provenance URL",
+      repository: {
+        type: "git",
+        url: "https://github.com/lambdasistemi/cardano-swiss-knife",
+      },
+      accepted: true,
+    },
+    {
+      name: "rejects a repository that only extends the expected suffix",
+      repository: {
+        type: "git",
+        url: "git+https://github.com/lambdasistemi/cardano-swiss-knife-extra.git",
+      },
+      accepted: false,
+    },
+    {
+      name: "compares repository.url case-sensitively",
+      repository: {
+        type: "git",
+        url: "git+https://github.com/LambdaSistemi/cardano-swiss-knife.git",
+      },
+      accepted: false,
+    },
+    {
+      name: "diagnoses the repository string shorthand",
+      repository: "github:lambdasistemi/cardano-swiss-knife",
+      accepted: false,
+    },
+  ];
+
+  try {
+    for (const { name, repository, accepted } of cases) {
+      await t.test(name, () => {
+        const scratch = mutateTarballAsset(nodePackage.outLink, (packageRoot) => {
+          const packageJsonPath = join(packageRoot, "package.json");
+          const packageJson = JSON.parse(readFileSync(packageJsonPath, "utf8"));
+          if (repository === undefined) delete packageJson.repository;
+          else packageJson.repository = repository;
+          writeFileSync(packageJsonPath, `${JSON.stringify(packageJson, null, 2)}\n`);
+        });
+        try {
+          const check = runChecker([
+            "--node-package",
+            join(scratch, "node-package"),
+            "--csk",
+            csk.outLink,
+            "--release-bundle",
+            bundle.outLink,
+            "--repo-root",
+            repoRoot,
+          ]);
+          if (accepted) {
+            assert.equal(check.status, 0, check.output);
+          } else {
+            assert.notEqual(check.status, 0, `checker accepted ${name}:\n${check.output}`);
+            assert.match(check.output, /repository\.url/);
+          }
+        } finally {
+          rmSync(scratch, { recursive: true, force: true });
+        }
+      });
+    }
+  } finally {
+    rmSync(nodePackage.outLink, { recursive: true, force: true });
+    rmSync(csk.outLink, { recursive: true, force: true });
+    rmSync(bundle.outLink, { recursive: true, force: true });
+  }
+});
+
 test("checker rejects a missing authoritative engine or book/registry asset", () => {
   const nodePackage = buildAttr("node-package");
   assert.equal(nodePackage.status, 0, nodePackage.output);
