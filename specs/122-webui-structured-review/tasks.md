@@ -25,18 +25,18 @@ Commit subject: `feat(webui): consume the shared structured signer review`
 
 Commit subject: `feat(webui): render categories, provenance, readiness and blockers`
 
-- [ ] T105a RED (moved from slice 1 per A-002): assert end-to-end that the
+- [X] T105a RED (moved from slice 1 per A-002): assert end-to-end that the
       workbench calls `tx.review` and the result reaches the render layer —
       provable here because there is now rendered output to assert against.
-- [ ] T105 RED: assert every blocker the engine reports is rendered — the test
+- [X] T105 RED: assert every blocker the engine reports is rendered — the test
       must fail when one is dropped, not merely when none render.
-- [ ] T105b GREEN (from A-003): render the preserved `version` and the
+- [X] T105b GREEN (from A-003): render the preserved `version` and the
       unknown-field passthrough section, matching the CLI's "Additional
       inspector fields" behaviour (ruling A-003 / SC-006 on #121). Slice 1
       preserves these in the parsed value; rendering them is this slice.
-- [ ] T106 GREEN: render control categories and evidence provenance.
-- [ ] T107 GREEN: render readiness state and every blocker.
-- [ ] T108 Proof: `nix run .#ci-playwright` green with the blockers visible in a
+- [X] T106 GREEN: render control categories and evidence provenance.
+- [X] T107 GREEN: render readiness state and every blocker.
+- [X] T108 Proof: `nix run .#ci-playwright` green with the blockers visible in a
       browser, not only typechecked.
 
 ## Slice 3 — `book-decoration`
@@ -51,6 +51,12 @@ Commit subject: `feat(webui): decorate the review with operator book labels`
 - [ ] T111 Proof: `nix run .#ci-playwright` green.
 
 ## Slice 4 — `value-emphasis`
+
+Slice 2 deliberately left `docs/inspector/dist/styles.css` untouched: Playwright
+selects by class attribute and PureScript `classNames` emits classes without
+stylesheet entries, so slice 2's proofs were style-independent. This slice
+therefore owns STYLING the review-panel classes slice 2 introduced, not merely
+adding emphasis to already-styled elements.
 
 Commit subject: `feat(webui): distinguish high-value and signer-controlled value`
 
