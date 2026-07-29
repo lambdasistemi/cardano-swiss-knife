@@ -3902,6 +3902,7 @@ inspectorComponent initial =
           StructureTab ->
             [ renderDecodedStructure state ]
               <> renderCompactIdentificationMaybe state
+              <> renderReviewMaybe state
           WitnessTab ->
             renderWitnessPlanMaybe state
           ValidationTab ->
@@ -3952,6 +3953,211 @@ inspectorComponent initial =
       , HH.div
           [ classNames [ "identity-grid" ] ]
           (map (renderIdentityRow state) identification.primary)
+      ]
+
+  renderReviewMaybe state =
+    case state.review of
+      Just review | review.valid -> [ renderReview review ]
+      _ -> []
+
+  renderReview review =
+    HH.section
+      [ classNames [ "review-panel", "identity-panel" ]
+      , mdSurface "decoded"
+      ]
+      ( [ HH.div
+            [ classNames [ "identity-heading" ] ]
+            [ HH.div_
+                [ HH.h3_ [ HH.text "Transaction review" ]
+                , HH.span [ classNames [ "review-version" ] ] [ HH.text review.version ]
+                ]
+            ]
+        , HH.div
+            [ classNames [ "review-identity-fields" ] ]
+            [ renderReviewField "review-tx-id" "Review tx ID" review.txId
+            , renderReviewField "review-body-hash" "Review body hash" review.bodyHash
+            , renderReviewField "review-fee" "Review fee (lovelace)" review.feeLovelace
+            ]
+        , renderReviewReadiness review
+        , renderReviewBlockers review.warnings
+        ]
+          <> renderReviewControlGroups review.controlGroups
+          <> renderReviewHighValueMovements review.highValueMovements
+          <> renderReviewSources review.sources
+          <> [ renderReviewCollateral review ]
+          <> renderReviewClaims review.claims
+          <> renderReviewAdditionalFields review.additionalFields
+      )
+
+  renderReviewField extraClass label value =
+    HH.div
+      [ classNames [ "review-field", extraClass ] ]
+      [ HH.span [ classNames [ "review-field-label" ] ] [ HH.text label ]
+      , HH.span [ classNames [ "review-field-value" ] ] [ HH.text value ]
+      ]
+
+  renderReviewReadiness review =
+    HH.div
+      [ classNames [ "review-readiness" ] ]
+      [ HH.div [ classNames [ "identity-section-title" ] ] [ HH.text "What is not proven" ]
+      , renderReviewField "" "Input status" review.inputStatus
+      , renderReviewField "" "Regular inputs" review.regularInputCount
+      , renderReviewField "" "Resolved regular inputs" review.resolvedRegularInputCount
+      , renderReviewField "" "Missing regular inputs" review.missingRegularInputCount
+      , renderReviewField "" "Net signer value provable" (if review.netSignerValueProvable then "yes" else "no")
+      , renderReviewField "" "Net signer value lovelace"
+          ( if review.netSignerValueLovelace == "" then "(not reported)"
+            else review.netSignerValueLovelace
+          )
+      , renderReviewField "" "Net signer value note" review.netSignerValueNote
+      ]
+
+  renderReviewBlockers warnings =
+    if Array.null warnings then
+      HH.text ""
+    else
+      HH.div
+        [ classNames [ "review-blockers" ] ]
+        ( [ HH.div [ classNames [ "identity-section-title" ] ] [ HH.text ("Warnings (" <> show (Array.length warnings) <> ")") ] ]
+            <> map (\w -> HH.div [ classNames [ "review-blocker" ] ] [ HH.text w ]) warnings
+        )
+
+  renderReviewControlGroups groups =
+    if Array.null groups then []
+    else
+      [ HH.div
+          [ classNames [ "review-control-groups" ] ]
+          ( [ HH.div [ classNames [ "identity-section-title" ] ] [ HH.text ("Output control groups (" <> show (Array.length groups) <> ")") ] ]
+              <> map renderReviewControlGroup groups
+          )
+      ]
+
+  renderReviewHighValueMovements movements =
+    if Array.null movements then []
+    else
+      [ HH.div
+          [ classNames [ "review-high-value-movements" ] ]
+          ( [ HH.div [ classNames [ "identity-section-title" ] ] [ HH.text ("High-value movements (" <> show (Array.length movements) <> ")") ] ]
+              <> map renderReviewHighValueMovement movements
+          )
+      ]
+
+  renderReviewControlGroup group =
+    HH.div
+      [ classNames [ "review-control-group" ] ]
+      ( [ HH.span [ classNames [ "review-control-group-category" ] ] [ HH.text group.category ]
+        , HH.span [ classNames [ "review-control-group-role" ] ] [ HH.text group.role ]
+        , HH.span [ classNames [ "review-control-group-provenance" ] ] [ HH.text group.roleProvenance ]
+        , HH.div [ classNames [ "review-control-group-evidence" ] ] [ HH.text (String.joinWith ", " group.evidence) ]
+        , renderReviewField "" "Lovelace" group.lovelace
+        , renderReviewField "" "Asset classes" group.assetClassCount
+        , renderReviewField "" "Outputs" group.outputCount
+        , renderReviewField "" "Output indices" (String.joinWith ", " group.outputIndices)
+        ]
+          <> map (\addr -> HH.div [ classNames [ "review-control-group-address" ] ] [ HH.text addr ]) group.addresses
+      )
+
+  renderReviewHighValueMovement group =
+    HH.div
+      [ classNames [ "review-high-value-movement" ] ]
+      ( [ HH.span [ classNames [ "review-control-group-category" ] ] [ HH.text group.category ]
+        , HH.span [ classNames [ "review-control-group-role" ] ] [ HH.text group.role ]
+        , HH.span [ classNames [ "review-control-group-provenance" ] ] [ HH.text group.roleProvenance ]
+        , HH.div [ classNames [ "review-control-group-evidence" ] ] [ HH.text (String.joinWith ", " group.evidence) ]
+        , renderReviewField "" "Lovelace" group.lovelace
+        , renderReviewField "" "Asset classes" group.assetClassCount
+        , renderReviewField "" "Outputs" group.outputCount
+        , renderReviewField "" "Output indices" (String.joinWith ", " group.outputIndices)
+        ]
+          <> map (\addr -> HH.div [ classNames [ "review-control-group-address" ] ] [ HH.text addr ]) group.addresses
+      )
+
+  renderReviewSources sources =
+    if Array.null sources then []
+    else
+      [ HH.div
+          [ classNames [ "review-sources" ] ]
+          ( [ HH.div [ classNames [ "identity-section-title" ] ] [ HH.text ("Sources (" <> show (Array.length sources) <> ")") ] ]
+              <> map renderReviewSource sources
+          )
+      ]
+
+  renderReviewSource source =
+    HH.div
+      [ classNames [ "review-source" ] ]
+      ( [ HH.span [ classNames [ "review-source-kind" ] ] [ HH.text source.kind ] ]
+          <> renderReviewSourceFields source
+      )
+
+  renderReviewSourceFields source =
+    case source.kind of
+      "regular_input" ->
+        [ renderReviewField "" "Count" source.count
+        , renderReviewField "" "Resolved" source.resolvedCount
+        , renderReviewField "" "Missing" source.missingCount
+        , renderReviewField "" "Resolved lovelace" source.resolvedLovelace
+        ]
+      "withdrawal" ->
+        [ renderReviewField "" "Count" source.count
+        , renderReviewField "" "Lovelace" source.lovelace
+        ]
+      "collateral" ->
+        [ renderReviewField "" "Conditional" source.conditional
+        , renderReviewField "" "Input count" source.inputCount
+        , renderReviewField "" "Body total lovelace" source.bodyTotalLovelace
+        , renderReviewField "" "Return lovelace" source.returnLovelace
+        ]
+      "reference_input" ->
+        [ renderReviewField "" "Count" source.count
+        , renderReviewField "" "Read only" source.readOnly
+        ]
+      _ ->
+        [ renderReviewField "" "Count" source.count ]
+
+  renderReviewCollateral review =
+    HH.div
+      [ classNames [ "review-collateral" ] ]
+      [ HH.div [ classNames [ "identity-section-title" ] ] [ HH.text "Collateral" ]
+      , renderReviewField "" "Conditional" (if review.collateralConditional then "true" else "false")
+      , renderReviewField "" "Input count" review.collateralInputCount
+      , renderReviewField "" "Body total lovelace" review.collateralBodyTotalLovelace
+      , renderReviewField "" "Return lovelace" review.collateralReturnLovelace
+      ]
+
+  renderReviewClaims claims =
+    if Array.null claims then []
+    else
+      [ HH.div
+          [ classNames [ "review-claims" ] ]
+          ( [ HH.div [ classNames [ "identity-section-title" ] ] [ HH.text ("Claims (" <> show (Array.length claims) <> ")") ] ]
+              <> map renderReviewClaim claims
+          )
+      ]
+
+  renderReviewClaim claim =
+    HH.div
+      [ classNames [ "review-claim" ] ]
+      [ renderReviewField "" "Label" claim.label
+      , renderReviewField "" "Value" claim.value
+      , renderReviewField "" "Detail" claim.detail
+      , renderReviewField "" "Self declared" (if claim.selfDeclared then "yes" else "no")
+      ]
+
+  renderReviewAdditionalFields fields =
+    if Array.null fields then []
+    else
+      [ HH.div
+          [ classNames [ "review-additional-fields" ] ]
+          ( [ HH.div [ classNames [ "identity-section-title" ] ] [ HH.text "Additional inspector fields" ] ]
+              <> map renderReviewAdditionalField fields
+          )
+      ]
+
+  renderReviewAdditionalField field =
+    HH.div
+      [ classNames [ "review-additional-field" ] ]
+      [ HH.span [ classNames [ "review-additional-field-key" ] ] [ HH.text field.key ]
+      , HH.span [ classNames [ "review-additional-field-value" ] ] [ HH.text field.value ]
       ]
 
   renderInspection summary =
