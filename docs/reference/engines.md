@@ -29,8 +29,8 @@ these semantics.
 - Artifact: `wasm-tx-inspector.wasm`
 - Source: `github:lambdasistemi/cardano-ledger-inspector`
 - Flake input: `cardano-ledger-inspector`
-- Revision: `b99028af070c85211098cbfee87bb5a80e4639df`
-- narHash: `sha256-LGbWmhkKCppfKrCZFCLJmXGGoURYJAqWXQ0uIqv+mKA=`
+- Revision: `007251eaaf3d5b75df2bd0902b4f01081c0df0a1`
+- narHash: `sha256-/7Qn3pL6/C4gU214lSYJZDAYq2ZePTFj8uwQ844XW+k=`
 - Owning language: Haskell
 - Protocol: wasm32-wasi reactor speaking the tx-inspector JSON protocol over stdin/stdout ({ tx_cbor, op, args } -> { stdout, stderr, exitOk }); driven by runInspector/runLedgerOperation for the tx.* operation family.
 - Responsibility: Conway ledger semantics: transaction CBOR decoding, inspection/browse/identify/intent, ledger validation, witness planning and attachment, and script evaluation.
