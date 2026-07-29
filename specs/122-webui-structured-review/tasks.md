@@ -30,6 +30,10 @@ Commit subject: `feat(webui): render categories, provenance, readiness and block
       provable here because there is now rendered output to assert against.
 - [ ] T105 RED: assert every blocker the engine reports is rendered — the test
       must fail when one is dropped, not merely when none render.
+- [ ] T105b GREEN (from A-003): render the preserved `version` and the
+      unknown-field passthrough section, matching the CLI's "Additional
+      inspector fields" behaviour (ruling A-003 / SC-006 on #121). Slice 1
+      preserves these in the parsed value; rendering them is this slice.
 - [ ] T106 GREEN: render control categories and evidence provenance.
 - [ ] T107 GREEN: render readiness state and every blocker.
 - [ ] T108 Proof: `nix run .#ci-playwright` green with the blockers visible in a
