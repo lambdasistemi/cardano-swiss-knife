@@ -1100,6 +1100,176 @@ export const operationScriptEvaluationImpl = (raw) => {
   }
 };
 
+const invalidTransactionReview = (title, subtitle) => ({
+  valid: false,
+  title,
+  subtitle,
+  version: "",
+  txId: "",
+  bodyHash: "",
+  feeLovelace: "",
+  inputStatus: "",
+  regularInputCount: "",
+  resolvedRegularInputCount: "",
+  missingRegularInputCount: "",
+  netSignerValueProvable: false,
+  netSignerValueLovelace: "",
+  netSignerValueNote: "",
+  warnings: [],
+  controlGroups: [],
+  highValueMovements: [],
+  claims: [],
+  collateralConditional: false,
+  collateralInputCount: "",
+  collateralBodyTotalLovelace: "",
+  collateralReturnLovelace: "",
+  sources: [],
+  additionalFields: [],
+});
+
+const reviewAssetEntries = (assets) => {
+  if (!assets || typeof assets !== "object" || Array.isArray(assets)) return [];
+  const entries = [];
+  for (const policyId of Object.keys(assets).sort()) {
+    const names = assets[policyId];
+    if (!names || typeof names !== "object") continue;
+    for (const assetName of Object.keys(names).sort()) {
+      entries.push({ policyId, assetName, quantity: text(names[assetName]) });
+    }
+  }
+  return entries;
+};
+
+const normalizeControlGroup = (group) => {
+  if (!group || typeof group !== "object") {
+    return {
+      category: "",
+      role: "",
+      roleProvenance: "",
+      evidence: [],
+      lovelace: "",
+      assetClassCount: "",
+      outputCount: "",
+      outputIndices: [],
+      addresses: [],
+      assets: [],
+    };
+  }
+  return {
+    category: text(group.category),
+    role: text(group.role),
+    roleProvenance: text(group.role_provenance),
+    evidence: Array.isArray(group.evidence) ? group.evidence.map(text) : [],
+    lovelace: text(group.lovelace),
+    assetClassCount: text(group.asset_class_count),
+    outputCount: text(group.output_count),
+    outputIndices: Array.isArray(group.output_indices) ? group.output_indices.map(text) : [],
+    addresses: Array.isArray(group.addresses) ? group.addresses.map(text) : [],
+    assets: reviewAssetEntries(group.assets),
+  };
+};
+
+const normalizeReviewClaim = (claim) => ({
+  label: text(claim?.label),
+  value: text(claim?.value),
+  detail: text(claim?.detail),
+  selfDeclared: claim?.self_declared === true,
+});
+
+const normalizeReviewSource = (source) => ({
+  kind: text(source?.kind),
+  count: text(source?.count),
+  resolvedCount: text(source?.resolved_count),
+  missingCount: text(source?.missing_count),
+  resolvedLovelace: text(source?.resolved_lovelace),
+  lovelace: text(source?.lovelace),
+  conditional: text(source?.conditional),
+  inputCount: text(source?.input_count),
+  bodyTotalLovelace: text(source?.body_total_lovelace),
+  returnLovelace: text(source?.return_lovelace),
+  readOnly: text(source?.read_only),
+});
+
+const KNOWN_REVIEW_KEYS = new Set([
+  "version", "tx_id", "body_hash", "context", "sources",
+  "control_groups", "high_value_movements", "fee", "collateral",
+  "net_signer_value", "claims", "warnings",
+]);
+
+const normalizeTransactionReview = (review) => {
+  if (!review || typeof review !== "object") {
+    return invalidTransactionReview(
+      "Transaction review",
+      "Ledger operation response missing review."
+    );
+  }
+
+  const context = review.context && typeof review.context === "object" ? review.context : {};
+  const netSignerValue =
+    review.net_signer_value && typeof review.net_signer_value === "object"
+      ? review.net_signer_value
+      : {};
+  const fee = review.fee && typeof review.fee === "object" ? review.fee : {};
+  const collateral =
+    review.collateral && typeof review.collateral === "object" ? review.collateral : {};
+
+  const additionalFields = [];
+  for (const key of Object.keys(review)) {
+    if (!KNOWN_REVIEW_KEYS.has(key)) {
+      let value;
+      try {
+        value = JSON.stringify(review[key]);
+      } catch (_err) {
+        value = text(review[key]);
+      }
+      additionalFields.push({ key, value });
+    }
+  }
+
+  return {
+    valid: true,
+    title: "Transaction review",
+    subtitle: `${shortHex(review.tx_id)} / ${formatLovelace(fee.lovelace)}`,
+    version: text(review.version),
+    txId: text(review.tx_id),
+    bodyHash: text(review.body_hash),
+    feeLovelace: text(fee.lovelace),
+    inputStatus: text(context.input_status),
+    regularInputCount: text(context.regular_input_count),
+    resolvedRegularInputCount: text(context.resolved_regular_input_count),
+    missingRegularInputCount: text(context.missing_regular_input_count),
+    netSignerValueProvable: netSignerValue.provable === true,
+    netSignerValueLovelace: text(netSignerValue.lovelace),
+    netSignerValueNote: text(netSignerValue.note),
+    warnings: Array.isArray(review.warnings) ? review.warnings.map(text) : [],
+    controlGroups: Array.isArray(review.control_groups)
+      ? review.control_groups.map(normalizeControlGroup)
+      : [],
+    highValueMovements: Array.isArray(review.high_value_movements)
+      ? review.high_value_movements.map(normalizeControlGroup)
+      : [],
+    claims: Array.isArray(review.claims) ? review.claims.map(normalizeReviewClaim) : [],
+    collateralConditional: collateral.conditional === true,
+    collateralInputCount: text(collateral.input_count),
+    collateralBodyTotalLovelace: text(collateral.body_total_lovelace),
+    collateralReturnLovelace: text(collateral.return_lovelace),
+    sources: Array.isArray(review.sources) ? review.sources.map(normalizeReviewSource) : [],
+    additionalFields,
+  };
+};
+
+export const operationTransactionReviewImpl = (raw) => {
+  try {
+    const parsed = JSON.parse(raw);
+    return normalizeTransactionReview(operationResult(parsed)?.review);
+  } catch (_err) {
+    return invalidTransactionReview(
+      "Transaction review",
+      "Ledger operation response was not JSON."
+    );
+  }
+};
+
 export const operationEntrySeedImpl = (inspectionRaw) => (identificationRaw) => (witnessPlanRaw) => {
   try {
     const inspection = operationResult(JSON.parse(inspectionRaw))?.inspection;

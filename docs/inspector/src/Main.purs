@@ -36,7 +36,7 @@ import FFI.BookStore as BookStore
 import FFI.Clipboard (copy) as Clipboard
 import FFI.EntryStore as EntryStore
 import FFI.Inspector (InspectorResult, runLedgerOperation)
-import FFI.Json (Browser, Identification, IntentSummary, MetadataValue(..), RdfGraph, ScriptEvaluation, Validation, WitnessPlan, inspect, operationArgsMerged, operationArgsWithPath, operationBrowser, operationEntrySeed, operationIdentification, operationInspection, operationIntentSummary, operationRdfGraph, operationScriptEvaluation, operationValidation, operationWitnessPlan, pretty, providerResolutionErrorArgs) as Json
+import FFI.Json (Browser, Identification, MetadataEntry, MetadataValue(..), RdfGraph, ScriptEvaluation, TransactionReview, Validation, WitnessPlan, inspect, operationArgsMerged, operationArgsWithPath, operationBrowser, operationEntrySeed, operationIdentification, operationInspection, operationIntentMetadata, operationRdfGraph, operationScriptEvaluation, operationTransactionReview, operationValidation, operationWitnessPlan, pretty, providerResolutionErrorArgs) as Json
 import FFI.OverlayBook as OverlayBook
 import FFI.RdfShapes as RdfShapes
 import FFI.Storage as Storage
@@ -201,7 +201,9 @@ type State =
   , operationArgs :: String
   , browser :: Maybe Json.Browser
   , identification :: Maybe Json.Identification
-  , intent :: Maybe Json.IntentSummary
+  , review :: Maybe Json.TransactionReview
+  , reviewResolutions :: Maybe ReviewResolutionsLens
+  , intentMetadata :: Array Json.MetadataEntry
   , witnessPlan :: Maybe Json.WitnessPlan
   , workbenchCandidate :: Maybe TxEntry
   , workbenchCandidateMessage :: Maybe String
@@ -309,6 +311,19 @@ type SparqlLens =
 
 type ResolvedLabelsLens =
   { rows :: Array RdfShapes.ResolvedLabelRow
+  , error :: Maybe String
+  }
+
+type ReviewResolution =
+  { identifier :: String
+  , label :: String
+  , resolutionType :: String
+  }
+
+-- Mirrors ResolvedLabelsLens: a failed query carries error :: Just msg so it is
+-- never presented as a successful empty result (a false "(none)" about the tx).
+type ReviewResolutionsLens =
+  { rows :: Array ReviewResolution
   , error :: Maybe String
   }
 
@@ -501,7 +516,9 @@ inspectorComponent initial =
         , operationArgs: "{}"
         , browser: Nothing
         , identification: Nothing
-        , intent: Nothing
+        , review: Nothing
+        , reviewResolutions: Nothing
+        , intentMetadata: []
         , witnessPlan: Nothing
         , workbenchCandidate: Nothing
         , workbenchCandidateMessage: Nothing
@@ -2361,23 +2378,22 @@ inspectorComponent initial =
     in HH.section [ classNames [ "decoded-screen" ] ] children
 
   renderDeclaredMetadata state =
-    case state.intent of
-      Just intent | intent.valid && not (Array.null intent.metadata) ->
-        [ HH.section
-            [ classNames [ "declared-metadata-panel", "identity-panel" ]
-            , mdSurface "decoded"
-            ]
-            [ HH.div
-                [ classNames [ "identity-heading" ] ]
-                [ HH.div_
-                    [ HH.h3_ [ HH.text "Self-declared transaction metadata" ]
-                    , HH.p_ [ HH.text "This is transaction-supplied metadata, not independently verified information." ]
-                    ]
-                ]
-            , HH.div [ classNames [ "declared-metadata-entries" ] ] (map renderMetadataEntry intent.metadata)
-            ]
-        ]
-      _ -> []
+    if Array.null state.intentMetadata then []
+    else
+      [ HH.section
+          [ classNames [ "declared-metadata-panel", "identity-panel" ]
+          , mdSurface "decoded"
+          ]
+          [ HH.div
+              [ classNames [ "identity-heading" ] ]
+              [ HH.div_
+                  [ HH.h3_ [ HH.text "Self-declared transaction metadata" ]
+                  , HH.p_ [ HH.text "This is transaction-supplied metadata, not independently verified information." ]
+                  ]
+              ]
+          , HH.div [ classNames [ "declared-metadata-entries" ] ] (map renderMetadataEntry state.intentMetadata)
+          ]
+      ]
 
   renderMetadataEntry entry =
     HH.div
@@ -3764,13 +3780,6 @@ inspectorComponent initial =
                     <> renderStderr r.stderr
                 )
 
-  renderIntentMaybe state =
-    case state.intent of
-      Just intent ->
-        if intent.valid then [ renderIntentSummary state intent ]
-        else []
-      Nothing -> []
-
   renderIdentificationMaybe state =
     case state.identification of
       Just identification ->
@@ -3839,17 +3848,10 @@ inspectorComponent initial =
           [ HH.h3_ [ HH.text identification.title ]
           , HH.p_ [ HH.text identification.subtitle ]
           ]
-      _ -> case state.intent of
-        Just intent | intent.valid ->
-          HH.div
-            [ classNames [ "result-summary-title" ] ]
-            [ HH.h3_ [ HH.text intent.title ]
-            , HH.p_ [ HH.text intent.subtitle ]
-            ]
-        _ ->
-          HH.div
-            [ classNames [ "result-summary-title" ] ]
-            [ HH.h3_ [ HH.text summary.title ] ]
+      _ ->
+        HH.div
+          [ classNames [ "result-summary-title" ] ]
+          [ HH.h3_ [ HH.text summary.title ] ]
 
   renderSummaryIdentity state =
     case state.identification of
@@ -3863,15 +3865,9 @@ inspectorComponent initial =
       Nothing -> []
 
   renderSummaryWarnings state =
-    [ renderIntentWarnings state.intent
-    , renderWitnessPlanWarnings state.witnessPlan
+    [ renderWitnessPlanWarnings state.witnessPlan
     , renderValidationWarnings state.validation
     ]
-
-  renderIntentWarnings intent =
-    case intent of
-      Just value | value.valid -> renderWitnessWarnings value.warnings
-      _ -> HH.text ""
 
   renderWitnessPlanWarnings witnessPlan =
     case witnessPlan of
@@ -3921,9 +3917,9 @@ inspectorComponent initial =
           StructureTab ->
             [ renderDecodedStructure state ]
               <> renderCompactIdentificationMaybe state
+              <> renderReviewMaybe state
           WitnessTab ->
-            renderIntentMaybe state
-              <> renderWitnessPlanMaybe state
+            renderWitnessPlanMaybe state
           ValidationTab ->
             renderValidationMaybe state
               <> renderShaclConformanceMaybe state state.shaclConformance
@@ -3974,6 +3970,250 @@ inspectorComponent initial =
           (map (renderIdentityRow state) identification.primary)
       ]
 
+  renderReviewMaybe state =
+    case state.review of
+      Just review | review.valid -> [ renderReview review state.reviewResolutions ]
+      _ -> []
+
+  renderReview review resolutions =
+    HH.section
+      [ classNames [ "review-panel", "identity-panel" ]
+      , mdSurface "decoded"
+      ]
+      ( [ HH.div
+            [ classNames [ "identity-heading" ] ]
+            [ HH.div_
+                [ HH.h3_ [ HH.text "Transaction review" ]
+                , HH.span [ classNames [ "review-version" ] ] [ HH.text review.version ]
+                ]
+            ]
+        , HH.div
+            [ classNames [ "review-identity-fields" ] ]
+            [ renderReviewField "review-tx-id" "Review tx ID" review.txId
+            , renderReviewField "review-body-hash" "Review body hash" review.bodyHash
+            , renderReviewField "review-fee" "Review fee (lovelace)" review.feeLovelace
+            ]
+        , renderReviewReadiness review
+        , renderReviewBlockers review.warnings
+        ]
+          <> renderReviewControlGroups review.controlGroups
+          <> renderReviewHighValueMovements review.highValueMovements
+          <> renderReviewSources review.sources
+          <> [ renderReviewCollateral review ]
+          <> renderReviewClaims review.claims
+          <> renderReviewResolutions resolutions
+          <> renderReviewAdditionalFields review.additionalFields
+      )
+
+  renderReviewField extraClass label value =
+    HH.div
+      [ classNames [ "review-field", extraClass ] ]
+      [ HH.span [ classNames [ "review-field-label" ] ] [ HH.text label ]
+      , HH.span [ classNames [ "review-field-value" ] ] [ HH.text value ]
+      ]
+
+  renderReviewReadiness review =
+    HH.div
+      [ classNames [ "review-readiness" ] ]
+      [ HH.div [ classNames [ "identity-section-title" ] ] [ HH.text "What is not proven" ]
+      , renderReviewField "" "Input status" review.inputStatus
+      , renderReviewField "" "Regular inputs" review.regularInputCount
+      , renderReviewField "" "Resolved regular inputs" review.resolvedRegularInputCount
+      , renderReviewField "" "Missing regular inputs" review.missingRegularInputCount
+      , renderReviewField "" "Net signer value provable" (if review.netSignerValueProvable then "yes" else "no")
+      , renderReviewField "" "Net signer value lovelace"
+          ( if review.netSignerValueLovelace == "" then "(not reported)"
+            else review.netSignerValueLovelace
+          )
+      , renderReviewField "" "Net signer value note" review.netSignerValueNote
+      ]
+
+  renderReviewBlockers warnings =
+    if Array.null warnings then
+      HH.text ""
+    else
+      HH.div
+        [ classNames [ "review-blockers" ] ]
+        ( [ HH.div [ classNames [ "identity-section-title" ] ] [ HH.text ("Warnings (" <> show (Array.length warnings) <> ")") ] ]
+            <> map (\w -> HH.div [ classNames [ "review-blocker" ] ] [ HH.text w ]) warnings
+        )
+
+  renderReviewControlGroups groups =
+    if Array.null groups then []
+    else
+      [ HH.div
+          [ classNames [ "review-control-groups" ] ]
+          ( [ HH.div [ classNames [ "identity-section-title" ] ] [ HH.text ("Output control groups (" <> show (Array.length groups) <> ")") ] ]
+              <> map renderReviewControlGroup groups
+          )
+      ]
+
+  renderReviewHighValueMovements movements =
+    if Array.null movements then []
+    else
+      [ HH.div
+          [ classNames [ "review-high-value-movements" ] ]
+          ( [ HH.div [ classNames [ "identity-section-title" ] ] [ HH.text ("High-value movements (" <> show (Array.length movements) <> ")") ] ]
+              <> map renderReviewHighValueMovement movements
+          )
+      ]
+
+  renderReviewControlGroup group =
+    HH.div
+      [ classNames [ "review-control-group" ] ]
+      ( [ HH.span [ classNames [ "review-control-group-category" ] ] [ HH.text group.category ]
+        , HH.span [ classNames [ "review-control-group-role" ] ] [ HH.text group.role ]
+        , HH.span [ classNames [ "review-control-group-provenance" ] ] [ HH.text group.roleProvenance ]
+        , HH.div [ classNames [ "review-control-group-evidence" ] ] [ HH.text (String.joinWith ", " group.evidence) ]
+        , renderReviewField "" "Lovelace" group.lovelace
+        , renderReviewField "" "Asset classes" group.assetClassCount
+        , renderReviewField "" "Outputs" group.outputCount
+        , renderReviewField "" "Output indices" (String.joinWith ", " group.outputIndices)
+        ]
+          <> map (\addr -> HH.div [ classNames [ "review-control-group-address" ] ] [ HH.text addr ]) group.addresses
+      )
+
+  renderReviewHighValueMovement group =
+    HH.div
+      [ classNames [ "review-high-value-movement" ] ]
+      ( [ HH.span [ classNames [ "review-control-group-category" ] ] [ HH.text group.category ]
+        , HH.span [ classNames [ "review-control-group-role" ] ] [ HH.text group.role ]
+        , HH.span [ classNames [ "review-control-group-provenance" ] ] [ HH.text group.roleProvenance ]
+        , HH.div [ classNames [ "review-control-group-evidence" ] ] [ HH.text (String.joinWith ", " group.evidence) ]
+        , renderReviewField "" "Lovelace" group.lovelace
+        , renderReviewField "" "Asset classes" group.assetClassCount
+        , renderReviewField "" "Outputs" group.outputCount
+        , renderReviewField "" "Output indices" (String.joinWith ", " group.outputIndices)
+        ]
+          <> map (\addr -> HH.div [ classNames [ "review-control-group-address" ] ] [ HH.text addr ]) group.addresses
+      )
+
+  renderReviewSources sources =
+    if Array.null sources then []
+    else
+      [ HH.div
+          [ classNames [ "review-sources" ] ]
+          ( [ HH.div [ classNames [ "identity-section-title" ] ] [ HH.text ("Sources (" <> show (Array.length sources) <> ")") ] ]
+              <> map renderReviewSource sources
+          )
+      ]
+
+  renderReviewSource source =
+    HH.div
+      [ classNames [ "review-source" ] ]
+      ( [ HH.span [ classNames [ "review-source-kind" ] ] [ HH.text source.kind ] ]
+          <> renderReviewSourceFields source
+      )
+
+  renderReviewSourceFields source =
+    case source.kind of
+      "regular_input" ->
+        [ renderReviewField "" "Count" source.count
+        , renderReviewField "" "Resolved" source.resolvedCount
+        , renderReviewField "" "Missing" source.missingCount
+        , renderReviewField "" "Resolved lovelace" source.resolvedLovelace
+        ]
+      "withdrawal" ->
+        [ renderReviewField "" "Count" source.count
+        , renderReviewField "" "Lovelace" source.lovelace
+        ]
+      "collateral" ->
+        [ renderReviewField "" "Conditional" source.conditional
+        , renderReviewField "" "Input count" source.inputCount
+        , renderReviewField "" "Body total lovelace" source.bodyTotalLovelace
+        , renderReviewField "" "Return lovelace" source.returnLovelace
+        ]
+      "reference_input" ->
+        [ renderReviewField "" "Count" source.count
+        , renderReviewField "" "Read only" source.readOnly
+        ]
+      _ ->
+        [ renderReviewField "" "Count" source.count ]
+
+  renderReviewCollateral review =
+    HH.div
+      [ classNames [ "review-collateral" ] ]
+      [ HH.div [ classNames [ "identity-section-title" ] ] [ HH.text "Collateral" ]
+      , renderReviewField "" "Conditional" (if review.collateralConditional then "true" else "false")
+      , renderReviewField "" "Input count" review.collateralInputCount
+      , renderReviewField "" "Body total lovelace" review.collateralBodyTotalLovelace
+      , renderReviewField "" "Return lovelace" review.collateralReturnLovelace
+      ]
+
+  renderReviewClaims claims =
+    if Array.null claims then []
+    else
+      [ HH.div
+          [ classNames [ "review-claims" ] ]
+          ( [ HH.div [ classNames [ "identity-section-title" ] ] [ HH.text ("Claims (" <> show (Array.length claims) <> ")") ] ]
+              <> map renderReviewClaim claims
+          )
+      ]
+
+  renderReviewClaim claim =
+    HH.div
+      [ classNames [ "review-claim" ] ]
+      [ renderReviewField "" "Label" claim.label
+      , renderReviewField "" "Value" claim.value
+      , renderReviewField "" "Detail" claim.detail
+      , renderReviewField "" "Self declared" (if claim.selfDeclared then "yes" else "no")
+      ]
+
+  -- Nothing (no selected books) omits the section; Just {error: Just msg} renders
+  -- an explicit failure (never a false "(none)"); Just {rows: []} renders the
+  -- heading present-but-empty with "(none)"; Just {rows} renders one entry per
+  -- resolution, in caller book order with duplicates preserved verbatim (no
+  -- re-sort, no dedup).
+  renderReviewResolutions Nothing = []
+  renderReviewResolutions (Just lens) =
+    [ HH.div
+        [ classNames [ "review-resolutions" ] ]
+        ( [ HH.div
+              [ classNames [ "identity-section-title", "review-resolutions-title" ] ]
+              [ HH.text
+                  ( "Book resolutions ("
+                      <> show (Array.length lens.rows)
+                      <> ", in caller book order; duplicates preserved)"
+                  )
+              ]
+          ]
+            <> case lens.error of
+                -- A failed query renders an explicit error, never a false "(none)".
+                Just err ->
+                  [ HH.div [ classNames [ "review-resolutions-error" ] ] [ HH.text err ] ]
+                Nothing ->
+                  if Array.null lens.rows then
+                    [ HH.div [ classNames [ "review-resolution-none" ] ] [ HH.text "(none)" ] ]
+                  else
+                    map renderReviewResolution lens.rows
+        )
+    ]
+
+  renderReviewResolution resolution =
+    HH.div
+      [ classNames [ "review-resolution" ] ]
+      [ renderReviewField "" "identifier" resolution.identifier
+      , renderReviewField "" "label" resolution.label
+      , renderReviewField "" "type" resolution.resolutionType
+      ]
+
+  renderReviewAdditionalFields fields =
+    if Array.null fields then []
+    else
+      [ HH.div
+          [ classNames [ "review-additional-fields" ] ]
+          ( [ HH.div [ classNames [ "identity-section-title" ] ] [ HH.text "Additional inspector fields" ] ]
+              <> map renderReviewAdditionalField fields
+          )
+      ]
+
+  renderReviewAdditionalField field =
+    HH.div
+      [ classNames [ "review-additional-field" ] ]
+      [ HH.span [ classNames [ "review-additional-field-key" ] ] [ HH.text field.key ]
+      , HH.span [ classNames [ "review-additional-field-value" ] ] [ HH.text field.value ]
+      ]
+
   renderInspection summary =
     [ HH.div
         [ classNames [ "inspection-summary" ] ]
@@ -3982,67 +4222,6 @@ inspectorComponent initial =
             (map renderMetric summary.metrics)
         ]
     ]
-
-  renderIntentSummary state intent =
-    HH.div
-      [ classNames [ "intent-panel" ]
-      , mdSurface "decoded"
-      ]
-      [ HH.div
-          [ classNames [ "identity-heading" ] ]
-          [ HH.div_
-              [ HH.h3_ [ HH.text intent.title ]
-              , HH.p_ [ HH.text intent.subtitle ]
-              ]
-          ]
-      , HH.div
-          [ classNames [ "metric-grid", "intent-metrics" ] ]
-          (map renderMetric intent.metrics)
-      , renderIntentClaims intent.claims
-      , renderWitnessWarnings intent.warnings
-      , HH.div_
-          (map (renderIntentSection state) intent.sections)
-      ]
-
-  renderIntentClaims claims =
-    if Array.null claims then
-      HH.text ""
-    else
-      HH.div
-        [ classNames [ "intent-claims" ] ]
-        (map renderIntentClaim claims)
-
-  renderIntentClaim claim =
-    HH.div
-      [ classNames [ "intent-claim" ] ]
-      [ HH.span
-          [ classNames [ "identity-section-title" ] ]
-          [ HH.text claim.label ]
-      , HH.strong_ [ HH.text claim.value ]
-      , if claim.detail == "" then
-          HH.text ""
-        else
-          HH.p_ [ HH.text claim.detail ]
-      ]
-
-  renderIntentSection state section =
-    HH.div
-      [ classNames [ "witness-section" ] ]
-      [ HH.div
-          [ classNames [ "identity-section-title" ] ]
-          [ HH.text section.title ]
-      , if Array.null section.rows then
-          HH.div
-            [ classNames [ "witness-empty" ] ]
-            [ HH.text section.empty ]
-        else
-          HH.div
-            [ classNames [ "witness-row-list" ] ]
-            ( map
-                (\row -> renderWitnessRowWithCopy state (not (Array.null row.identifierCandidates)) row)
-                section.rows
-            )
-      ]
 
   renderIdentification state identification =
     HH.div
@@ -5469,6 +5648,43 @@ inspectorComponent initial =
       , shaclConformance
       }
 
+  -- Project a transaction-scoped review label row to the {raw, label, type}
+  -- shape the node host emits (node/src/rdf-engine.js resolveReviewRdf): the
+  -- identifier is the entity's last ":" segment, the type is "overlay:" plus the
+  -- type IRI's last "#" segment (empty when the row carries no type). This is
+  -- projection only; the present-identifier restriction stays in the query.
+  reviewResolutionLastSegment sep subject =
+    case Array.last (String.split (String.Pattern sep) subject) of
+      Just lastSegment -> lastSegment
+      Nothing -> ""
+
+  projectReviewResolution row =
+    { identifier: reviewResolutionLastSegment ":" row.entity
+    , label: row.label
+    , resolutionType:
+        if row.typeIri == "" then ""
+        else "overlay:" <> reviewResolutionLastSegment "#" row.typeIri
+    }
+
+  -- Nothing when no books are selected (section omitted); Just lens otherwise.
+  -- A failed query is preserved as error :: Just msg (never collapsed into a
+  -- successful empty result, which would falsely report "(none)" about the tx —
+  -- the node host reports the same failure as BOOK_IMPORT). Books are passed
+  -- per-book so resolveReviewLabels preserves caller order and cross-book dups.
+  computeReviewResolutions st rdf = do
+    let bookTurtles = map _.turtle (selectedBooks st)
+    if Array.null bookTurtles then
+      pure Nothing
+    else do
+      result <- H.liftEffect (RdfShapes.queryReviewResolvedLabels rdf.turtle bookTurtles)
+      pure
+        ( Just
+            ( case result of
+                Left err -> { rows: [], error: Just err }
+                Right rows -> { rows: map projectReviewResolution rows, error: Nothing }
+            )
+        )
+
   resolvedLabelsLensForState st =
     case st.rdf of
       Just rdf ->
@@ -6052,6 +6268,7 @@ inspectorComponent initial =
               { resolvedLabelsLens = resolvedLabelsLens
               , decodedTreeLens = decodedTreeLens
               , shaclConformance = shaclConformance
+              , reviewResolutions = Nothing
               }
         Just txCbor -> do
           H.modify_ _ { running = true, fetchError = Nothing }
@@ -6060,6 +6277,7 @@ inspectorComponent initial =
           let rdf = Json.operationRdfGraph rdfResult.stdout
           if rdfResult.exitOk && rdf.valid then do
             lenses <- rdfLensesForState st rdf
+            reviewResolutions <- computeReviewResolutions st rdf
             H.modify_
               _
                 { running = false
@@ -6069,6 +6287,7 @@ inspectorComponent initial =
                 , typedFieldsLens = lenses.typedFieldsLens
                 , decodedTreeLens = lenses.decodedTreeLens
                 , shaclConformance = lenses.shaclConformance
+                , reviewResolutions = reviewResolutions
                 , fetchError = Nothing
                 }
           else
@@ -6081,6 +6300,7 @@ inspectorComponent initial =
                 , typedFieldsLens = Nothing
                 , decodedTreeLens = Nothing
                 , shaclConformance = Nothing
+                , reviewResolutions = Nothing
                 , fetchError =
                     Just
                       ( if rdfResult.stderr == "" then
@@ -6142,7 +6362,9 @@ inspectorComponent initial =
           , operationArgs = "{}"
           , browser = Nothing
           , identification = Nothing
-          , intent = Nothing
+          , review = Nothing
+          , reviewResolutions = Nothing
+          , intentMetadata = []
           , witnessPlan = Nothing
           , workbenchCandidate = Nothing
           , workbenchCandidateMessage = Nothing
@@ -6222,6 +6444,7 @@ inspectorComponent initial =
             else pure "{}"
           identifyResult <- H.liftAff (runLedgerOperation h "tx.identify" inputContextArgs)
           intentResult <- H.liftAff (runLedgerOperation h "tx.intent" inputContextArgs)
+          reviewResult <- H.liftAff (runLedgerOperation h "tx.review" inputContextArgs)
           witnessPlanResult <- H.liftAff (runLedgerOperation h Ledger.planTransactionWitnessesOperation inputContextArgs)
           validationResult <- H.liftAff (runLedgerOperation h Ledger.validateTransactionOperation inputContextArgs)
           scriptEvaluationResult <- H.liftAff (runLedgerOperation h Ledger.evaluateTransactionScriptsOperation inputContextArgs)
@@ -6231,7 +6454,8 @@ inspectorComponent initial =
             inspectionResult = operationResult { stdout = Json.operationInspection operationResult.stdout }
             browser = Json.operationBrowser operationResult.stdout
             identification = Json.operationIdentification identifyResult.stdout
-            intent = Json.operationIntentSummary intentResult.stdout
+            review = Json.operationTransactionReview reviewResult.stdout
+            intentMetadata = Json.operationIntentMetadata intentResult.stdout
             witnessPlan = Json.operationWitnessPlan witnessPlanResult.stdout
             entrySeed =
               if operationResult.exitOk && identifyResult.exitOk && witnessPlanResult.exitOk then
@@ -6268,6 +6492,11 @@ inspectorComponent initial =
                 , decodedTreeLens: Nothing
                 , shaclConformance: Nothing
                 }
+          reviewResolutions <-
+            if operationResult.exitOk && rdfResult.exitOk && rdf.valid then
+              computeReviewResolutions st rdf
+            else
+              pure Nothing
           H.modify_
             _
               { running = false
@@ -6279,9 +6508,11 @@ inspectorComponent initial =
               , identification =
                   if identifyResult.exitOk && identification.valid then Just identification
                   else Nothing
-              , intent =
-                  if intentResult.exitOk && intent.valid then Just intent
+              , review =
+                  if reviewResult.exitOk && review.valid then Just review
                   else Nothing
+              , reviewResolutions = reviewResolutions
+              , intentMetadata = intentMetadata
               , witnessPlan =
                   if witnessPlanResult.exitOk && witnessPlan.valid then Just witnessPlan
                   else Nothing

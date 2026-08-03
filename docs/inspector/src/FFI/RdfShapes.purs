@@ -2,6 +2,7 @@ module FFI.RdfShapes
   ( Json
   , DecodedTreeRow
   , ResolvedLabelRow
+  , ReviewResolutionRow
   , ShaclReport
   , ShaclViolation
   , TypedFieldRow
@@ -9,6 +10,7 @@ module FFI.RdfShapes
   , query
   , queryDecodedTree
   , queryResolvedLabels
+  , queryReviewResolvedLabels
   , queryTypedFields
   , queryTransactionOutputs
   , validate
@@ -46,6 +48,14 @@ type TransactionOutputRow =
 type ResolvedLabelRow =
   { label :: String
   , role :: String
+  , entity :: String
+  , matched :: String
+  }
+
+type ReviewResolutionRow =
+  { label :: String
+  , role :: String
+  , typeIri :: String
   , entity :: String
   , matched :: String
   }
@@ -90,6 +100,13 @@ foreign import queryResolvedLabelsImpl
   -> String
   -> Effect (Either String (Array ResolvedLabelRow))
 
+foreign import queryReviewResolvedLabelsImpl
+  :: (String -> Either String (Array ReviewResolutionRow))
+  -> (Array ReviewResolutionRow -> Either String (Array ReviewResolutionRow))
+  -> String
+  -> Array String
+  -> Effect (Either String (Array ReviewResolutionRow))
+
 foreign import queryTypedFieldsImpl
   :: (String -> Either String (Array TypedFieldRow))
   -> (Array TypedFieldRow -> Either String (Array TypedFieldRow))
@@ -117,6 +134,9 @@ queryTransactionOutputs = queryTransactionOutputsImpl Left Right
 
 queryResolvedLabels :: String -> Effect (Either String (Array ResolvedLabelRow))
 queryResolvedLabels = queryResolvedLabelsImpl Left Right
+
+queryReviewResolvedLabels :: String -> Array String -> Effect (Either String (Array ReviewResolutionRow))
+queryReviewResolvedLabels = queryReviewResolvedLabelsImpl Left Right
 
 queryTypedFields :: String -> Effect (Either String (Array TypedFieldRow))
 queryTypedFields = queryTypedFieldsImpl Left Right
