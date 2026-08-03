@@ -18,6 +18,15 @@ const justfile = join(repoRoot, "justfile");
 const releaseYml = join(repoRoot, ".github", "workflows", "release.yml");
 const ciYml = join(repoRoot, ".github", "workflows", "ci.yml");
 const pagesYml = join(repoRoot, ".github", "workflows", "pages.yml");
+const publishRehearsalYml = join(
+  repoRoot,
+  ".github",
+  "workflows",
+  "publish-rehearsal.yml",
+);
+
+const REAL_PACKAGE = "@lambdasistemi/cardano-swiss-knife";
+const REHEARSAL_PACKAGE = "@lambdasistemi/csk-publish-rehearsal";
 
 const run = (command, args, options = {}) => {
   const result = spawnSync(command, args, {
@@ -378,12 +387,138 @@ ${tagCheck}      - run: nix build .#combined-site
 `;
 };
 
+const goodPublishRehearsalYaml = (opts = {}) => {
+  const {
+    omitTag = false,
+    tagValue = "next",
+    omitProvenance = false,
+    omitAccess = false,
+    automaticTrigger = false,
+    secondPublishWithoutTag = false,
+    bumpRootPackage = false,
+    publishedName = REHEARSAL_PACKAGE,
+    cleanupName = REHEARSAL_PACKAGE,
+    selfHosted = false,
+    omitOidc = false,
+    nonUniqueVersion = false,
+  } = opts;
+
+  const tagFlag = omitTag ? "" : ` --tag ${tagValue}`;
+  const provenanceFlag = omitProvenance ? "" : " --provenance";
+  const accessFlag = omitAccess ? "" : " --access public";
+  const extraTrigger = automaticTrigger
+    ? `  push:
+    branches: [main]
+`
+    : "";
+  const extraPublish = secondPublishWithoutTag
+    ? `
+          npm publish${accessFlag} --provenance ./rehearsal/package.tgz`
+    : "";
+  const rootVersionBump = bumpRootPackage
+    ? `
+          npm version 9.9.9 --no-git-tag-version`
+    : "";
+  const versionSuffix = nonUniqueVersion
+    ? "-rc.1"
+    : "-rc.${{ github.run_number }}.${{ github.run_attempt }}";
+  const runsOn = selfHosted ? "nixos" : "ubuntu-latest";
+  const permissions = omitOidc
+    ? `    permissions:
+      contents: read
+`
+    : `    permissions:
+      contents: read
+      id-token: write
+`;
+
+  return `name: Publish rehearsal
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: "Publish the rehearsal package or clean it up"
+        required: true
+        default: publish
+        type: choice
+        options:
+          - publish
+          - cleanup
+${extraTrigger}permissions:
+  contents: read
+jobs:
+  publish:
+    if: \${{ inputs.operation == 'publish' }}
+    runs-on: ${runsOn}
+${permissions}    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+      - uses: paolino/dev-assets/setup-nix@v0.0.1
+        with:
+          cachix-auth-token: \${{ secrets.CACHIX_AUTH_TOKEN }}
+      - name: Build and prove the original release artifacts
+        run: |
+          nix build .#node-package --out-link node-package
+          nix build .#csk --out-link csk
+          nix build .#release-bundle --out-link release-bundle
+          node scripts/check-release-package.mjs --node-package node-package --csk csk --release-bundle release-bundle
+          node scripts/check-release-version.mjs --node-package node-package --csk csk --release-bundle release-bundle
+      - name: Repack a run-unique sibling prerelease
+        id: repack
+        shell: bash
+        run: |
+          set -euo pipefail
+          work=$(mktemp -d)
+          tar -xzf ./node-package/*.tgz -C "$work"
+          base_version=$(node -p "require('$work/package/package.json').version")
+          rehearsal_version="$base_version${versionSuffix}"
+          node -e 'const fs=require("fs"); const p=process.argv[1]; const x=JSON.parse(fs.readFileSync(p)); x.name=process.argv[2]; x.version=process.argv[3]; fs.writeFileSync(p, JSON.stringify(x, null, 2) + "\\n")' "$work/package/package.json" "${publishedName}" "$rehearsal_version"
+          mkdir -p rehearsal
+          tar -czf rehearsal/package.tgz -C "$work" package
+          echo "version=$rehearsal_version" >> "$GITHUB_OUTPUT"${rootVersionBump}
+      - name: Publish sibling package under next
+        env:
+          NODE_AUTH_TOKEN: \${{ secrets.NPM_TOKEN }}
+        run: |
+          npm publish${accessFlag}${provenanceFlag}${tagFlag} ./rehearsal/package.tgz${extraPublish}
+      - name: Verify rehearsal dist-tags
+        env:
+          NODE_AUTH_TOKEN: \${{ secrets.NPM_TOKEN }}
+        run: |
+          dist_tags=$(npm view "${publishedName}" dist-tags --json)
+          node -e 'const tags=JSON.parse(process.argv[1]); if (tags.next !== process.argv[2] || tags.latest === process.argv[2]) process.exit(1)' "$dist_tags" "\${{ steps.repack.outputs.version }}"
+  cleanup:
+    if: \${{ inputs.operation == 'cleanup' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+      - name: Remove or deprecate the rehearsal package
+        env:
+          NODE_AUTH_TOKEN: \${{ secrets.NPM_TOKEN }}
+        run: |
+          npm unpublish "${cleanupName}" --force ||
+            npm deprecate "${cleanupName}@*" "Rehearsal package only; use ${REAL_PACKAGE}"
+`;
+};
+
 const withGoodTree = (mutate) => {
   const root = mkdtempSync(join(tmpdir(), "csk-release-workflows-"));
   const paths = {
     releasePath: join(root, ".github", "workflows", "release.yml"),
     ciPath: join(root, ".github", "workflows", "ci.yml"),
     pagesPath: join(root, ".github", "workflows", "pages.yml"),
+    publishRehearsalPath: join(
+      root,
+      ".github",
+      "workflows",
+      "publish-rehearsal.yml",
+    ),
   };
   for (const path of Object.values(paths)) {
     mkdirSync(dirname(path), { recursive: true });
@@ -391,6 +526,7 @@ const withGoodTree = (mutate) => {
   writeFileSync(paths.releasePath, goodReleaseYaml());
   writeFileSync(paths.ciPath, goodCiYaml());
   writeFileSync(paths.pagesPath, goodPagesYaml());
+  writeFileSync(paths.publishRehearsalPath, goodPublishRehearsalYaml());
   mutate({
     root,
     ...paths,
@@ -405,6 +541,10 @@ test("release-workflows checker and just recipe exist", () => {
   assert.ok(existsSync(releaseYml), "release.yml is missing");
   assert.ok(existsSync(ciYml), "ci.yml is missing");
   assert.ok(existsSync(pagesYml), "pages.yml is missing");
+  assert.ok(
+    existsSync(publishRehearsalYml),
+    "publish-rehearsal.yml is missing",
+  );
   const justText = readFileSync(justfile, "utf8");
   assert.match(
     justText,
@@ -442,6 +582,113 @@ test("checker passes on the good fixture tree", () => {
   const root = withGoodTree(() => {});
   const { status, output } = runChecker(root);
   assert.equal(status, 0, `checker failed on good fixtures:\n${output}`);
+});
+
+test("checker passes on a good publish rehearsal fixture", () => {
+  const root = withGoodTree(() => {});
+  const { status, output } = runChecker(root);
+  assert.equal(status, 0, `checker failed on good rehearsal fixture:\n${output}`);
+});
+
+const invalidPublishRehearsals = [
+  {
+    label: "missing --tag next",
+    options: { omitTag: true },
+    message: /--tag next|dist-tag|literal next/i,
+  },
+  {
+    label: "--tag latest",
+    options: { tagValue: "latest" },
+    message: /--tag next|dist-tag|literal next/i,
+  },
+  {
+    label: "--tag nextgen",
+    options: { tagValue: "nextgen" },
+    message: /--tag next|dist-tag|literal next/i,
+  },
+  {
+    label: "expression-valued --tag",
+    options: { tagValue: "${{ inputs.dist_tag }}" },
+    message: /--tag next|literal next|expression/i,
+  },
+  {
+    label: "missing provenance",
+    options: { omitProvenance: true },
+    message: /provenance/i,
+  },
+  {
+    label: "missing --access public",
+    options: { omitAccess: true },
+    message: /--access public|access|restricted/i,
+  },
+  {
+    label: "automatic push trigger",
+    options: { automaticTrigger: true },
+    message: /workflow_dispatch|push|automatic|trigger/i,
+  },
+  {
+    label: "untagged fallback publish",
+    options: { secondPublishWithoutTag: true },
+    message: /every npm publish|--tag next|multiple|fallback/i,
+  },
+  {
+    label: "repository package.json version bump",
+    options: { bumpRootPackage: true },
+    message: /package\.json|npm version|authored version|repository root/i,
+  },
+  {
+    label: "self-hosted runner",
+    options: { selfHosted: true },
+    message: /GitHub-hosted|ubuntu|provenance/i,
+  },
+  {
+    label: "missing id-token permission",
+    options: { omitOidc: true },
+    message: /id-token|OIDC|provenance/i,
+  },
+  {
+    label: "non-run-unique prerelease",
+    options: { nonUniqueVersion: true },
+    message: /run_number|run_attempt|run-unique|prerelease/i,
+  },
+];
+
+for (const { label, options, message } of invalidPublishRehearsals) {
+  test(`negative: publish rehearsal rejects ${label}`, () => {
+    const root = withGoodTree(({ publishRehearsalPath, write }) => {
+      write(publishRehearsalPath, goodPublishRehearsalYaml(options));
+    });
+    const { status, output } = runChecker(root);
+    assert.notEqual(status, 0, `checker accepted rehearsal with ${label}`);
+    assert.match(output, message);
+    assert.match(output, /check-release-workflows: 1 error\(s\)/);
+  });
+}
+
+test("negative: publish rehearsal cannot publish the real package name", () => {
+  const root = withGoodTree(({ publishRehearsalPath, write }) => {
+    write(
+      publishRehearsalPath,
+      goodPublishRehearsalYaml({ publishedName: REAL_PACKAGE }),
+    );
+  });
+  const { status, output } = runChecker(root);
+  assert.notEqual(status, 0, "checker accepted rehearsal publishing the real package");
+  assert.match(output, /cardano-swiss-knife|real package|rehearsal sibling/i);
+  assert.match(output, /check-release-workflows: 1 error\(s\)/);
+});
+
+test("negative: publish rehearsal cannot unpublish the real package name", () => {
+  const root = withGoodTree(({ publishRehearsalPath, write }) => {
+    write(
+      publishRehearsalPath,
+      goodPublishRehearsalYaml({ cleanupName: REAL_PACKAGE }),
+    );
+  });
+  const { status, output } = runChecker(root);
+  assert.notEqual(status, 0, "checker accepted rehearsal unpublishing the real package");
+  assert.match(output, /cardano-swiss-knife|real package|rehearsal sibling|unpublish/i);
+  assert.match(output, /check-release-workflows: 1 error\(s\)/);
 });
 
 test("negative: missing release_created gating fails", () => {

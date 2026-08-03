@@ -1,0 +1,109 @@
+name: Publish rehearsal
+
+# This workflow may write to the public npm registry. It is deliberately
+# hard-coded to the disposable sibling package in both publish and cleanup
+# paths; never parameterize the package name while using the scope-wide token.
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Publish the rehearsal package or clean it up
+        required: true
+        default: publish
+        type: choice
+        options:
+          - publish
+          - cleanup
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    if: ${{ inputs.operation == 'publish' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      - name: Setup Nix and Cachix
+        uses: paolino/dev-assets/setup-nix@v0.0.1
+        with:
+          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+
+      - name: Build and prove the original release artifacts
+        run: |
+          nix build .#node-package --out-link node-package
+          nix build .#csk --out-link csk
+          nix build .#release-bundle --out-link release-bundle
+          node scripts/check-release-package.mjs \
+            --node-package node-package \
+            --csk csk \
+            --release-bundle release-bundle
+          node scripts/check-release-version.mjs \
+            --node-package node-package \
+            --csk csk \
+            --release-bundle release-bundle
+
+      - name: Repack a run-unique sibling prerelease
+        id: repack
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          tarballs=(./node-package/*.tgz)
+          if [ "${#tarballs[@]}" -ne 1 ]; then
+            echo "expected exactly one original npm tarball, found ${#tarballs[@]}" >&2
+            exit 1
+          fi
+
+          work="$(mktemp -d)"
+          trap 'rm -rf "$work"' EXIT
+          tar -xzf "${tarballs[0]}" -C "$work"
+          base_version="$(node -p "require('$work/package/package.json').version")"
+          rehearsal_version="$base_version-rc.${{ github.run_number }}.${{ github.run_attempt }}"
+          node -e 'const fs=require("fs"); const p=process.argv[1]; const x=JSON.parse(fs.readFileSync(p)); x.name=process.argv[2]; x.version=process.argv[3]; fs.writeFileSync(p, JSON.stringify(x, null, 2) + "\n")' "$work/package/package.json" "@lambdasistemi/csk-publish-rehearsal" "$rehearsal_version"
+
+          mkdir -p rehearsal
+          tar -czf ./rehearsal/package.tgz -C "$work" package
+          echo "version=$rehearsal_version" >> "$GITHUB_OUTPUT"
+
+      - name: Publish sibling package under next
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public --provenance --tag next ./rehearsal/package.tgz
+
+      - name: Verify rehearsal dist-tags
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          dist_tags="$(npm view "@lambdasistemi/csk-publish-rehearsal" dist-tags --json)"
+          node -e 'const tags=JSON.parse(process.argv[1]); const version=process.argv[2]; if (tags.next !== version || tags.latest === version) process.exit(1)' "$dist_tags" "${{ steps.repack.outputs.version }}"
+
+  cleanup:
+    if: ${{ inputs.operation == 'cleanup' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      - name: Remove or deprecate the rehearsal package
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          npm unpublish "@lambdasistemi/csk-publish-rehearsal" --force ||
+            npm deprecate "@lambdasistemi/csk-publish-rehearsal@*" "Rehearsal package only; use @lambdasistemi/cardano-swiss-knife"

@@ -316,38 +316,66 @@ const stripShellQuotes = (token) => {
   return token;
 };
 
-const npmPublishPositionals = (run) => {
+const shellCommandTokens = (run) => {
   const normalized = String(run ?? "").replace(/\\\r?\n/g, " ");
-  const command = normalized
+  return normalized
     .split(/\r?\n|&&|;|\|\|/)
-    .find((part) => /(?:^|\s)npm\s+publish(?:\s|$)/.test(part));
-  if (command === undefined) return [];
+    .map(
+      (command) =>
+        command
+          .match(
+            /\$\{\{.*?\}\}|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^\s]+/g,
+          )
+          ?.map(stripShellQuotes) ?? [],
+    )
+    .filter((tokens) => tokens.length > 0);
+};
 
-  const tokens =
-    command
-      .match(/"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^\s]+/g)
-      ?.map(stripShellQuotes) ?? [];
-  const npmIdx = tokens.findIndex(
-    (token, index) => token === "npm" && tokens[index + 1] === "publish",
-  );
-  if (npmIdx < 0) return [];
+const npmCommandInvocations = (run, subcommand, valueFlags = new Set()) => {
+  const invocations = [];
+  for (const tokens of shellCommandTokens(run)) {
+    const npmIdx = tokens.findIndex(
+      (token, index) =>
+        token === "npm" && tokens[index + 1] === subcommand,
+    );
+    if (npmIdx < 0) continue;
 
-  const positionals = [];
-  for (let index = npmIdx + 2; index < tokens.length; index += 1) {
-    const token = tokens[index];
-    if (token === "--") {
-      positionals.push(...tokens.slice(index + 1));
-      break;
+    const flags = new Map();
+    const positionals = [];
+    for (let index = npmIdx + 2; index < tokens.length; index += 1) {
+      const token = tokens[index];
+      if (token === "--") {
+        positionals.push(...tokens.slice(index + 1));
+        break;
+      }
+      if (token.startsWith("--")) {
+        const equals = token.indexOf("=");
+        const flag = equals < 0 ? token : token.slice(0, equals);
+        if (equals >= 0) {
+          flags.set(flag, token.slice(equals + 1));
+        } else if (valueFlags.has(flag)) {
+          flags.set(flag, tokens[index + 1]);
+          index += 1;
+        } else {
+          flags.set(flag, true);
+        }
+        continue;
+      }
+      if (token.startsWith("-")) continue;
+      positionals.push(token);
     }
-    if (token.startsWith("--")) {
-      const [flag] = token.split("=", 1);
-      if (!token.includes("=") && npmPublishValueFlags.has(flag)) index += 1;
-      continue;
-    }
-    if (token.startsWith("-")) continue;
-    positionals.push(token);
+    invocations.push({ flags, positionals, tokens });
   }
-  return positionals;
+  return invocations;
+};
+
+const npmPublishInvocations = (run) =>
+  npmCommandInvocations(run, "publish", npmPublishValueFlags);
+
+const npmPublishPositionals = (run) => {
+  return npmPublishInvocations(run).flatMap(
+    (invocation) => invocation.positionals,
+  );
 };
 
 const isPathShaped = (argument) =>
@@ -778,6 +806,217 @@ const checkReleaseWorkflow = (doc) => {
 };
 
 // ---------------------------------------------------------------------------
+// publish-rehearsal.yml
+// ---------------------------------------------------------------------------
+
+const realPackageName = "@lambdasistemi/cardano-swiss-knife";
+const rehearsalPackageName = "@lambdasistemi/csk-publish-rehearsal";
+
+const checkPublishRehearsalWorkflow = (doc) => {
+  if (doc === undefined) return;
+
+  const triggers = doc.on ?? {};
+  const triggerNames =
+    triggers && typeof triggers === "object" && !Array.isArray(triggers)
+      ? Object.keys(triggers)
+      : [];
+  if (
+    triggerNames.length !== 1 ||
+    triggerNames[0] !== "workflow_dispatch"
+  ) {
+    fail(
+      "publish-rehearsal.yml must use workflow_dispatch only (no automatic trigger)",
+    );
+  }
+
+  const inputs =
+    triggers.workflow_dispatch &&
+    typeof triggers.workflow_dispatch === "object"
+      ? triggers.workflow_dispatch.inputs ?? {}
+      : {};
+  const operation = inputs.operation;
+  const operationOptions = asArray(operation?.options).map(String);
+  if (
+    Object.keys(inputs).length !== 1 ||
+    !operation ||
+    String(operation.type ?? "") !== "choice" ||
+    String(operation.default ?? "") !== "publish" ||
+    !operationOptions.includes("publish") ||
+    !operationOptions.includes("cleanup")
+  ) {
+    fail(
+      "publish-rehearsal.yml workflow_dispatch must expose only operation=publish|cleanup",
+    );
+  }
+
+  const jobs = doc.jobs ?? {};
+  const publish = jobs.publish;
+  const cleanup = jobs.cleanup;
+  if (!publish || !cleanup) {
+    fail("publish-rehearsal.yml must define publish and cleanup jobs");
+    return;
+  }
+
+  if (!isGithubHostedRunner(publish["runs-on"])) {
+    fail(
+      "publish rehearsal must run on a GitHub-hosted runner for npm provenance",
+    );
+  }
+  if (!permissionIsWrite(publish.permissions, "id-token")) {
+    fail(
+      "publish rehearsal must set job-level id-token: write for npm provenance OIDC",
+    );
+  }
+
+  const publishSteps = asArray(publish.steps);
+  const allPublishText = publishSteps.map(stepText).join("\n");
+  const nodeStep = publishSteps.find((step) =>
+    /actions\/setup-node@/.test(String(step.uses ?? "")),
+  );
+  if (Number(nodeStep?.with?.["node-version"]) !== 22) {
+    fail("publish rehearsal must use Node 22");
+  }
+  if (!hasNixSetupStep(publishSteps) || !hasCachixConfigured(publishSteps)) {
+    fail(
+      "publish rehearsal must install Nix and configure Cachix before building",
+    );
+  }
+
+  const buildIdx = stepIndexWhere(publishSteps, (step) =>
+    /nix build[\s\S]*(?:#node-package|node-package)/.test(stepText(step)),
+  );
+  const packageProofIdx = stepIndexWhere(publishSteps, (step) =>
+    /check-release-package\.mjs/.test(stepText(step)),
+  );
+  const versionProofIdx = stepIndexWhere(publishSteps, (step) =>
+    /check-release-version\.mjs/.test(stepText(step)),
+  );
+  const repackIdx = stepIndexWhere(publishSteps, (step) => {
+    const text = stepText(step);
+    return /x\.name\s*=/.test(text) && /x\.version\s*=/.test(text);
+  });
+  const publishStepIndexes = allStepIndexesWhere(publishSteps, (step) =>
+    /(?:^|\s)npm\s+publish(?:\s|$)/m.test(String(step.run ?? "")),
+  );
+
+  if (
+    buildIdx < 0 ||
+    packageProofIdx < 0 ||
+    versionProofIdx < 0 ||
+    repackIdx < 0 ||
+    publishStepIndexes.length === 0 ||
+    !(buildIdx < repackIdx) ||
+    !(packageProofIdx < repackIdx) ||
+    !(versionProofIdx < repackIdx) ||
+    !publishStepIndexes.every((index) => repackIdx < index)
+  ) {
+    fail(
+      "publish rehearsal must build and prove the original tarball before rewriting its name/version and publishing",
+    );
+  }
+
+  if (/\bnpm\s+version\b/.test(allPublishText)) {
+    fail(
+      "publish rehearsal must not run npm version or mutate the repository package.json",
+    );
+  }
+
+  const repackText =
+    repackIdx >= 0 ? String(publishSteps[repackIdx].run ?? "") : "";
+  if (
+    !/github\.run_number/.test(repackText) ||
+    !/github\.run_attempt/.test(repackText)
+  ) {
+    fail(
+      "publish rehearsal prerelease version must include github.run_number and github.run_attempt",
+    );
+  }
+
+  const rewrittenName = repackText.match(
+    /x\.name\s*=\s*process\.argv\[2\][^\n]*["']\$work\/package\/package\.json["']\s+["']([^"']+)["']/,
+  )?.[1];
+  const publishPostconditionText = publishSteps
+    .filter((step) => /npm\s+view/.test(String(step.run ?? "")))
+    .map((step) => String(step.run))
+    .join("\n");
+  const viewedName = publishPostconditionText.match(
+    /npm\s+view\s+["']?(@[^"' \t\n]+)["']?\s+dist-tags/,
+  )?.[1];
+  if (
+    rewrittenName !== rehearsalPackageName ||
+    viewedName !== rehearsalPackageName
+  ) {
+    fail(
+      `publish rehearsal must rewrite and publish only the rehearsal sibling ${rehearsalPackageName}, never the real package ${realPackageName}`,
+    );
+  }
+
+  if (
+    !/\btags\.next\b/.test(publishPostconditionText) ||
+    !/\btags\.latest\b/.test(publishPostconditionText) ||
+    !/steps\.repack\.outputs\.version/.test(publishPostconditionText)
+  ) {
+    fail(
+      "publish rehearsal must verify next equals the published version and latest does not",
+    );
+  }
+
+  for (const stepIndex of publishStepIndexes) {
+    const step = publishSteps[stepIndex];
+    const invocations = npmPublishInvocations(step.run);
+    for (const invocation of invocations) {
+      if (invocation.flags.get("--tag") !== "next") {
+        fail(
+          "every npm publish in the rehearsal must use the exact literal --tag next",
+        );
+      }
+      if (invocation.flags.get("--provenance") !== true) {
+        fail("every npm publish in the rehearsal must use --provenance");
+      }
+      if (invocation.flags.get("--access") !== "public") {
+        fail("every npm publish in the rehearsal must use --access public");
+      }
+      if (
+        invocation.positionals.length === 0 ||
+        invocation.positionals.some((argument) => !isPathShaped(argument))
+      ) {
+        fail(
+          "every npm publish in the rehearsal must publish a path-shaped repacked tarball",
+        );
+      }
+    }
+    if (!/NODE_AUTH_TOKEN|NPM_TOKEN/.test(stepText(step))) {
+      fail("publish rehearsal must use the repository npm token");
+    }
+  }
+
+  const cleanupText = asArray(cleanup.steps)
+    .map((step) => String(step.run ?? ""))
+    .join("\n");
+  const unpublishTarget = npmCommandInvocations(
+    cleanupText,
+    "unpublish",
+  )[0]?.positionals[0];
+  const deprecateTarget = npmCommandInvocations(
+    cleanupText,
+    "deprecate",
+  )[0]?.positionals[0];
+  if (
+    unpublishTarget !== rehearsalPackageName ||
+    deprecateTarget !== `${rehearsalPackageName}@*`
+  ) {
+    fail(
+      `cleanup must unpublish/deprecate only the rehearsal sibling ${rehearsalPackageName}, never the real package ${realPackageName}`,
+    );
+  }
+  if (!/\|\|/.test(cleanupText)) {
+    fail(
+      "cleanup must fall back from npm unpublish --force to npm deprecate",
+    );
+  }
+};
+
+// ---------------------------------------------------------------------------
 // ci.yml
 // ---------------------------------------------------------------------------
 
@@ -956,10 +1195,17 @@ const checkPagesWorkflow = (doc, raw) => {
 const releaseRaw = readText(".github/workflows/release.yml");
 const ciRaw = readText(".github/workflows/ci.yml");
 const pagesRaw = readText(".github/workflows/pages.yml");
+const publishRehearsalRaw = readText(
+  ".github/workflows/publish-rehearsal.yml",
+);
 
 const releaseDoc = parseWorkflow(releaseRaw, "release.yml");
 const ciDoc = parseWorkflow(ciRaw, "ci.yml");
 const pagesDoc = parseWorkflow(pagesRaw, "pages.yml");
+const publishRehearsalDoc = parseWorkflow(
+  publishRehearsalRaw,
+  "publish-rehearsal.yml",
+);
 
 // yq may parse `on` as a key; JSON has "on". Our subset parser keeps "on".
 // Some YAML loaders turn `on:` into boolean true key — normalize if needed.
@@ -975,6 +1221,7 @@ const normalizeOn = (doc) => {
 checkReleaseWorkflow(normalizeOn(releaseDoc));
 checkCiWorkflow(normalizeOn(ciDoc));
 checkPagesWorkflow(normalizeOn(pagesDoc), pagesRaw);
+checkPublishRehearsalWorkflow(normalizeOn(publishRehearsalDoc));
 
 if (errors.length > 0) {
   for (const error of errors) {

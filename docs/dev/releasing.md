@@ -135,6 +135,39 @@ release.
 
 ## Operations runbook
 
+### Rehearsing npm publication
+
+The manually dispatched `publish-rehearsal.yml` workflow exercises the real
+npm registry, the repository's scope-wide npm token, GitHub-hosted OIDC
+provenance, and the release tarball without publishing the production package
+name. Its target is hard-coded to the disposable sibling
+`@lambdasistemi/csk-publish-rehearsal`; there is intentionally no package-name
+input.
+
+Choose the `publish` operation in the **Publish rehearsal** workflow (or run
+`gh workflow run publish-rehearsal.yml -f operation=publish`). The job builds
+the normal artifacts and runs the package/version proofs on the original
+tarball first. It then rewrites only the tarball-internal name and version,
+using a run-unique `-rc.<run_number>.<run_attempt>` version, and runs
+`npm publish --tag next --provenance --access public`. The repository
+`package.json` remains untouched. A final registry check requires `next` to
+name that exact prerelease and rejects the run if the prerelease became
+`latest`.
+
+After recording the proof, dispatch the same workflow with the `cleanup`
+operation (or run
+`gh workflow run publish-rehearsal.yml -f operation=cleanup`). npm permits
+unpublishing the whole package only within 72 hours of its initial publish and
+only while it has no dependents. The cleanup job therefore tries
+`npm unpublish --force` against the hard-coded rehearsal sibling and, if npm
+refuses, falls back to deprecating every sibling version with a message that
+points users to `@lambdasistemi/cardano-swiss-knife`.
+
+This rehearsal does not exercise publish permission for the exact production
+package name. The token is scope-wide, so it proves the scope credential and
+publication mechanics; the first publish of the final name remains a live
+event at release `0.1.5`.
+
 ### Cutting a release
 
 Merge the release PR. In order, this:
