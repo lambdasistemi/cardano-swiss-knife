@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.1.5](https://github.com/lambdasistemi/cardano-swiss-knife/compare/v0.1.4...v0.1.5) (2026-08-03)
+
+
+### Features
+
+* rehearse npm publication against the real registry ([2a5f651](https://github.com/lambdasistemi/cardano-swiss-knife/commit/2a5f651dee2b2f58d013d90b34567022ade4c065))
+
+
+### Bug Fixes
+
+* declare the repository so provenance validation passes ([3f909e2](https://github.com/lambdasistemi/cardano-swiss-knife/commit/3f909e252adea55270cc4112ca8298e3ac075445))
+
+
+### Documentation
+
+* specify the provenance repository defect and the registry rehearsal ([1ee8fa3](https://github.com/lambdasistemi/cardano-swiss-knife/commit/1ee8fa35201fe3f5fb6e8d57b6366904ede1b313))
+
 ## [0.1.4](https://github.com/lambdasistemi/cardano-swiss-knife/compare/v0.1.3...v0.1.4) (2026-07-29)
 
 
